@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 语音情感分析</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 900px; 
+            margin: 30px auto; 
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { 
+            text-align: center; 
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .control-panel {
+            text-align: center;
+            margin: 30px 0;
+        }
+        button { 
+            padding: 18px 40px; 
+            font-size: 18px; 
+            margin: 10px; 
+            cursor: pointer;
+            border: none;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        #recordBtn { 
+            background: linear-gradient(45deg, #4CAF50, #45a049); 
+            color: white; 
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        #recordBtn.recording { 
+            background: linear-gradient(45deg, #f44336, #da190b);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        #uploadBtn {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        }
+        #uploadBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        #status { 
+            margin: 20px 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+            border-radius: 15px;
+            text-align: center;
+            font-size: 16px;
+            border-left: 5px solid #2196F3;
+        }
+        #status.success { border-left-color: #4CAF50; background: #e8f5e9; }
+        #status.error { border-left-color: #f44336; background: #ffebee; }
+        
+        #audioContainer {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 15px;
+        }
+        audio { 
+            width: 100%;
+            border-radius: 30px;
+        }
+        
+        #result { 
+            margin: 20px 0; 
+            padding: 0;
+            background: transparent;
+            border-radius: 15px;
+        }
+        
+        /* 主导情感卡片 */
+        .dominant-emotion {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .dominant-emotion .emoji {
+            font-size: 80px;
+            margin-bottom: 10px;
+        }
+        .dominant-emotion .label {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .dominant-emotion .confidence {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+        
+        /* 情感分布图表 */
+        .emotion-chart {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .emotion-chart h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 20px;
+        }
+        .emotion-bar {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .emotion-bar .label {
+            width: 120px;
+            font-weight: 500;
+            color: #555;
+        }
+        .emotion-bar .bar-container {
+            flex: 1;
+            height: 28px;
+            background: #e0e0e0;
+            border-radius: 14px;
+            overflow: hidden;
+            margin: 0 15px;
+        }
+        .emotion-bar .bar {
+            height: 100%;
+            border-radius: 14px;
+            transition: width 0.8s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .emotion-bar .percentage {
+            width: 60px;
+            text-align: right;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        /* 建议卡片 */
+        .advice-card {
+            background: #fff3e0;
+            border-left: 5px solid #FF9800;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .advice-card h4 {
+            margin-top: 0;
+            color: #e65100;
+        }
+        
+        .error { color: #f44336; padding: 20px; background: #ffebee; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 AI 语音情感分析</h1>
+        
+        <div class="control-panel">
+            <button id="recordBtn">🎙️ 开始录音</button>
+            <button id="uploadBtn" disabled>📤 分析情感</button>
+        </div>
+
+        <div id="status">状态: 就绪，点击"开始录音"录制您的声音</div>
+
+        <div id="audioContainer" style="display:none;">
+            <h3>🎵 录音回放</h3>
+            <audio id="audioPlayback" controls></audio>
+        </div>
+
+        <div id="result">
+            <p id="resultText" style="text-align: center; color: #999; padding: 40px;">
+                录制音频后将在此处显示情感分析结果
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 配置 ====================
+        const API_BASE_URL = 'http://localhost:8000';  // 后端地址
+        const API_ENDPOINT = `${API_BASE_URL}/api/v1/voice/upload`;
+
+        // ==================== 全局变量 ====================
+        let mediaRecorder = null;      // 录音器对象
+        let audioChunks = [];          // 音频数据块
+        let audioBlob = null;          // 完整的音频Blob
+        let isRecording = false;       // 是否正在录音
+
+        // ==================== DOM元素 ====================
+        const recordBtn = document.getElementById('recordBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const status = document.getElementById('status');
+        const resultText = document.getElementById('resultText');
+        const audioContainer = document.getElementById('audioContainer');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        // ==================== 录音功能 ====================
+
+        // 开始/停止录音按钮点击
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        // 开始录音
+        async function startRecording() {
+            try {
+                // 请求麦克风权限
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 16000,      // 16kHz，匹配后端要求
+                        channelCount: 1,         // 单声道
+                        echoCancellation: true,  // 回声消除
+                        noiseSuppression: true   // 降噪
+                    }
+                });
+
+                // 创建录音器
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'  // 浏览器支持的格式
+                });
+
+                audioChunks = [];
+
+                // 收集音频数据
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                // 录音停止时处理
+                mediaRecorder.onstop = () => {
+                    // 合并音频块
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                    // 创建播放URL
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioContainer.style.display = 'block';
+
+                    // 启用上传按钮
+                    uploadBtn.disabled = false;
+
+                    updateStatus('录音完成，可以点击"上传识别"', 'success');
+                };
+
+                // 开始录音
+                mediaRecorder.start();
+                isRecording = true;
+
+                // 更新UI
+                recordBtn.textContent = '⏹️ 停止录音';
+                recordBtn.classList.add('recording');
+                updateStatus('🔴 正在录音，请说话...', '');
+
+            } catch (err) {
+                console.error('录音失败:', err);
+                updateStatus('❌ 无法访问麦克风: ' + err.message, 'error');
+            }
+        }
+
+        // 停止录音
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+
+                // 停止所有音轨
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+
+                isRecording = false;
+                recordBtn.textContent = '🎙️ 重新录音';
+                recordBtn.classList.remove('recording');
+            }
+        }
+        function getEmotionEmoji(emotion) {
+    const map = {
+        "happy": "😊",
+        "neutral": "😐",
+        "sad": "😢",
+        "angry": "😠",
+        "fear": "😰",
+        "surprise": "😲",
+        "disgust": "🤢",
+        "unknown": "❓"
+    };
+    return map[emotion] || "❓";
+}
+
+// 情感对应的颜色
+function getEmotionColor(emotion) {
+    const map = {
+        "happy": "#4CAF50",
+        "neutral": "#9E9E9E",
+        "sad": "#2196F3",
+        "angry": "#f44336",
+        "fear": "#FF9800",
+        "unknown": "#757575"
+    };
+    return map[emotion] || "#757575";
+}
+
+// 情感对应的建议
+function getEmotionAdvice(emotion) {
+    const map = {
+        "happy": "表达积极自信，状态很好！继续保持",
+        "neutral": "表达平稳，可以尝试增加一些情感色彩",
+        "sad": "听起来有些低落，建议调整心态，展现自信",
+        "angry": "似乎有些激动，建议深呼吸，保持平和",
+        "fear": "听起来有些紧张，建议深呼吸放松，相信自己",
+        "unknown": "无法判断情感状态，请重新录制"
+    };
+    return map[emotion] || "请重新尝试";
+}
+
+        // ==================== 上传识别功能 ====================
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!audioBlob) {
+                updateStatus('没有可上传的录音', 'error');
+                return;
+            }
+
+            await uploadAndRecognize();
+        });
+
+        // 上传并识别
+        async function uploadAndRecognize() {
+            updateStatus('📤 正在上传音频...', '');
+            uploadBtn.disabled = true;
+
+            try {
+                // 创建 FormData
+                const formData = new FormData();
+
+                // 添加音频文件（转换为wav格式文件名）
+                const timestamp = new Date().getTime();
+                formData.append('file', audioBlob, `recording_${timestamp}.wav`);
+                formData.append('user_id', 'frontend_test_user');
+                formData.append('engine', 'auto');
+
+                // 发送请求
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // 检查响应状态
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // 解析响应
+                const result = await response.json();
+                
+                // 调试：打印返回的数据
+                console.log('后端返回数据:', result);
+
+                // 显示结果
+                if (result.success) {
+                    displaySuccess(result);
+                } else {
+                    displayError(result.error || '识别失败');
+                }
+
+            } catch (err) {
+                console.error('上传失败:', err);
+                displayError('网络错误: ' + err.message + '<br>请检查后端服务是否启动 (uvicorn main:app --reload)');
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // ==================== 结果显示 ====================
+
+        function displaySuccess(result) {
+            const dominant = result.dominant_emotion || 'unknown';
+            const confidence = (result.confidence * 100).toFixed(2);
+            const allEmotions = result.all_emotions || {};
+            
+            // 构建情感分布条形图
+            let emotionsHtml = '';
+            const sortedEmotions = Object.entries(allEmotions)
+                .sort((a, b) => b[1] - a[1]); // 按分数降序
+            
+            for (const [label, score] of sortedEmotions) {
+                const percentage = (score * 100).toFixed(2);
+                const barColor = getEmotionBarColor(label);
+                emotionsHtml += `
+                    <div class="emotion-bar">
+                        <span class="label">${label}</span>
+                        <div class="bar-container">
+                            <div class="bar" style="width: ${percentage}%; background: ${barColor};">
+                                ${percentage > 15 ? percentage + '%' : ''}
+                            </div>
+                        </div>
+                        <span class="percentage">${percentage}%</span>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <!-- 主导情感大卡片 -->
+                <div class="dominant-emotion">
+                    <div class="emoji">${getEmotionEmoji(dominant)}</div>
+                    <div class="label">${dominant}</div>
+                    <div class="confidence">置信度: ${confidence}%</div>
+                </div>
+                
+                <!-- 情感分布图表 -->
+                <div class="emotion-chart">
+                    <h3>📊 情感分布详情</h3>
+                    ${emotionsHtml}
+                </div>
+                
+                <!-- 建议卡片 -->
+                <div class="advice-card">
+                    <h4>💡 分析建议</h4>
+                    <p>${getEmotionAdvice(dominant)}</p>
+                </div>
+            `;
+            
+            resultText.innerHTML = html;
+            updateStatus('✅ 情感分析完成！', 'success');
+        }
+
+        function displayError(errorMsg) {
+            resultText.innerHTML = `
+                <div class="error">
+                    <h3>❌ 分析失败</h3>
+                    <p>${errorMsg}</p>
+                </div>
+            `;
+            updateStatus('分析失败', 'error');
+        }
+
+        function updateStatus(msg, type) {
+            status.textContent = msg;
+            status.className = type;
+        }
+        
+        // 获取情感对应的颜色（用于条形图）
+        function getEmotionBarColor(emotionLabel) {
+            // 根据标签中的英文部分判断
+            if (emotionLabel.includes('happy')) return 'linear-gradient(90deg, #4CAF50, #81C784)';
+            if (emotionLabel.includes('sad')) return 'linear-gradient(90deg, #2196F3, #64B5F6)';
+            if (emotionLabel.includes('angry')) return 'linear-gradient(90deg, #f44336, #E57373)';
+            if (emotionLabel.includes('neutral')) return 'linear-gradient(90deg, #9E9E9E, #BDBDBD)';
+            if (emotionLabel.includes('fear')) return 'linear-gradient(90deg, #FF9800, #FFB74D)';
+            if (emotionLabel.includes('surprise')) return 'linear-gradient(90deg, #9C27B0, #BA68C8)';
+            if (emotionLabel.includes('disgust')) return 'linear-gradient(90deg, #795548, #A1887F)';
+            return 'linear-gradient(90deg, #607D8B, #90A4AE)';
+        }
+    </script>
+</body>
+</html>

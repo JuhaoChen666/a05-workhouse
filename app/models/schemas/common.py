@@ -45,8 +45,8 @@ class PaginationParams(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
 
 
-class TimestampMixin(BaseModel):
-    """Timestamp mixin."""
+class TimestampMixin:
+    """Timestamp mixin (not a Pydantic model, just fields)."""
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None

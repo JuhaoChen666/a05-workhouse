@@ -114,3 +114,79 @@ def get_modelscope_provider() -> ModelScopeProvider:
     if _modelscope_provider is None:
         _modelscope_provider = ModelScopeProvider()
     return _modelscope_provider
+
+
+from modelscope.pipelines import pipeline
+from modelscope.utils.constant import Tasks
+import numpy as np
+def get_emotion_emo2vec(audio_path: str) -> dict:
+    """
+    使用 emotion2vec 分析音频文件的情感状态
+
+    参数:
+        audio_path: WAV音频文件的完整路径（如 "data/audio/20250223/user_xxx.wav"）
+
+    返回:
+        包含完整情感分析结果的字典:
+        {
+            "dominant_emotion": "生气/angry",  # 主导情感
+            "confidence": 0.9732,               # 置信度
+            "all_emotions": {                   # 所有情感分数
+                "生气/angry": 0.9732,
+                "厌恶/disgusted": 0.0000,
+                "恐惧/fearful": 0.0000,
+                ...
+            }
+        }
+    """
+    inference_pipeline = pipeline(
+        task=Tasks.emotion_recognition,
+        model="iic/emotion2vec_plus_large"
+    )
+
+    result = inference_pipeline(
+        audio_path,
+        granularity="utterance",
+        extract_embedding=False
+    )
+
+    # 解析结果
+    if result and len(result) > 0:
+        item = result[0]
+        labels = item['labels']
+        scores = item['scores']
+        
+        # 转换为Python原生类型（避免numpy类型导致JSON序列化问题）
+        labels = [str(label) for label in labels]
+        scores = [float(score) for score in scores]
+
+        # 找出得分最高的情感
+        max_score_idx = int(np.argmax(scores))
+        dominant_emotion = labels[max_score_idx]
+        confidence = float(scores[max_score_idx])
+
+        # 构建所有情感的字典
+        all_emotions = {label: score for label, score in zip(labels, scores)}
+
+        # 打印详细结果（调试用）
+        print(f"\n🎯 主导情感: {dominant_emotion}")
+        print(f"📊 置信度: {confidence:.2%}")
+        print(f"\n所有情感得分:")
+        print(audio_path)
+        for label, score in zip(labels, scores):
+            print(f"  {label}: {score:.4f}")
+
+        # 返回完整结果
+        return {
+            "success": True,
+            "dominant_emotion": dominant_emotion,
+            "confidence": float(confidence),
+            "all_emotions": all_emotions,
+            "audio_path": audio_path
+        }
+    else:
+        return {
+            "success": False,
+            "error": "情感识别失败，无返回结果",
+            "audio_path": audio_path
+        }

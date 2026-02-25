@@ -23,7 +23,7 @@ def create_application() -> FastAPI:
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -43,6 +43,12 @@ def create_application() -> FastAPI:
         prefix=settings.API_V1_PREFIX,
     )
 
+    from app.api.v1.endpoints import voice  # 导入语音模块
+
+    app.include_router(
+        voice.router,  # 使用 voice 模块的路由
+        prefix=settings.API_V1_PREFIX,  # 前缀 /api/v1
+    )
     @app.get("/")
     async def root():
         """Root endpoint."""
