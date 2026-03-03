@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { useUserStore } from '@/store/user';
 
+const API_BASE = 'http://localhost:3000';
+export const apiOrigin = API_BASE;
+
 // 创建 axios 实例
 const instance = axios.create({
-  baseURL: 'http://localhost:3000/api', // 本地开发可通过 Vite 代理到后端
+  baseURL: `${API_BASE}/api`,
   timeout: 10000,
 });
 

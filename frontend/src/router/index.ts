@@ -21,9 +21,45 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/home',
-    name: 'Home',
-    component: () => import('../pages/Home/HomePage.vue'),
-    meta: { requiresAuth: true }, // 需要登录
+    component: () => import('../layouts/HomeLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'Home',
+        component: () => import('../pages/Home/HomePage.vue'),
+      },
+      {
+        path: 'interview',
+        name: 'Interview',
+        component: () => import('../pages/Interview/InterviewPage.vue'),
+      },
+      {
+        path: 'question-bank',
+        name: 'QuestionBank',
+        component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('../pages/Profile/ProfilePage.vue'),
+      },
+      {
+        path: 'records',
+        name: 'InterviewRecordList',
+        component: () => import('../pages/InterviewRecordList/InterviewRecordListPage.vue'),
+      },
+      {
+        path: 'report/:id',
+        name: 'ReportDetail',
+        component: () => import('../pages/ReportDetail/ReportDetailPage.vue'),
+      },
+      {
+        path: 'job/:id',
+        name: 'JobDetail',
+        component: () => import('../pages/JobDetail/JobDetailPage.vue'),
+      },
+    ],
   },
 ];
 

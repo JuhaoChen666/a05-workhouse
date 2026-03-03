@@ -50,6 +50,7 @@
 | 1003 | 用户名已存在 |
 | 1004 | 用户名或密码错误 |
 | 1005 | 用户不存在 |
+| 1006 | 原密码错误 |
 | 400 | 请求参数错误（如无效 ID） |
 | 401 | 未提供 token / token 无效或已过期 |
 | 403 | 无权限（如非管理员） |
@@ -145,13 +146,37 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。
 
-成功返回：`data: { id, username, email?, roleId, roleName }`。错误：401、1005。
+成功返回：`data: { id, username, email?, roleId, roleName, avatarUrl? }`。错误：401、1005。
+
+---
+
+#### 3.1 上传/修改头像
+
+**POST** `/auth/avatar`
+
+需要认证。请求体为 `multipart/form-data`，字段名 `file`（图片文件）；或 `application/json` 传 `base64` 字符串（字段 `avatar`）。成功返回：`data: { avatarUrl }`。前端更新本地用户信息后，个人中心及顶栏头像即更新。
+
+---
+
+#### 4. 修改密码
+
+**PUT** `/auth/password`
+
+需要认证。
+
+| 请求体 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| oldPassword | string | 是 | 原密码 |
+| newPassword | string | 是 | 新密码 |
+| confirmPassword | string | 是 | 确认新密码，需与 newPassword 一致 |
+
+成功：`data: null`。错误：1002（两次新密码不一致）、1006（原密码错误）。
 
 ---
 
 ### 角色
 
-#### 4. 角色列表
+#### 5. 角色列表
 
 **GET** `/roles`
 
@@ -163,7 +188,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 岗位（Position）
 
-#### 5. 岗位列表
+#### 6. 岗位列表
 
 **GET** `/positions`
 
@@ -173,7 +198,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 6. 岗位详情
+#### 7. 岗位详情
 
 **GET** `/positions/:id`
 
@@ -181,7 +206,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 7. 新增岗位（管理员）
+#### 8. 新增岗位（管理员）
 
 **POST** `/positions`
 
@@ -196,7 +221,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 8. 更新岗位（管理员）
+#### 9. 更新岗位（管理员）
 
 **PUT** `/positions/:id`
 
@@ -204,7 +229,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 9. 删除岗位（管理员）
+#### 10. 删除岗位（管理员）
 
 **DELETE** `/positions/:id`
 
@@ -214,7 +239,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 题库（Question Bank）
 
-#### 10. 题库列表（分页、按岗位筛选）
+#### 11. 题库列表（分页、按岗位筛选）
 
 **GET** `/question-bank?page=1&pageSize=10&positionId=1`
 
@@ -224,7 +249,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 11. 题库详情
+#### 12. 题库详情
 
 **GET** `/question-bank/:id`
 
@@ -232,7 +257,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 12. 新增题目（管理员）
+#### 13. 新增题目（管理员）
 
 **POST** `/question-bank`
 
@@ -249,7 +274,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 13. 更新题目（管理员）
+#### 14. 更新题目（管理员）
 
 **PUT** `/question-bank/:id`
 
@@ -257,7 +282,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 14. 删除题目（管理员）
+#### 15. 删除题目（管理员）
 
 **DELETE** `/question-bank/:id`
 
@@ -267,7 +292,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 面试记录（Interview Record）
 
-#### 15. 创建面试记录（开始面试）
+#### 16. 创建面试记录（开始面试）
 
 **POST** `/interview-record`
 
@@ -281,7 +306,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 16. 当前用户面试记录列表
+#### 17. 当前用户面试记录列表
 
 **GET** `/interview-record?page=1&pageSize=10`
 
@@ -291,7 +316,27 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 17. 面试记录详情
+#### 17.1 当前用户面试数据统计
+
+**GET** `/interview-record/stats`
+
+需要认证。用于个人中心统计面板。
+
+响应：`data: { totalCount, finishedCount, avgScore, lastAt }`。其中 `totalCount` 为总次数，`finishedCount` 为已结束次数，`avgScore` 为已结束记录的平均得分（无则为 `null`），`lastAt` 为最近一次开始时间（ISO 字符串，无则为 `null`）。
+
+---
+
+#### 17.2 最近几次面试分数（折线图）
+
+**GET** `/interview-record/recent-scores?limit=10`
+
+需要认证。按开始时间倒序取当前用户最近若干次**已结束**面试的分数，用于个人中心折线图。`limit` 默认 10，最大 20。
+
+响应：`data: [{ interviewRecordId, positionName, startedAt, totalScore }]`（按 startedAt 倒序，即最近一次在前）。
+
+---
+
+#### 18. 面试记录详情
 
 **GET** `/interview-record/:id`
 
@@ -301,7 +346,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 18. 结束面试
+#### 19. 结束面试
 
 **PATCH** `/interview-record/:id/end`
 
@@ -316,7 +361,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 面试对话详情（Interview Detail）
 
-#### 19. 追加对话详情（每轮问答）
+#### 20. 追加对话详情（每轮问答）
 
 **POST** `/interview-detail`
 
@@ -337,7 +382,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 报告（Report）
 
-#### 20. 获取某次面试的报告
+#### 21. 获取某次面试的报告
 
 **GET** `/report?interviewRecordId=1`
 
@@ -347,7 +392,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 21. 保存/更新报告
+#### 22. 保存/更新报告
 
 **POST** `/report`
 
@@ -360,13 +405,53 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 同一 `interviewRecordId` 再次提交会更新原报告。
 
+---
 
+#### 22.1 报告内容结构约定（示例）
+
+报告 `content` 为 JSON，可含：`totalScore`、`dimensions`（各维度得分/评语）、`summary`、`suggestions` 等，供前端展示。详见各端实现。
+
+---
+
+### 用户能力分析
+
+#### 23. 获取当前用户能力分析（柱状图 + 雷达图）
+
+**GET** `/user/ability-analysis`
+
+需要认证。用于个人中心柱状图与六边形（雷达）图。
+
+响应：`data: { bar: [{ name, value }], radar: [{ name, value, max? }] }`。`bar` 为各能力项与分数（如技术深度、表达清晰度、逻辑性等）；`radar` 为雷达图维度，`value` 为当前值，`max` 为满分（默认 100）。
+
+---
+
+### 热门岗位（招聘信息）
+
+以下为首页「热门岗位」卡片及岗位详情页所用接口，与面试用岗位（`/positions`）可独立。
+
+#### 24. 热门岗位列表
+
+**GET** `/jobs/hot?limit=10`
+
+需要认证。返回热门招聘岗位列表，用于首页左侧卡片。`limit` 默认 10。
+
+响应：`data: [{ id, name, companyName, companyLogo, salaryMin, salaryMax, jobContent }]`。其中 `salaryMin`/`salaryMax` 为数字（单位：元/月），`jobContent` 为工作内容描述文本。
+
+---
+
+#### 25. 岗位详情（招聘）
+
+**GET** `/jobs/:id`
+
+需要认证。返回单条招聘岗位详情，用于岗位详情页。
+
+响应：`data: { id, name, companyName, companyLogo, salaryMin, salaryMax, jobContent }`。404 表示不存在。
 
 ---
 
 ### 用户管理（管理员）
 
-#### 25. 用户列表（管理员）
+#### 27. 用户列表（管理员）
 
 **GET** `/users?page=1&pageSize=10`
 
@@ -380,7 +465,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 以下接口均需认证且 `roleId === 2`。
 
-#### 26. 全部面试记录列表（管理员）
+#### 28. 全部面试记录列表（管理员）
 
 **GET** `/admin/interview-record?page=1&pageSize=10&userId=1&positionId=2`
 
@@ -390,7 +475,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 27. 导出面试记录（管理员）
+#### 29. 导出面试记录（管理员）
 
 **GET** `/admin/export/interview-record?userId=1&positionId=2&limit=500`
 

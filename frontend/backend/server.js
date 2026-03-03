@@ -497,6 +497,48 @@ app.post('/api/report', authMiddleware, async (req, res) => {
   }
 });
 
+// ----- 热门岗位（招聘信息，首页展示） -----
+const hotJobs = [
+  { id: 1, name: 'Java 后端开发工程师', companyName: '字节跳动', companyLogo: '', salaryMin: 25000, salaryMax: 45000, jobContent: '负责后端服务与复杂应用的设计、开发和维护；参与系统性能优化和架构设计；与前端协作实现业务逻辑；要求熟悉 Java、Spring Boot、MySQL、Redis、微服务。' },
+  { id: 2, name: '高级 Java 开发工程师', companyName: '阿里巴巴', companyLogo: '', salaryMin: 30000, salaryMax: 50000, jobContent: '负责电商/云计算相关后端系统开发；参与分布式系统设计与优化；要求 3 年以上 Java 经验，熟悉 Spring Cloud、MQ、Kafka。' },
+  { id: 3, name: 'Web 前端开发工程师', companyName: '腾讯', companyLogo: '', salaryMin: 20000, salaryMax: 40000, jobContent: '负责前端需求分析、架构设计和代码开发；与产品、设计、后端协作完成页面与功能；熟练掌握 Vue/React、TypeScript、前端工程化。' },
+  { id: 4, name: '前端开发工程师', companyName: '美团', companyLogo: '', salaryMin: 18000, salaryMax: 35000, jobContent: '负责业务前端开发与组件库维护；优化前端性能与体验；要求精通 HTML5/CSS3/JavaScript，有 Vue 或 React 项目经验。' },
+  { id: 5, name: 'Python 算法工程师', companyName: '华为', companyLogo: '', salaryMin: 28000, salaryMax: 48000, jobContent: '负责机器学习/深度学习模型研发与落地；参与数据处理与算法优化；要求熟悉 Python、TensorFlow/PyTorch、常用 ML 算法。' },
+  { id: 6, name: 'C++ 开发工程师', companyName: '网易', companyLogo: '', salaryMin: 22000, salaryMax: 42000, jobContent: '负责游戏或基础组件开发；性能优化与跨平台适配；要求扎实的 C++ 基础，有大型项目经验优先。' },
+  { id: 7, name: 'Go 后端开发', companyName: '滴滴', companyLogo: '', salaryMin: 24000, salaryMax: 44000, jobContent: '负责高并发后端服务开发；参与微服务架构设计；要求熟悉 Go、MySQL、Redis、K8s。' },
+  { id: 8, name: '全栈开发工程师', companyName: '小米', companyLogo: '', salaryMin: 20000, salaryMax: 38000, jobContent: '负责 Web 全栈功能开发；前后端联调与部署；要求熟悉 Node/Vue 或 React，有后端经验。' },
+];
+
+app.get('/api/jobs/hot', authMiddleware, (req, res) => {
+  const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+  const list = hotJobs.slice(0, limit).map((j) => ({
+    id: j.id,
+    name: j.name,
+    companyName: j.companyName,
+    companyLogo: j.companyLogo,
+    salaryMin: j.salaryMin,
+    salaryMax: j.salaryMax,
+    jobContent: j.jobContent,
+  }));
+  return res.json(ok(list));
+});
+
+app.get('/api/jobs/:id', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
+  const j = hotJobs.find((x) => x.id === id);
+  if (!j) return res.status(404).json(fail(404, '岗位不存在'));
+  return res.json(ok({
+    id: j.id,
+    name: j.name,
+    companyName: j.companyName,
+    companyLogo: j.companyLogo,
+    salaryMin: j.salaryMin,
+    salaryMax: j.salaryMax,
+    jobContent: j.jobContent,
+  }));
+});
+
 // ----- 学习资源 -----
 app.get('/api/learning-resource', authMiddleware, async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);

@@ -1,8 +1,11 @@
 export interface UserInfo {
-    id: string;
-    username: string;
-    email?: string;
-  }
+  id: string;
+  username: string;
+  email?: string;
+  roleId?: number;
+  roleName?: string;
+  avatarUrl?: string | null;
+}
   
   export interface LoginRequest {
     username: string;
