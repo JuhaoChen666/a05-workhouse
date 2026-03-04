@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const pool = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
@@ -8,8 +11,38 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 头像上传目录
+const AVATAR_DIR = path.join(__dirname, 'uploads', 'avatar');
+if (!fs.existsSync(AVATAR_DIR)) {
+  fs.mkdirSync(AVATAR_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, AVATAR_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '.png';
+    const userId = (req.user && req.user.id) || 'guest';
+    cb(null, `avatar_${userId}_${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
+
+// 根据相对路径生成完整可访问的头像链接；如无则返回默认头像链接
+function buildAvatarUrl(req, avatarPath) {
+  const base = `${req.protocol}://${req.get('host')}`;
+  const pathOrDefault = avatarPath || '/api/avatar-file/default-avatar.png';
+  if (pathOrDefault.startsWith('http')) return pathOrDefault;
+  return base + pathOrDefault;
+}
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+// 对外暴露头像静态文件
+app.use('/api/avatar-file', express.static(AVATAR_DIR));
 
 function ok(data = null, message = 'ok') {
   return { code: 0, message, data };
@@ -74,7 +107,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
   try {
     const [rows] = await pool.query(
-      'SELECT u.id, u.username, u.role_id, r.name AS role_name FROM `user` u JOIN role r ON u.role_id = r.id WHERE u.username = ? AND u.password = ?',
+      'SELECT u.id, u.username, u.role_id, u.avatar_url, r.name AS role_name FROM `user` u JOIN role r ON u.role_id = r.id WHERE u.username = ? AND u.password = ?',
       [username, password]
     );
     if (rows.length === 0) {
@@ -86,6 +119,7 @@ app.post('/api/auth/login', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '2h' }
     );
+    const avatarUrl = buildAvatarUrl(req, row.avatar_url);
     return res.json(
       ok({
         token,
@@ -94,6 +128,7 @@ app.post('/api/auth/login', async (req, res) => {
           username: row.username,
           roleId: row.role_id,
           roleName: row.role_name,
+          avatarUrl,
         },
       })
     );
@@ -108,13 +143,14 @@ app.get('/api/auth/profile', authMiddleware, async (req, res) => {
   const { id } = req.user;
   try {
     const [rows] = await pool.query(
-      'SELECT u.id, u.username, u.email, u.role_id, r.name AS role_name FROM `user` u JOIN role r ON u.role_id = r.id WHERE u.id = ?',
+      'SELECT u.id, u.username, u.email, u.avatar_url, u.role_id, r.name AS role_name FROM `user` u JOIN role r ON u.role_id = r.id WHERE u.id = ?',
       [id]
     );
     if (rows.length === 0) {
       return res.json(fail(1005, '用户不存在'));
     }
     const u = rows[0];
+    const avatarUrl = buildAvatarUrl(req, u.avatar_url);
     return res.json(
       ok({
         id: String(u.id),
@@ -122,10 +158,45 @@ app.get('/api/auth/profile', authMiddleware, async (req, res) => {
         email: u.email || undefined,
         roleId: u.role_id,
         roleName: u.role_name,
+        avatarUrl,
       })
     );
   } catch (err) {
     console.error('获取用户信息失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+// 上传 / 修改头像（支持 multipart/form-data 和 base64 JSON）
+app.post('/api/auth/avatar', authMiddleware, upload.single('file'), async (req, res) => {
+  const { id } = req.user;
+  try {
+    let avatarUrl = null;
+
+    if (req.file) {
+      // 表单上传文件
+      avatarUrl = `/api/avatar-file/${req.file.filename}`;
+    } else if (req.body && req.body.avatar) {
+      // base64 字符串
+      const base64 = req.body.avatar;
+      const match = base64.match(/^data:image\/\w+;base64,(.+)$/);
+      const data = match ? match[1] : base64;
+      const buf = Buffer.from(data, 'base64');
+      const filename = `avatar_${id}_${Date.now()}.png`;
+      const filepath = path.join(AVATAR_DIR, filename);
+      fs.writeFileSync(filepath, buf);
+      avatarUrl = `/api/avatar-file/${filename}`;
+    } else {
+      return res.json(fail(400, '请上传文件或提供 avatar 字段'));
+    }
+
+    await pool.query('UPDATE `user` SET avatar_url = ? WHERE id = ?', [avatarUrl, id]);
+
+    const fullUrl = buildAvatarUrl(req, avatarUrl);
+
+    return res.json(ok({ avatarUrl: fullUrl }));
+  } catch (err) {
+    console.error('上传头像失败:', err);
     return res.status(500).json(fail(500, '服务器错误'));
   }
 });
@@ -497,46 +568,83 @@ app.post('/api/report', authMiddleware, async (req, res) => {
   }
 });
 
-// ----- 热门岗位（招聘信息，首页展示） -----
-const hotJobs = [
-  { id: 1, name: 'Java 后端开发工程师', companyName: '字节跳动', companyLogo: '', salaryMin: 25000, salaryMax: 45000, jobContent: '负责后端服务与复杂应用的设计、开发和维护；参与系统性能优化和架构设计；与前端协作实现业务逻辑；要求熟悉 Java、Spring Boot、MySQL、Redis、微服务。' },
-  { id: 2, name: '高级 Java 开发工程师', companyName: '阿里巴巴', companyLogo: '', salaryMin: 30000, salaryMax: 50000, jobContent: '负责电商/云计算相关后端系统开发；参与分布式系统设计与优化；要求 3 年以上 Java 经验，熟悉 Spring Cloud、MQ、Kafka。' },
-  { id: 3, name: 'Web 前端开发工程师', companyName: '腾讯', companyLogo: '', salaryMin: 20000, salaryMax: 40000, jobContent: '负责前端需求分析、架构设计和代码开发；与产品、设计、后端协作完成页面与功能；熟练掌握 Vue/React、TypeScript、前端工程化。' },
-  { id: 4, name: '前端开发工程师', companyName: '美团', companyLogo: '', salaryMin: 18000, salaryMax: 35000, jobContent: '负责业务前端开发与组件库维护；优化前端性能与体验；要求精通 HTML5/CSS3/JavaScript，有 Vue 或 React 项目经验。' },
-  { id: 5, name: 'Python 算法工程师', companyName: '华为', companyLogo: '', salaryMin: 28000, salaryMax: 48000, jobContent: '负责机器学习/深度学习模型研发与落地；参与数据处理与算法优化；要求熟悉 Python、TensorFlow/PyTorch、常用 ML 算法。' },
-  { id: 6, name: 'C++ 开发工程师', companyName: '网易', companyLogo: '', salaryMin: 22000, salaryMax: 42000, jobContent: '负责游戏或基础组件开发；性能优化与跨平台适配；要求扎实的 C++ 基础，有大型项目经验优先。' },
-  { id: 7, name: 'Go 后端开发', companyName: '滴滴', companyLogo: '', salaryMin: 24000, salaryMax: 44000, jobContent: '负责高并发后端服务开发；参与微服务架构设计；要求熟悉 Go、MySQL、Redis、K8s。' },
-  { id: 8, name: '全栈开发工程师', companyName: '小米', companyLogo: '', salaryMin: 20000, salaryMax: 38000, jobContent: '负责 Web 全栈功能开发；前后端联调与部署；要求熟悉 Node/Vue 或 React，有后端经验。' },
-];
-
-app.get('/api/jobs/hot', authMiddleware, (req, res) => {
+// ----- 热门岗位（招聘信息，首页展示 & 搜索，使用 job 表） ----- 
+app.get('/api/jobs/hot', authMiddleware, async (req, res) => {
   const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
-  const list = hotJobs.slice(0, limit).map((j) => ({
-    id: j.id,
-    name: j.name,
-    companyName: j.companyName,
-    companyLogo: j.companyLogo,
-    salaryMin: j.salaryMin,
-    salaryMax: j.salaryMax,
-    jobContent: j.jobContent,
-  }));
-  return res.json(ok(list));
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type FROM job ORDER BY id DESC LIMIT ?',
+      [limit]
+    );
+    return res.json(ok(rows));
+  } catch (err) {
+    console.error('获取热门岗位失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
 });
 
-app.get('/api/jobs/:id', authMiddleware, (req, res) => {
+// 招聘岗位搜索（关键词 + 岗位类型筛选）
+// 注意：必须放在 /api/jobs/:id 之前注册，否则会被当作 :id 路径处理
+app.get('/api/jobs/search', authMiddleware, async (req, res) => {
+  const keywordRaw = (req.query.keyword || '').toString().trim();
+  const type = (req.query.type || '').toString().trim();
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize, 10) || 8));
+  const offset = (page - 1) * pageSize;
+
+  const keyword = keywordRaw.toLowerCase();
+
+  try {
+    let where = '1=1';
+    const params = [];
+
+    if (keyword) {
+      where += ' AND (LOWER(name) LIKE ? OR LOWER(company_name) LIKE ? OR LOWER(job_content) LIKE ?)';
+      const kw = `%${keyword}%`;
+      params.push(kw, kw, kw);
+    }
+    if (type) {
+      where += ' AND type = ?';
+      params.push(type);
+    }
+
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM job WHERE ${where}`,
+      params
+    );
+    const total = countRows[0].total || 0;
+
+    const listParams = [...params, pageSize, offset];
+    const [rows] = await pool.query(
+      `SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type
+       FROM job
+       WHERE ${where}
+       ORDER BY id DESC
+       LIMIT ? OFFSET ?`,
+      listParams
+    );
+
+    return res.json(ok({ list: rows, total }));
+  } catch (err) {
+    console.error('搜索岗位失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
-  const j = hotJobs.find((x) => x.id === id);
-  if (!j) return res.status(404).json(fail(404, '岗位不存在'));
-  return res.json(ok({
-    id: j.id,
-    name: j.name,
-    companyName: j.companyName,
-    companyLogo: j.companyLogo,
-    salaryMin: j.salaryMin,
-    salaryMax: j.salaryMax,
-    jobContent: j.jobContent,
-  }));
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type FROM job WHERE id = ?',
+      [id]
+    );
+    if (rows.length === 0) return res.status(404).json(fail(404, '岗位不存在'));
+    return res.json(ok(rows[0]));
+  } catch (err) {
+    console.error('获取岗位详情失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
 });
 
 // ----- 学习资源 -----
