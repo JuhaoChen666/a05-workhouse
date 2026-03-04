@@ -3,5 +3,6 @@
   <component name="Black">
     <option name="sdkName" value="D:\miniconda3" />
   </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="ProjectRootManager" version="2" project-jdk-name="emotion2vec" project-jdk-type="Python SDK" />
 </project>
