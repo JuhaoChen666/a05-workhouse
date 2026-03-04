@@ -26,7 +26,7 @@
           </el-menu-item>
         </el-menu>
       </el-aside>
-      <el-container direction="vertical">
+      <el-container direction="vertical" class="main-wrapper">
         <el-header class="header">
           <div class="header-right">
             <el-dropdown trigger="hover" @command="handleUserCommand">
@@ -55,11 +55,15 @@
           </div>
         </el-header>
         <el-main class="main">
-          <router-view v-slot="{ Component }">
-            <transition name="fade" mode="out-in">
-              <component :is="Component" />
-            </transition>
-          </router-view>
+          <el-scrollbar class="main-scrollbar" always>
+            <div class="main-inner">
+              <router-view v-slot="{ Component }">
+                <transition name="fade" mode="out-in">
+                  <component :is="Component" />
+                </transition>
+              </router-view>
+            </div>
+          </el-scrollbar>
         </el-main>
       </el-container>
     </el-container>
@@ -79,7 +83,6 @@ import {
   ArrowDown,
 } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
-import { apiOrigin } from '@/api/request';
 
 const route = useRoute();
 const router = useRouter();
@@ -87,11 +90,7 @@ const userStore = useUserStore();
 
 const activeMenu = computed(() => route.path);
 
-const avatarSrc = computed(() => {
-  const url = userStore.userInfo?.avatarUrl;
-  if (!url) return undefined;
-  return url.startsWith('http') ? url : apiOrigin + url;
-});
+const avatarSrc = computed(() => userStore.userInfo?.avatarUrl || undefined);
 
 const avatarText = computed(() => {
   const name = userStore.userInfo?.username;
@@ -117,6 +116,15 @@ function handleUserCommand(command: string) {
 <style scoped>
 .home-layout {
   height: 100vh;
+  overflow: hidden;
+}
+.home-layout > .el-container {
+  height: 100%;
+  min-height: 0;
+}
+.main-wrapper {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .aside {
@@ -167,8 +175,22 @@ function handleUserCommand(command: string) {
 }
 .main {
   background: #f5f7fa;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-scrollbar {
+  flex: 1;
+  min-height: 0;
+}
+.main-scrollbar :deep(.el-scrollbar__wrap) {
+  overflow-x: hidden;
+}
+.main-inner {
   padding: 20px;
-  overflow: auto;
 }
 .fade-enter-active,
 .fade-leave-active {

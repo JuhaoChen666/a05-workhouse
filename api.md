@@ -76,7 +76,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 | 表名 | 说明 | 主要字段 |
 |------|------|----------|
 | role | 角色 | id, name（普通用户、管理员） |
-| user | 用户信息 | id, username, password, email, role_id |
+| user | 用户信息 | id, username, password, email, avatar_url, role_id |
 | position | 岗位 | id, name, sort_order |
 | question_bank | 题库 | id, position_id, question, answer, knowledge_tags |
 | knowledge_base | 知识库文档 | id, content, vector_id |
@@ -130,7 +130,8 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
       "id": "1",
       "username": "zhangsan",
       "roleId": 1,
-      "roleName": "普通用户"
+      "roleName": "普通用户",
+      "avatarUrl": "http://localhost:3000/api/avatar-file/default-avatar.png"
     }
   }
 }
@@ -146,7 +147,8 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。
 
-成功返回：`data: { id, username, email?, roleId, roleName, avatarUrl? }`。错误：401、1005。
+成功返回：`data: { id, username, email?, roleId, roleName, avatarUrl }`。错误：401、1005。  
+其中 `avatarUrl` 为**完整可访问链接**，若用户尚未上传头像，则指向默认头像：`http://localhost:3000/api/avatar-file/default-avatar.png`。
 
 ---
 
@@ -154,7 +156,25 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 **POST** `/auth/avatar`
 
-需要认证。请求体为 `multipart/form-data`，字段名 `file`（图片文件）；或 `application/json` 传 `base64` 字符串（字段 `avatar`）。成功返回：`data: { avatarUrl }`。前端更新本地用户信息后，个人中心及顶栏头像即更新。
+需要认证。更新当前登录用户的头像，完成后会覆盖原有头像地址。
+
+- 支持两种请求方式：
+  - `multipart/form-data`：字段名 **`file`**，上传图片文件（最大约 2MB）；
+  - `application/json`：传入 base64 字符串，字段名 **`avatar`**，可为裸 base64 或 `data:image/png;base64,...` 形式。
+
+成功返回：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "avatarUrl": "http://localhost:3000/api/avatar-file/avatar_1_1700000000000.png"
+  }
+}
+```
+
+- `avatarUrl`：后端生成的**完整头像访问链接**。前端收到后应更新本地用户信息（例如 Pinia / localStorage），之后都以该链接展示头像。
 
 ---
 
@@ -435,7 +455,31 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。返回热门招聘岗位列表，用于首页左侧卡片。`limit` 默认 10。
 
-响应：`data: [{ id, name, companyName, companyLogo, salaryMin, salaryMax, jobContent }]`。其中 `salaryMin`/`salaryMax` 为数字（单位：元/月），`jobContent` 为工作内容描述文本。
+响应：
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Java 后端开发工程师",
+    "companyName": "示例公司",
+    "companyLogo": "",
+    "salaryMin": 25000,
+    "salaryMax": 45000,
+    "jobContent": "工作内容描述",
+    "type": "backend"
+  }
+]
+```
+
+- `salaryMin` / `salaryMax`: 数字，单位为元/月
+- `jobContent`: 工作内容描述文本
+- `type`: 岗位类型编码，当前值包括：
+  - `backend`: 后端开发
+  - `frontend`: 前端开发
+  - `algo`: 算法工程师
+  - `fullstack`: 全栈开发
+  - `other`: 其它
 
 ---
 
@@ -445,7 +489,46 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。返回单条招聘岗位详情，用于岗位详情页。
 
-响应：`data: { id, name, companyName, companyLogo, salaryMin, salaryMax, jobContent }`。404 表示不存在。
+响应：`data: { id, name, companyName, companyLogo, salaryMin, salaryMax, jobContent, type }`。404 表示不存在。
+
+---
+
+#### 25.1 招聘岗位搜索
+
+**GET** `/jobs/search?keyword=前端&type=frontend&page=1&pageSize=8`
+
+需要认证。用于首页 Banner 搜索和岗位搜索结果页，支持关键词与岗位类型组合筛选。
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| keyword | string | 否 | 关键词，模糊匹配岗位名称、公司名称、工作内容 |
+| type | string | 否 | 岗位类型，取值同 `/jobs/hot` 返回的 `type` 字段 |
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 8，最大 50 |
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "list": [
+      {
+        "id": 3,
+        "name": "Web 前端开发工程师",
+        "companyName": "腾讯",
+        "companyLogo": "",
+        "salaryMin": 20000,
+        "salaryMax": 40000,
+        "jobContent": "负责前端需求分析、架构设计和代码开发……",
+        "type": "frontend"
+      }
+    ],
+    "total": 1
+  }
+}
+```
 
 ---
 
@@ -493,4 +576,4 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-*文档根据当前后端 server.js 整理，日期：2026-03-01*
+*文档根据当前后端 server.js 整理，日期：2026-03-04*

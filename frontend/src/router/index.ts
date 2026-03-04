@@ -30,9 +30,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/Home/HomePage.vue'),
       },
       {
-        path: 'interview',
-        name: 'Interview',
-        component: () => import('../pages/Interview/InterviewPage.vue'),
+        path: 'job-search',
+        name: 'JobSearch',
+        component: () => import('../pages/JobSearch/JobSearchPage.vue'),
+      },
+      {
+        path: 'interview/settings/:id',
+        name: 'InterviewSettings',
+        component: () => import('../pages/Interview/InterviewSettingsPage.vue'),
+      },
+      {
+        path: 'interview/session/:id',
+        name: 'InterviewSession',
+        component: () => import('../pages/Interview/InterviewSessionPage.vue'),
       },
       {
         path: 'question-bank',

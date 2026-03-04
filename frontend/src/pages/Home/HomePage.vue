@@ -4,7 +4,24 @@
     <div class="banner">
       <h1>AI 模拟面试平台</h1>
       <p>智能面试练习，助力求职进阶</p>
-      <el-button type="primary" size="large" @click="goInterview">开始模拟面试</el-button>
+      <div class="banner-actions">
+        <div class="banner-search-wrap">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索心仪岗位，例如：前端开发、Java、算法工程师"
+            class="banner-search-input"
+            clearable
+            @keyup.enter="goJobSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-button type="primary" size="large" class="banner-search-btn" @click="goJobSearch">
+            搜索岗位
+          </el-button>
+        </div>
+      </div>
     </div>
 
     <!-- 下方两栏：左侧热门岗位 | 右侧最近报告 -->
@@ -38,12 +55,21 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 页尾 -->
+    <div class="home-footer">
+      <div class="home-footer-inner">
+        <span class="home-footer-title">AI 模拟面试平台</span>
+        <span class="home-footer-desc">本项目用于学习与演示，不代表真实招聘信息。</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { Search } from '@element-plus/icons-vue';
 import { getHotJobsApi, type HotJobItem } from '@/api/jobs';
 import { getReportByRecordIdApi } from '@/api/report';
 import { getInterviewRecordListApi } from '@/api/interview';
@@ -53,6 +79,7 @@ const hotJobs = ref<HotJobItem[]>([]);
 const reportLoading = ref(false);
 const latestReport = ref<{ totalScore?: number; summary?: string } | null>(null);
 const latestRecordId = ref<number | null>(null);
+const searchKeyword = ref('');
 
 function goInterview() {
   router.push({ name: 'Interview' });
@@ -62,6 +89,16 @@ function goJobDetail(id: number) {
 }
 function goReport() {
   if (latestRecordId.value) router.push({ name: 'ReportDetail', params: { id: String(latestRecordId.value) } });
+}
+
+// 从首页 banner 进入岗位搜索页
+function goJobSearch() {
+  router.push({
+    name: 'JobSearch',
+    query: {
+      keyword: searchKeyword.value || undefined,
+    },
+  });
 }
 
 onMounted(async () => {
@@ -104,6 +141,23 @@ onMounted(async () => {
 }
 .banner h1 { margin: 0 0 8px; font-size: 28px; }
 .banner p { margin: 0 0 20px; opacity: 0.9; }
+.banner-actions {
+  display: flex;
+  justify-content: center;
+}
+.banner-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+}
+.banner-search-input {
+  flex: 1;
+}
+.banner-search-btn {
+  white-space: nowrap;
+}
 .main-row { margin-top: 8px; }
 .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #303133; }
 .job-cards { margin-bottom: 16px; }
@@ -116,4 +170,25 @@ onMounted(async () => {
 .report-card { min-height: 180px; }
 .report-score { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
 .report-summary { font-size: 13px; color: #606266; margin: 0 0 12px; line-height: 1.5; }
+.home-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+  text-align: center;
+  color: #909399;
+  font-size: 12px;
+}
+.home-footer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.home-footer-title {
+  font-weight: 500;
+  color: #606266;
+}
+.home-footer-desc {
+  opacity: 0.85;
+}
 </style>
