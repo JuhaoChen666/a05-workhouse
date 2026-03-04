@@ -1,14 +1,12 @@
 package com.example.springbootbackend.utils;
 
-import com.example.coursesystem.entity.User;
-import com.example.coursesystem.exception.ServiceException;
-import com.example.coursesystem.service.UserService;
+import com.example.springbootbackend.entity.User;
+import com.example.springbootbackend.exception.ServiceException;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
@@ -17,8 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    @Autowired
-    private UserService userService;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -28,26 +25,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. 验证Authorization头格式
         if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
-            chain.doFilter(request, response); // 放行到后续过滤器
+            chain.doFilter(request, response);
             return;
         }
 
         // 3. 提取并验证Token
         try {
-            String token = authHeader.substring(7); // 去除"Bearer "前缀
-            Claims claims = JwtUtils.getClaimsbyToken(token); // 调用工具类解析
+            String token = authHeader.substring(7);
+            Claims claims = JwtUtils.getClaimsbyToken(token);
 
-            // 4. 从claims中获取用户名
-            String username = claims.getSubject();
-            if (!StringUtils.hasText(username)) {
+            // 4. 从claims中获取用户信息
+            Integer id = claims.get("id", Integer.class);
+            String username = claims.get("username", String.class);
+            Integer roleId = claims.get("roleId", Integer.class);
+
+            if (id == null || !StringUtils.hasText(username) || roleId == null) {
                 throw new ServiceException("Token中未包含有效用户信息");
             }
 
-            // 5. 从数据库加载用户详细信息
-            User user = userService.findByUsername(username);
-            if (user == null) {
-                throw new ServiceException("用户不存在或已被禁用");
-            }
+            // 5. 构建用户对象
+            User user = new User();
+            user.setUserID(id);
+            user.setUsername(username);
+            user.setRole_id(roleId);
 
             // 6. 创建认证对象并注入安全上下文
             UsernamePasswordAuthenticationToken authentication =
@@ -58,10 +58,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
 
         } catch (ServiceException e) {
-            // 8. 自定义异常处理
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
         } catch (Exception e) {
-            // 9. 其他异常处理
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "无效的访问令牌");
         }
     }

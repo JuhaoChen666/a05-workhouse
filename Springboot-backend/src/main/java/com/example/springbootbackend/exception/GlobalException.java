@@ -1,6 +1,6 @@
 package com.example.springbootbackend.exception;
 
-import com.example.coursesystem.utils.Result;
+import com.example.springbootbackend.utils.Result;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;

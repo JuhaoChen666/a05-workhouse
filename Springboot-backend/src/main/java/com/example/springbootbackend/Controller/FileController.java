@@ -1,8 +1,8 @@
 package com.example.springbootbackend.Controller;
 
 import cn.hutool.core.io.FileUtil;
-import com.example.coursesystem.exception.CustomException;
-import com.example.coursesystem.utils.Result;
+import com.example.springbootbackend.exception.CustomException;
+import com.example.springbootbackend.utils.Result;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

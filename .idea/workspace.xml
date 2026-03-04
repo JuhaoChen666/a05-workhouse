@@ -4,86 +4,49 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/FileController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/CorsConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/MyBatisPlusConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/WebSeverConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/CustomException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/GlobalException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/ServiceException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtAuthenticationFilter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtUtils.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.env.example" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Emo2Vec-Agent.iml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/Emo2Vec-Agent.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/MarsCodeWorkspaceAppSettings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/graph/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/graph/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/graph/builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/graph/builder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/graph/state.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/graph/state.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/tools/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/tools/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/tools/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/tools/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/tools/modelscope_tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/tools/modelscope_tools.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/agent/tools/web_search.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/agent/tools/web_search.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/endpoints/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/endpoints/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/endpoints/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/endpoints/agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/endpoints/chat.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/endpoints/chat.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/endpoints/system.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/endpoints/system.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/endpoints/voice.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/v1/endpoints/voice.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/core/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/events.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/core/events.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/logging.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/core/logging.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/infrastructure/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/infrastructure/cache/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/cache/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/infrastructure/cache/redis_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/cache/redis_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/infrastructure/vector_store/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/infrastructure/vector_store/chroma_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store/chroma_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/deepseek.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/deepseek.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/embeddings.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/embeddings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/modelscope.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/modelscope.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/llm/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/schemas/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/schemas/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/schemas/chat.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/chat.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/schemas/common.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/common.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/services/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/agent_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/services/agent_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/chat_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/services/chat_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/voice_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/services/voice_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/utils/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/audio_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/utils/audio_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/exceptions.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/utils/exceptions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/audio/20260224/frontend_test_user_20260224_022305.wav" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/data/audio/20260224/frontend_test_user_20260224_022305.wav" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/chroma/chroma.sqlite3" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/data/chroma/chroma.sqlite3" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/logs/emo2vec.log" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/logs/emo2vec.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_main.http" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/test_main.http" afterDir="false" />
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="fix:后端FastAPI和Springboot分离目录">
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/UserV0.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/resources/Assets/avatar_default.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/FileController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/FileController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/SpringbootBackendApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/SpringbootBackendApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/MyBatisPlusConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/MyBatisPlusConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/WebSeverConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/WebSeverConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/CustomException.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/CustomException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/GlobalException.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/GlobalException.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtAuthenticationFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtAuthenticationFilter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtUtils.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Interface" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
       <MavenGeneralSettings>
@@ -92,6 +55,9 @@
       </MavenGeneralSettings>
     </option>
   </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -99,33 +65,48 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;Spring Boot.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;项目&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;MavenSettings&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
-    &quot;应用程序.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RequestMappingsPanelOrder0": "0",
+    "RequestMappingsPanelOrder1": "1",
+    "RequestMappingsPanelWidth0": "75",
+    "RequestMappingsPanelWidth1": "75",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "Spring Boot.SpringbootBackendApplication.executor": "Run",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/a05-workhouse/Springboot-backend/src/main/resources/Assets",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "项目",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.2",
+    "run.code.analysis.last.selected.profile": "pProject Default",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true",
+    "应用程序.SpringbootBackendApplication.executor": "Run"
+  },
+  "keyToStringList": {
+    "DatabaseDriversLRU": [
+      "mysql"
+    ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\a05-workhouse\Springboot-backend\src\main\resources\Assets" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\a05-workhouse" />
       <recent name="D:\a05-workhouse\FastAPI-Backend" />
     </key>
     <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.example.springbootbackend.service" />
       <recent name="com.example.springbootbackend.utils" />
       <recent name="com.example.springbootbackend.exception" />
       <recent name="com.example.springbootbackend.Controller" />
@@ -133,6 +114,15 @@
     </key>
   </component>
   <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
     <configuration name="SpringbootBackendApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <module name="Springboot-backend" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.springbootbackend.SpringbootBackendApplication" />
@@ -161,10 +151,47 @@
       <workItem from="1772461172590" duration="364000" />
       <workItem from="1772514199428" duration="3152000" />
       <workItem from="1772528923158" duration="569000" />
+      <workItem from="1772529516469" duration="1352000" />
+      <workItem from="1772535949684" duration="2087000" />
+      <workItem from="1772538056564" duration="3860000" />
+      <workItem from="1772545095408" duration="3241000" />
+      <workItem from="1772624596145" duration="6919000" />
     </task>
+    <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
+      <option name="closed" value="true" />
+      <created>1772529713880</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1772529713880</updated>
+    </task>
+    <task id="LOCAL-00002" summary="fix:后端FastAPI和Springboot分离目录">
+      <option name="closed" value="true" />
+      <created>1772529729078</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1772529729078</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="fix:后端FastAPI和Springboot分离目录" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix:后端FastAPI和Springboot分离目录" />
   </component>
 </project>
