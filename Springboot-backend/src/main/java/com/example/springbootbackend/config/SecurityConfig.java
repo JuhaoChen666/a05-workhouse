@@ -1,6 +1,6 @@
 package com.example.springbootbackend.config;
 
-import com.example.coursesystem.utils.JwtAuthenticationFilter;
+import com.example.springbootbackend.utils.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,10 +20,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .requiresChannel(channel -> channel
-                .requestMatchers(request -> !request.getMethod().equals("POST")) // POST请求不强制HTTPS
-                .requiresSecure()
-            )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()
