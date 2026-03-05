@@ -4,26 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="fix:后端FastAPI和Springboot分离目录">
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/UserV0.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/resources/Assets/avatar_default.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:登录注册功能添加">
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/EmailService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/RedisUtils.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/FileController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/FileController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/SpringbootBackendApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/SpringbootBackendApplication.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/MyBatisPlusConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/MyBatisPlusConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/WebSeverConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/WebSeverConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/CustomException.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/CustomException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/GlobalException.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/exception/GlobalException.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtAuthenticationFilter.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtAuthenticationFilter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/JwtUtils.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" afterDir="false" />
     </list>
@@ -65,38 +52,38 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RequestMappingsPanelOrder0": "0",
-    "RequestMappingsPanelOrder1": "1",
-    "RequestMappingsPanelWidth0": "75",
-    "RequestMappingsPanelWidth1": "75",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "Spring Boot.SpringbootBackendApplication.executor": "Run",
-    "git-widget-placeholder": "master",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/a05-workhouse/Springboot-backend/src/main/resources/Assets",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "项目",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.2",
-    "run.code.analysis.last.selected.profile": "pProject Default",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true",
-    "应用程序.SpringbootBackendApplication.executor": "Run"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;Spring Boot.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/a05-workhouse/Springboot-backend/src/main/resources/Assets&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;项目&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
+    &quot;应用程序.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;
   },
-  "keyToStringList": {
-    "DatabaseDriversLRU": [
-      "mysql"
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mysql&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\a05-workhouse\Springboot-backend\src\main\resources\Assets" />
@@ -155,7 +142,8 @@
       <workItem from="1772535949684" duration="2087000" />
       <workItem from="1772538056564" duration="3860000" />
       <workItem from="1772545095408" duration="3241000" />
-      <workItem from="1772624596145" duration="6919000" />
+      <workItem from="1772624596145" duration="8852000" />
+      <workItem from="1772702483214" duration="10429000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -173,7 +161,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772529729078</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="feat:登录注册功能添加">
+      <option name="closed" value="true" />
+      <created>1772632169586</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632169586</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -192,6 +188,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fix:后端FastAPI和Springboot分离目录" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix:后端FastAPI和Springboot分离目录" />
+    <MESSAGE value="feat:登录注册功能添加" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat:登录注册功能添加" />
   </component>
 </project>

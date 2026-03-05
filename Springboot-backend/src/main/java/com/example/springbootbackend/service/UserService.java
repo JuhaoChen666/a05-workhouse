@@ -22,11 +22,7 @@ public class UserService {
         return userMapper.FindByUserID(userID);
     }
 
-    public void setPassword(int userID, String newPassword) {
-        User user =findByUserID(userID);
-        String encryptedPwd = PasswordEncoder.encode(newPassword); // [!code focus]
-        userMapper.updatePassword(user.getUsername(), encryptedPwd);
-    }
+
     public User login(User user) {
         User dbuser=findByUsername(user.getUsername());
         if(dbuser==null){
@@ -36,7 +32,7 @@ public class UserService {
             throw new ServiceException("密码不能为空");
         }
         if(!PasswordEncoder.matches(user.getPassword(),dbuser.getPassword())){
-            throw new ServiceException("密码错误");
+            throw new ServiceException("用户名或密码错误");
         }
         return dbuser;
     }
@@ -59,5 +55,17 @@ public class UserService {
         user.setAvatar("D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/avatar_default.png");
         user.setRole_id(1);
         return userMapper.insertUser(user);
+    }
+    public int updatePassword(String username, String password, String confirmPassword) {
+        if(password==null||confirmPassword==null||
+                password.isEmpty()||confirmPassword.isEmpty()){
+            throw new ServiceException("密码不能为空");
+        }
+        if (!confirmPassword.equals(password)) {
+            throw new ServiceException("两次密码不一致");
+        }
+        String encryptedPwd = PasswordEncoder.encode(password); // [!code focus]
+        userMapper.updatePassword(username, encryptedPwd);
+        return 1;
     }
 }

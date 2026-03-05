@@ -76,6 +76,27 @@ public class Result {
     public static Result userNotExist() {
         return error("1005", "用户不存在");
     }
+    //邮箱未绑定
+    public static Result emailNotBound() {
+        return error("1006", "邮箱未绑定");
+    }
+    //用户名不能为空
+    public static Result usernameEmpty() {
+        return error("1007", "用户名不能为空");
+    }
+    //验证码为空
+    public static Result captchaEmpty() {
+        return error("1008", "验证码不能为空");
+    }
+    //验证码错误
+    public static Result captchaError() {
+        return error("1009", "验证码错误");
+    }
+    //密码为空
+    public static Result passwordEmpty() {
+        return error("1010", "密码不能为空");
+    }
+
     //请求参数错误
     public static Result requestParamError() {
         return error("400", "请求参数错误");
