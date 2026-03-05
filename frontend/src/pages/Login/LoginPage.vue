@@ -13,6 +13,7 @@
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="onSubmit">登录</el-button>
           <el-button type="text" @click="goRegister">没有账号？去注册</el-button>
+          <el-button type="text" @click="goForgot">忘记密码？</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -46,6 +47,7 @@ const rules: FormRules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 };
 
+
 // 实际提交逻辑（节流包装前）
 const doSubmit = () => {
   if (loading.value) return;
@@ -71,6 +73,10 @@ const onSubmit = throttle(doSubmit, 500);
 
 const goRegister = () => {
   router.push({ name: 'Register' });
+};
+
+const goForgot = () => {
+  router.push({ name: 'ForgotPassword' });
 };
 </script>
 

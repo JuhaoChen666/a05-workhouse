@@ -4,27 +4,22 @@
 
     <!-- 用户资料卡片：头像 + 基本信息 -->
     <el-card class="section-card profile-card" shadow="hover">
-      <template #header><span>用户资料</span></template>
+      <template #header>
+        <span>用户资料</span>
+        <el-button type="primary" link style="float: right;" @click="goAccountSettings">
+          账号与安全设置
+        </el-button>
+      </template>
       <div class="profile-header">
         <div class="avatar-area">
           <el-avatar :size="80" :src="avatarFullUrl" class="avatar">
             {{ profile?.username?.slice(0, 2) || '?' }}
           </el-avatar>
-          <el-upload
-            class="avatar-upload"
-            :show-file-list="false"
-            :http-request="handleAvatarUpload"
-            accept="image/*"
-          >
-            <el-button size="small" type="primary">修改头像</el-button>
-          </el-upload>
         </div>
         <div class="profile-form" v-if="profile">
           <el-form label-width="80px">
             <el-form-item label="用户名">{{ profile.username }}</el-form-item>
-            <el-form-item label="邮箱">
-              <el-input v-model="profile.email" placeholder="选填" @blur="onProfileBlur" />
-            </el-form-item>
+            <el-form-item label="邮箱">{{ profile.email || '未绑定' }}</el-form-item>
             <el-form-item label="角色">{{ profile.roleName ?? '普通用户' }}</el-form-item>
           </el-form>
         </div>
@@ -106,24 +101,6 @@
       </el-table>
     </el-card>
 
-    <!-- 修改密码 -->
-    <el-card class="section-card" shadow="hover">
-      <template #header><span>修改密码</span></template>
-      <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="100px">
-        <el-form-item label="原密码" prop="oldPassword">
-          <el-input v-model="pwdForm.oldPassword" type="password" placeholder="请输入原密码" show-password />
-        </el-form-item>
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input v-model="pwdForm.newPassword" type="password" placeholder="请输入新密码" show-password />
-        </el-form-item>
-        <el-form-item label="确认新密码" prop="confirmPassword">
-          <el-input v-model="pwdForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="pwdLoading" @click="onSubmitPassword">修改密码</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
   </div>
 </template>
 
@@ -147,8 +124,6 @@ const profile = ref<UserInfo | null>(null);
 const listLoading = ref(false);
 const recentRecords = ref<InterviewRecordItem[]>([]);
 const statsData = ref({ totalCount: 0, finishedCount: 0, avgScore: null as number | null, lastAt: null as string | null });
-const pwdLoading = ref(false);
-const pwdFormRef = ref<FormInstance>();
 const lineChartRef = ref<HTMLElement | null>(null);
 const barChartRef = ref<HTMLElement | null>(null);
 const radarChartRef = ref<HTMLElement | null>(null);
@@ -158,19 +133,6 @@ const avatarFullUrl = computed(() => {
   if (!url) return '';
   return url.startsWith('http') ? url : apiOrigin + url;
 });
-
-const pwdForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
-const pwdRules: FormRules = {
-  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    { validator: (_r, v, cb) => (v !== pwdForm.newPassword ? cb(new Error('两次输入不一致')) : cb()), trigger: 'blur' },
-  ],
-};
 
 const stats = computed(() => ({
   totalCount: statsData.value.totalCount,
@@ -231,39 +193,8 @@ async function fetchRecentRecords() {
   }
 }
 
-async function handleAvatarUpload({ file }: { file: File }) {
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const res = await uploadAvatarApi(form);
-    if (res?.avatarUrl) {
-      profile.value = { ...profile.value!, avatarUrl: res.avatarUrl };
-      userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
-      ElMessage.success('头像已更新');
-    }
-  } catch (e: any) {
-    ElMessage.error(e.message || '上传失败');
-  }
-}
-
-function onProfileBlur() {}
-
-function onSubmitPassword() {
-  pwdFormRef.value?.validate(async (valid) => {
-    if (!valid) return;
-    pwdLoading.value = true;
-    try {
-      await changePasswordApi(pwdForm as ChangePasswordRequest);
-      ElMessage.success('密码已修改，请重新登录');
-      pwdForm.oldPassword = '';
-      pwdForm.newPassword = '';
-      pwdForm.confirmPassword = '';
-    } catch (e: any) {
-      ElMessage.error(e.message || '修改密码失败');
-    } finally {
-      pwdLoading.value = false;
-    }
-  });
+function goAccountSettings() {
+  router.push({ name: 'ProfileEdit' });
 }
 
 function goAllRecords() {

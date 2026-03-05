@@ -16,6 +16,8 @@ export interface UserInfo {
     username: string;
     password: string;
     confirmPassword: string;
+    email?: string;
+    emailCode?: string;
   }
   
   export interface LoginResponse {

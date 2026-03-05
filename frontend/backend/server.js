@@ -31,6 +31,35 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 },
 });
 
+// 简单的验证码存储（仅用于演示环境，进程重启后会丢失）
+// key 形如：register:email 或 reset:username
+const verifyCodes = new Map();
+const CODE_EXPIRE_MS = 10 * 60 * 1000; // 10 分钟
+
+function genCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function setCode(key) {
+  const code = genCode();
+  verifyCodes.set(key, { code, expiresAt: Date.now() + CODE_EXPIRE_MS });
+  return code;
+}
+
+function checkCode(key, code) {
+  const item = verifyCodes.get(key);
+  if (!item) return false;
+  if (Date.now() > item.expiresAt) {
+    verifyCodes.delete(key);
+    return false;
+  }
+  const okMatch = String(code).trim() === String(item.code);
+  if (okMatch) {
+    verifyCodes.delete(key);
+  }
+  return okMatch;
+}
+
 // 根据相对路径生成完整可访问的头像链接；如无则返回默认头像链接
 function buildAvatarUrl(req, avatarPath) {
   const base = `${req.protocol}://${req.get('host')}`;
@@ -79,19 +108,33 @@ function adminMiddleware(req, res, next) {
 
 // 用户注册
 app.post('/api/auth/register', async (req, res) => {
-  const { username, password, confirmPassword } = req.body || {};
+  const { username, password, confirmPassword, email, emailCode } = req.body || {};
   if (!username || !password || !confirmPassword) {
     return res.json(fail(1001, '用户名或密码不能为空'));
   }
   if (password !== confirmPassword) {
     return res.json(fail(1002, '两次密码不一致'));
   }
+  // 如果填写了邮箱，则需要验证码校验
+  if (email) {
+    if (!emailCode) {
+      return res.json(fail(400, '请先完成邮箱验证码验证'));
+    }
+    const okMatch = checkCode(`register:${email}`, emailCode);
+    if (!okMatch) {
+      return res.json(fail(1009, '验证码错误或已过期'));
+    }
+  }
   try {
     const [rows] = await pool.query('SELECT id FROM `user` WHERE username = ?', [username]);
     if (rows.length > 0) {
       return res.json(fail(1003, '用户名已存在'));
     }
-    await pool.query('INSERT INTO `user` (username, password, role_id) VALUES (?, ?, 1)', [username, password]);
+    await pool.query('INSERT INTO `user` (username, password, email, role_id) VALUES (?, ?, ?, 1)', [
+      username,
+      password,
+      email || null,
+    ]);
     return res.json(ok(null, '注册成功'));
   } catch (err) {
     console.error('注册失败:', err);
@@ -163,6 +206,104 @@ app.get('/api/auth/profile', authMiddleware, async (req, res) => {
     );
   } catch (err) {
     console.error('获取用户信息失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+// 发送验证码（注册绑定邮箱 / 找回密码）
+app.post('/api/auth/send-code', async (req, res) => {
+  const { scene, username, email } = req.body || {};
+
+  if (scene === 'register') {
+    if (!email) return res.json(fail(400, '邮箱不能为空'));
+    const key = `register:${email}`;
+    const code = setCode(key);
+    console.log(`[验证码][注册] email=${email}, code=${code}`);
+    return res.json(ok(null, '验证码已发送'));
+  }
+
+  // 默认视为找回密码
+  if (!username) return res.json(fail(400, '用户名不能为空'));
+  try {
+    const [rows] = await pool.query('SELECT id, email FROM `user` WHERE username = ?', [username]);
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+    let userEmail = rows[0].email;
+
+    if (!userEmail) {
+      if (!email) {
+        return res.json(fail(400, '邮箱未绑定，请先绑定邮箱'));
+      }
+      // 简单处理：在找回密码流程中顺便绑定邮箱
+      await pool.query('UPDATE `user` SET email = ? WHERE id = ?', [email, rows[0].id]);
+      userEmail = email;
+    }
+
+    const key = `reset:${username}`;
+    const code = setCode(key);
+    console.log(`[验证码][找回密码] username=${username}, email=${userEmail}, code=${code}`);
+    return res.json(ok(null, '验证码已发送'));
+  } catch (err) {
+    console.error('发送验证码失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+// 找回密码：验证验证码并重置密码
+app.post('/api/auth/verify-code', async (req, res) => {
+  const { username, code, newPassword, confirmPassword } = req.body || {};
+  if (!username) return res.json(fail(400, '用户名不能为空'));
+  if (!code) return res.json(fail(1008, '验证码不能为空'));
+  if (!newPassword || !confirmPassword) return res.json(fail(1010, '密码不能为空'));
+  if (newPassword !== confirmPassword) return res.json(fail(1002, '两次密码不一致'));
+
+  try {
+    const [rows] = await pool.query('SELECT id FROM `user` WHERE username = ?', [username]);
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+
+    const key = `reset:${username}`;
+    const okMatch = checkCode(key, code);
+    if (!okMatch) return res.json(fail(1009, '验证码错误或已过期'));
+
+    await pool.query('UPDATE `user` SET password = ? WHERE id = ?', [newPassword, rows[0].id]);
+    return res.json(ok(null, '密码重置成功'));
+  } catch (err) {
+    console.error('重置密码失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+// 修改密码（需登录 + 邮箱验证码）
+app.post('/api/auth/password', authMiddleware, async (req, res) => {
+  const { oldPassword, newPassword, confirmPassword, code } = req.body || {};
+  if (!oldPassword || !newPassword || !confirmPassword) {
+    return res.json(fail(1010, '密码不能为空'));
+  }
+  if (newPassword !== confirmPassword) {
+    return res.json(fail(1002, '两次新密码不一致'));
+  }
+  if (!code) {
+    return res.json(fail(1008, '验证码不能为空'));
+  }
+
+  const userId = req.user.id;
+  const username = req.user.username;
+
+  try {
+    const [rows] = await pool.query('SELECT password FROM `user` WHERE id = ?', [userId]);
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+    if (rows[0].password !== oldPassword) {
+      return res.json(fail(1006, '原密码错误'));
+    }
+
+    const okMatch = checkCode(`reset:${username}`, code);
+    if (!okMatch) {
+      return res.json(fail(1009, '验证码错误或已过期'));
+    }
+
+    await pool.query('UPDATE `user` SET password = ? WHERE id = ?', [newPassword, userId]);
+    return res.json(ok(null, '密码修改成功'));
+  } catch (err) {
+    console.error('修改密码失败:', err);
     return res.status(500).json(fail(500, '服务器错误'));
   }
 });

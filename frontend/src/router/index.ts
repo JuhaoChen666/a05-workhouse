@@ -20,6 +20,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Register/RegisterPage.vue'),
   },
   {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('../pages/ForgotPassword/ForgotPasswordPage.vue'),
+  },
+  {
     path: '/home',
     component: () => import('../layouts/HomeLayout.vue'),
     meta: { requiresAuth: true },
@@ -53,6 +58,11 @@ const routes: RouteRecordRaw[] = [
         path: 'profile',
         name: 'Profile',
         component: () => import('../pages/Profile/ProfilePage.vue'),
+      },
+      {
+        path: 'profile/edit',
+        name: 'ProfileEdit',
+        component: () => import('../pages/Profile/ProfileEditPage.vue'),
       },
       {
         path: 'records',
