@@ -4,15 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:登录注册功能添加">
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/EmailService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/RedisUtils.java" afterDir="false" />
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:邮箱验证码发送,验证码校验并重置密码功能">
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/PositionsController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/Positions.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/Positions_Info.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/Role.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/PositionsMapper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/Positions_infoMapper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/PositionsService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/WebController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/utils/Result.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/resources/application.properties" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -143,7 +145,10 @@
       <workItem from="1772538056564" duration="3860000" />
       <workItem from="1772545095408" duration="3241000" />
       <workItem from="1772624596145" duration="8852000" />
-      <workItem from="1772702483214" duration="10429000" />
+      <workItem from="1772702483214" duration="10746000" />
+      <workItem from="1772888284293" duration="844000" />
+      <workItem from="1772968012588" duration="359000" />
+      <workItem from="1772968385209" duration="7537000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -169,7 +174,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772632169586</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="feat:邮箱验证码发送,验证码校验并重置密码功能">
+      <option name="closed" value="true" />
+      <created>1772713676988</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1772713676988</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -189,6 +202,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fix:后端FastAPI和Springboot分离目录" />
     <MESSAGE value="feat:登录注册功能添加" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat:登录注册功能添加" />
+    <MESSAGE value="feat:邮箱验证码发送,验证码校验并重置密码功能" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat:邮箱验证码发送,验证码校验并重置密码功能" />
   </component>
 </project>
