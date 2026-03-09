@@ -22,4 +22,7 @@ public class PositionsService {
     public Positions_Info getPosition_InfoById(int id) {
         return positions_infoMapper.getPositions_InfoById(id);
     }
+    public int deletePosition(int id) {
+        return positionsMapper.deletePosition(id);
+    }
 }
