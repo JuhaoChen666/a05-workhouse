@@ -14,6 +14,6 @@ public interface PositionsMapper {
     @Select("SELECT * FROM positions order by sort_order")
     List<Positions> getAllPositionsOrderBySortOrder();
     @Delete("DELETE FROM positions WHERE id = #{id}")
-    int deletePosition(int id);
+    int deletePosition(Integer id);
 
 }
