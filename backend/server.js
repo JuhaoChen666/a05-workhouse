@@ -42,18 +42,22 @@ const positions = [
   { id: 2, name: 'Web 前端开发', sortOrder: 1 },
   { id: 3, name: 'Python 算法工程师', sortOrder: 2 },
 ];
+// 岗位扩展字段仅存放在内存中，用于模拟岗位详情与后台编辑
+// key: positionId, value: { city, workExperience, ... }
+const positionExtras = new Map();
 const interviewRecords = [];
 const reports = [];
 // 热门岗位（招聘信息）- 从网上整理的计算机相关招聘
+// companyLogo 字段使用公司英文标识，前端通过 `/img/${companyLogo}.ico` 加载对应图标
 const hotJobs = [
-  { id: 1, name: 'Java 后端开发工程师', companyName: '字节跳动', companyLogo: '', salaryMin: 25000, salaryMax: 45000, jobContent: '负责后端服务与复杂应用的设计、开发和维护；参与系统性能优化和架构设计；与前端协作实现业务逻辑；要求熟悉 Java、Spring Boot、MySQL、Redis、微服务。' },
-  { id: 2, name: '高级 Java 开发工程师', companyName: '阿里巴巴', companyLogo: '', salaryMin: 30000, salaryMax: 50000, jobContent: '负责电商/云计算相关后端系统开发；参与分布式系统设计与优化；要求 3 年以上 Java 经验，熟悉 Spring Cloud、MQ、Kafka。' },
-  { id: 3, name: 'Web 前端开发工程师', companyName: '腾讯', companyLogo: '', salaryMin: 20000, salaryMax: 40000, jobContent: '负责前端需求分析、架构设计和代码开发；与产品、设计、后端协作完成页面与功能；熟练掌握 Vue/React、TypeScript、前端工程化。' },
-  { id: 4, name: '前端开发工程师', companyName: '美团', companyLogo: '', salaryMin: 18000, salaryMax: 35000, jobContent: '负责业务前端开发与组件库维护；优化前端性能与体验；要求精通 HTML5/CSS3/JavaScript，有 Vue 或 React 项目经验。' },
-  { id: 5, name: 'Python 算法工程师', companyName: '华为', companyLogo: '', salaryMin: 28000, salaryMax: 48000, jobContent: '负责机器学习/深度学习模型研发与落地；参与数据处理与算法优化；要求熟悉 Python、TensorFlow/PyTorch、常用 ML 算法。' },
-  { id: 6, name: 'C++ 开发工程师', companyName: '网易', companyLogo: '', salaryMin: 22000, salaryMax: 42000, jobContent: '负责游戏或基础组件开发；性能优化与跨平台适配；要求扎实的 C++ 基础，有大型项目经验优先。' },
-  { id: 7, name: 'Go 后端开发', companyName: '滴滴', companyLogo: '', salaryMin: 24000, salaryMax: 44000, jobContent: '负责高并发后端服务开发；参与微服务架构设计；要求熟悉 Go、MySQL、Redis、K8s。' },
-  { id: 8, name: '全栈开发工程师', companyName: '小米', companyLogo: '', salaryMin: 20000, salaryMax: 38000, jobContent: '负责 Web 全栈功能开发；前后端联调与部署；要求熟悉 Node/Vue 或 React，有后端经验。' },
+  { id: 1, name: 'Java 后端开发工程师', companyName: '字节跳动', companyLogo: 'ByteDance', salaryMin: 25000, salaryMax: 45000, jobContent: '负责后端服务与复杂应用的设计、开发和维护；参与系统性能优化和架构设计；与前端协作实现业务逻辑；要求熟悉 Java、Spring Boot、MySQL、Redis、微服务。' },
+  { id: 2, name: '高级 Java 开发工程师', companyName: '阿里巴巴', companyLogo: 'Alibaba', salaryMin: 30000, salaryMax: 50000, jobContent: '负责电商/云计算相关后端系统开发；参与分布式系统设计与优化；要求 3 年以上 Java 经验，熟悉 Spring Cloud、MQ、Kafka。' },
+  { id: 3, name: 'Web 前端开发工程师', companyName: '腾讯', companyLogo: 'Tencent', salaryMin: 20000, salaryMax: 40000, jobContent: '负责前端需求分析、架构设计和代码开发；与产品、设计、后端协作完成页面与功能；熟练掌握 Vue/React、TypeScript、前端工程化。' },
+  { id: 4, name: '前端开发工程师', companyName: '美团', companyLogo: 'Meituan', salaryMin: 18000, salaryMax: 35000, jobContent: '负责业务前端开发与组件库维护；优化前端性能与体验；要求精通 HTML5/CSS3/JavaScript，有 Vue 或 React 项目经验。' },
+  { id: 5, name: 'Python 算法工程师', companyName: '华为', companyLogo: 'Huawei', salaryMin: 28000, salaryMax: 48000, jobContent: '负责机器学习/深度学习模型研发与落地；参与数据处理与算法优化；要求熟悉 Python、TensorFlow/PyTorch、常用 ML 算法。' },
+  { id: 6, name: 'C++ 开发工程师', companyName: '网易', companyLogo: 'NetEase', salaryMin: 22000, salaryMax: 42000, jobContent: '负责游戏或基础组件开发；性能优化与跨平台适配；要求扎实的 C++ 基础，有大型项目经验优先。' },
+  { id: 7, name: 'Go 后端开发', companyName: '滴滴', companyLogo: 'Didi', salaryMin: 24000, salaryMax: 44000, jobContent: '负责高并发后端服务开发；参与微服务架构设计；要求熟悉 Go、MySQL、Redis、K8s。' },
+  { id: 8, name: '全栈开发工程师', companyName: '小米', companyLogo: 'Xiaomi', salaryMin: 20000, salaryMax: 38000, jobContent: '负责 Web 全栈功能开发；前后端联调与部署；要求熟悉 Node/Vue 或 React，有后端经验。' },
 ];
 
 function resOk(data = null) {
@@ -178,7 +182,12 @@ app.get('/api/roles', authMiddleware, (_, res) => {
 
 app.get('/api/positions', authMiddleware, (_, res) => {
   const list = [...positions].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
-  return res.json(resOk(list.map((p) => ({ id: p.id, name: p.name, sortOrder: p.sortOrder }))));
+  // 将内存中的扩展字段合并到列表中，方便后台管理表单回显
+  const merged = list.map((p) => {
+    const extra = positionExtras.get(p.id) || {};
+    return { id: p.id, name: p.name, sortOrder: p.sortOrder, ...extra };
+  });
+  return res.json(resOk(merged));
 });
 
 // ---------- 面试记录 ----------
@@ -197,6 +206,56 @@ app.post('/api/interview-record', authMiddleware, (req, res) => {
   };
   interviewRecords.push(record);
   return res.json(resOk({ id: record.id, userId: record.userId, positionId: record.positionId, startedAt: record.startedAt }));
+});
+
+// 后台 / 详情页用到的岗位详情（包含扩展字段）
+app.get('/api/positions/:id', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const p = positions.find((x) => x.id === id);
+  if (!p) return res.json(resErr(404, '岗位不存在'));
+
+  const extra = positionExtras.get(id) || {};
+  const q = req.query || {};
+
+  const detail = {
+    id: p.id,
+    name: p.name,
+    sortOrder: p.sortOrder,
+    city: q.city || extra.city || '北京',
+    workExperience: q.workExperience || extra.workExperience || '3-5 年',
+    education: q.education || extra.education || '本科及以上',
+    salaryMin:
+      q.salaryMin !== undefined
+        ? Number(q.salaryMin)
+        : extra.salaryMin !== undefined
+        ? Number(extra.salaryMin)
+        : 20000,
+    salaryMax:
+      q.salaryMax !== undefined
+        ? Number(q.salaryMax)
+        : extra.salaryMax !== undefined
+        ? Number(extra.salaryMax)
+        : 40000,
+    responsibilities:
+      q.responsibilities ||
+      extra.responsibilities ||
+      '1. 负责 Web 前端需求分析与开发；2. 与产品和后端配合，持续优化用户体验；3. 推动前端工程化与性能优化。',
+    requirements:
+      q.requirements ||
+      extra.requirements ||
+      '1. 熟悉 HTML5/CSS3/JavaScript；2. 至少掌握一种前端框架（如 Vue/React）；3. 良好的编码习惯与沟通协作能力。',
+    tags:
+      (q.tags &&
+        String(q.tags)
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)) ||
+      extra.tags ||
+      ['前端', '面试', '高薪'],
+    publishDate: q.publishDate || extra.publishDate || new Date().toISOString(),
+  };
+
+  return res.json(resOk(detail));
 });
 
 app.get('/api/interview-record', authMiddleware, (req, res) => {

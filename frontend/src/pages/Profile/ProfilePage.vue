@@ -105,14 +105,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
-import { getProfileApi, changePasswordApi, uploadAvatarApi, type ChangePasswordRequest } from '@/api/auth';
+import { getProfileApi } from '@/api/auth';
 import { getInterviewRecordListApi, getInterviewStatsApi, getRecentScoresApi, type InterviewRecordItem } from '@/api/interview';
-import { getAbilityAnalysisApi } from '@/api/user';
+import { getAbilityAnalysisApi, type AbilityRadarItem } from '@/api/user';
 import { apiOrigin } from '@/api/request';
 import type { UserInfo } from '@/types/auth';
 import { useUserStore } from '@/store/user';
@@ -155,8 +154,8 @@ function formatDateTime(iso: string) {
 async function loadProfile() {
   try {
     const res = await getProfileApi();
-    profile.value = res as UserInfo;
-    if (res && (res as UserInfo).avatarUrl) userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: (res as UserInfo).avatarUrl });
+    profile.value = res;
+    if (res?.avatarUrl) userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
   } catch (e: any) {
     ElMessage.error(e.message || '获取用户信息失败');
   }
@@ -181,8 +180,8 @@ async function fetchRecentRecords() {
     recentRecords.value = res.list ?? [];
     if (statsData.value.totalCount === 0 && (res.total ?? 0) > 0) {
       statsData.value.totalCount = res.total ?? 0;
-      const withScore = (res.list ?? []).filter((r) => r.totalScore != null && r.endedAt);
-      const sum = withScore.reduce((s, r) => s + (r.totalScore ?? 0), 0);
+      const withScore = (res.list ?? []).filter((r: InterviewRecordItem) => r.totalScore != null && r.endedAt);
+      const sum = withScore.reduce((s: number, r: InterviewRecordItem) => s + (r.totalScore ?? 0), 0);
       statsData.value.avgScore = withScore.length ? sum / withScore.length : null;
       statsData.value.lastAt = (res.list ?? [])[0]?.startedAt ?? null;
     }
@@ -209,15 +208,15 @@ function initLineChart() {
   if (!lineChartRef.value) return;
   const chart = echarts.init(lineChartRef.value);
   getRecentScoresApi({ limit: 10 }).then((list) => {
-    const data = (list ?? []).reverse();
+    const data = (list ?? []).slice().reverse();
     chart.setOption({
       tooltip: { trigger: 'axis' },
       xAxis: {
         type: 'category',
-        data: data.map((d) => (d.startedAt ? formatDateTime(d.startedAt).slice(0, 16) : '')),
+        data: data.map((d: { startedAt?: string; totalScore?: number }) => (d.startedAt ? formatDateTime(d.startedAt).slice(0, 16) : '')),
       },
       yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
-      series: [{ name: '得分', type: 'line', data: data.map((d) => d.totalScore), smooth: true }],
+      series: [{ name: '得分', type: 'line', data: data.map((d: { totalScore?: number }) => d.totalScore), smooth: true }],
     });
   }).catch(() => {
     chart.setOption({ title: { text: '暂无数据', left: 'center' } });
@@ -231,9 +230,9 @@ function initBarChart() {
     const bar = res?.bar ?? [];
     chart.setOption({
       tooltip: {},
-      xAxis: { type: 'category', data: bar.map((b) => b.name) },
+      xAxis: { type: 'category', data: bar.map((b: { name: string; value: number }) => b.name) },
       yAxis: { type: 'value', max: 100, name: '分数' },
-      series: [{ type: 'bar', data: bar.map((b) => b.value) }],
+      series: [{ type: 'bar', data: bar.map((b: { name: string; value: number }) => b.value) }],
     });
   }).catch(() => {
     chart.setOption({ title: { text: '暂无数据', left: 'center' } });
@@ -245,8 +244,8 @@ function initRadarChart() {
   const chart = echarts.init(radarChartRef.value);
   getAbilityAnalysisApi().then((res) => {
     const radar = res?.radar ?? [];
-    const indicator = radar.map((r) => ({ name: r.name, max: r.max ?? 100 }));
-    const values = radar.map((r) => r.value);
+    const indicator = radar.map((r: AbilityRadarItem) => ({ name: r.name, max: r.max ?? 100 }));
+    const values = radar.map((r: AbilityRadarItem) => r.value);
     chart.setOption({
       tooltip: {},
       radar: { indicator },

@@ -33,7 +33,15 @@
             <el-card shadow="hover" class="job-card" @click="goJobDetail(j.id)">
               <div class="job-card-header">
                 <span class="job-name">{{ j.name }}</span>
-                <span class="company-name">{{ j.companyName }}</span>
+                <span class="company-name">
+                  <img
+                    v-if="j.companyLogo"
+                    :src="`/img/${j.companyLogo}.ico`"
+                    class="company-logo"
+                    alt="company logo"
+                  />
+                  {{ j.companyName }}
+                </span>
               </div>
               <p class="job-desc">{{ (j.jobContent || '').slice(0, 60) }}...</p>
               <div class="job-salary">
@@ -81,9 +89,6 @@ const latestReport = ref<{ totalScore?: number; summary?: string } | null>(null)
 const latestRecordId = ref<number | null>(null);
 const searchKeyword = ref('');
 
-function goInterview() {
-  router.push({ name: 'Interview' });
-}
 function goJobDetail(id: number) {
   router.push({ name: 'JobDetail', params: { id: String(id) } });
 }
@@ -164,7 +169,8 @@ onMounted(async () => {
 .job-card { cursor: pointer; margin-bottom: 16px; }
 .job-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .job-name { font-weight: 600; }
-.company-name { font-size: 12px; color: #909399; }
+.company-name { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
+.company-logo { width: 16px; height: 16px; }
 .job-desc { font-size: 13px; color: #606266; margin: 0 0 8px; line-height: 1.4; }
 .job-salary { color: #e6a23c; font-size: 14px; font-weight: 500; }
 .report-card { min-height: 180px; }

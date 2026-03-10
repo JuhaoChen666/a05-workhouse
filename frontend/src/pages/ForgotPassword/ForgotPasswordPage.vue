@@ -97,7 +97,7 @@ const onSendCode = async () => {
       username: form.username,
       email: form.email || undefined,
     });
-    ElMessage.success('验证码已发送，请查收（示例中在后端日志中查看）');
+    ElMessage.success('验证码已发送，请查收');
     let left = 60;
     sendCodeText.value = `${left}s 后可重发`;
     if (timer) window.clearInterval(timer);
