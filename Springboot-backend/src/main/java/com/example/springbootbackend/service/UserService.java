@@ -54,6 +54,9 @@ public class UserService {
         user.setPassword(encryptedPwd);
         user.setAvatar("D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/avatar_default.png");
         user.setRole_id(1);
+        // 基于时间戳自动生成用户ID
+        int generatedId = (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
+        user.setUserID(generatedId);
         return userMapper.insertUser(user);
     }
     public int updatePassword(String username, String password, String confirmPassword) {

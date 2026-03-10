@@ -1,5 +1,6 @@
 package com.example.springbootbackend.Controller;
 
+import com.example.springbootbackend.entity.Role;
 import com.example.springbootbackend.entity.User;
 import com.example.springbootbackend.exception.ServiceException;
 import com.example.springbootbackend.service.EmailService;
@@ -14,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -54,11 +57,12 @@ public class WebController {
             }else if (user.getRole_id()==2){
                 userv0.setRoleName("管理员");
             }
-            return Result.success(Map.of(
-                    "token", token,
-                    "user", userv0
+            Map<String,Object> data=new LinkedHashMap<>();
+            data.put("token", token);
+            data.put("user", userv0);
+            return Result.success(data);
 
-            ));
+
 
         } catch (ServiceException e) {
             if (e.getMessage().equals("用户不存在")) {
@@ -149,6 +153,14 @@ public class WebController {
             return Result.error(e.getMessage());
         }
         return Result.error("密码重置失败");
+    }
+    @GetMapping("/roles")
+    public Result getRoles() {
+        List<Role> roles = List.of(
+                new Role(1, "普通用户"),
+                new Role(2, "管理员")
+        );
+        return Result.success(roles);
     }
 }
 
