@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
 import type { Pinia } from 'pinia';
+import { ElMessage } from 'element-plus';
 import { useUserStore } from '../store/user';
 
 const routes: RouteRecordRaw[] = [
@@ -81,6 +82,47 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    path: '/admin',
+    component: () => import('../pages/Admin/AdminLayout.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+    children: [
+      {
+        path: '',
+        redirect: '/admin/users',
+      },
+      {
+        path: 'users',
+        name: 'AdminUsers',
+        meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/UserManagePage.vue'),
+      },
+      {
+        path: 'positions',
+        name: 'AdminPositions',
+        meta: { title: '岗位管理', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/PositionManagePage.vue'),
+      },
+      {
+        path: 'positions/:id',
+        name: 'AdminPositionDetail',
+        meta: { title: '岗位详情', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/PositionDetailPage.vue'),
+      },
+      {
+        path: 'question-bank',
+        name: 'AdminQuestionBank',
+        meta: { title: '题库管理', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/QuestionBankManagePage.vue'),
+      },
+      {
+        path: 'learning-resource',
+        name: 'AdminLearningResource',
+        meta: { title: '学习资源', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/LearningResourceManagePage.vue'),
+      },
+    ],
+  },
 ];
 
 const router = createRouter({
@@ -92,11 +134,23 @@ const router = createRouter({
 export function setupRouterGuard(pinia: Pinia) {
   router.beforeEach((to, _from, next) => {
     const userStore = useUserStore(pinia);
-    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+    const requiresAuth = to.matched.some((r) => r.meta.requiresAuth);
+    const requiresAdmin = to.matched.some((r) => r.meta.requiresAdmin);
+
+    // 需要登录但当前未登录，跳转到登录页并带上重定向地址
+    if (requiresAuth && !userStore.isLoggedIn) {
       next({ name: 'Login' });
-    } else {
-      next();
+      return;
     }
+
+    // 仅管理员可访问的路由：如果已登录但不是管理员，则提示并回到首页
+    if (requiresAdmin && userStore.userInfo && userStore.userInfo.roleId !== 2) {
+      ElMessage.error('仅管理员可访问后台管理系统');
+      next({ name: 'Home' });
+      return;
+    }
+
+    next();
   });
 }
 

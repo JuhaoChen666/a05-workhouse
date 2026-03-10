@@ -19,13 +19,11 @@ instance.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：统一处理 code / message
+// 响应拦截器：统一处理 code / message，返回 data 字段（已解包）
 instance.interceptors.response.use(
   (response) => {
     const data = response.data;
-    // 这里假设后端统一返回 { code, message, data }
     if (data.code !== 0) {
-      // 可以在这里做全局错误提示
       return Promise.reject(new Error(data.message || '请求错误'));
     }
     return data.data;
@@ -35,4 +33,16 @@ instance.interceptors.response.use(
   }
 );
 
-export default instance;
+// 封装为返回解包后的 data 类型，避免各处拿到 AxiosResponse
+export default {
+  get: <T = unknown>(url: string, config?: Parameters<typeof instance.get>[1]) =>
+    instance.get(url, config) as Promise<T>,
+  post: <T = unknown>(url: string, data?: unknown, config?: Parameters<typeof instance.post>[2]) =>
+    instance.post(url, data, config) as Promise<T>,
+  put: <T = unknown>(url: string, data?: unknown, config?: Parameters<typeof instance.put>[2]) =>
+    instance.put(url, data, config) as Promise<T>,
+  patch: <T = unknown>(url: string, data?: unknown, config?: Parameters<typeof instance.patch>[2]) =>
+    instance.patch(url, data, config) as Promise<T>,
+  delete: <T = unknown>(url: string, config?: Parameters<typeof instance.delete>[1]) =>
+    instance.delete(url, config) as Promise<T>,
+};

@@ -130,7 +130,7 @@ function goResumeOptimize() {
 }
 
 // 处理文件选择
-function handleFileChange(file: UploadFile, fileListInner: UploadFiles) {
+function handleFileChange(_file: UploadFile, fileListInner: UploadFiles) {
   fileList.value = fileListInner;
 }
 

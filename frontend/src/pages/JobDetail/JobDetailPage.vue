@@ -7,8 +7,13 @@
           <div class="job-header-left">
             <h2 class="job-title">{{ job.name }}</h2>
             <div class="company">
+              <el-image
+                v-if="job.companyLogo"
+                :src="`/img/${job.companyLogo}.ico`"
+                class="company-logo"
+                fit="contain"
+              />
               <span class="company-name">{{ job.companyName }}</span>
-              <el-image v-if="job.companyLogo" :src="job.companyLogo" class="company-logo" fit="contain" />
             </div>
             <div class="salary">
               薪资：{{ (job.salaryMin / 1000).toFixed(0) }}k - {{ (job.salaryMax / 1000).toFixed(0) }}k / 月

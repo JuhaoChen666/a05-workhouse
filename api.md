@@ -290,6 +290,39 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。404 表示岗位不存在。
 
+> 说明：为了方便后台管理系统在本地联调，本项目的模拟后端在原有基础结构上，
+> 额外返回了一份更详细的岗位信息，并允许用 GET 查询参数临时覆盖这些字段。
+
+响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": 1,
+    "name": "前端开发工程师",
+    "sortOrder": 0,
+    "city": "北京",
+    "workExperience": "3-5 年",
+    "education": "本科及以上",
+    "salaryMin": 20000,
+    "salaryMax": 40000,
+    "responsibilities": "1. 负责 Web 前端需求分析与开发；2. 与产品和后端配合，持续优化用户体验；3. 推动前端工程化与性能优化。",
+    "requirements": "1. 熟悉 HTML5/CSS3/JavaScript；2. 至少掌握一种前端框架（如 Vue/React）；3. 良好的编码习惯与沟通协作能力。",
+    "tags": ["前端", "面试", "高薪"],
+    "publishDate": "2026-03-04T12:00:00.000Z"
+  }
+}
+```
+
+在本地开发环境中，可以通过查询参数覆盖其中部分字段，例如：
+
+`GET /positions/1?city=上海&salaryMin=30000&salaryMax=50000`
+
+上述请求会返回相同结构的数据，只是 `city` 与薪资范围会按查询参数进行替换，
+方便在不改动数据库的前提下模拟不同岗位详情。
+
 ---
 
 #### 8. 新增岗位（管理员）
@@ -311,7 +344,24 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 **PUT** `/positions/:id`
 
-需要认证 + 管理员。请求体：`name?`, `sortOrder?`。
+需要认证 + 管理员。请求体字段均为可选，用于局部更新：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | string | 否 | 岗位名称 |
+| sortOrder | number | 否 | 排序值 |
+| city | string | 否 | 工作城市，如“北京” |
+| workExperience | string | 否 | 工作经验要求，如“3-5 年” |
+| education | string | 否 | 学历要求，如“本科及以上” |
+| salaryMin | number | 否 | 薪资下限（元/月） |
+| salaryMax | number | 否 | 薪资上限（元/月） |
+| responsibilities | string | 否 | 职责描述，建议按 1.2.3. 形式分条 |
+| requirements | string | 否 | 任职要求，建议按 1.2.3. 形式分条 |
+| tags | string / string[] | 否 | 标签集合，可以是字符串数组，也可以是逗号分隔的字符串 |
+| publishDate | string | 否 | 发布时间，ISO 格式字符串 |
+
+> 注意：当前模拟后端中，扩展字段（除 `name` / `sortOrder` 外）仅存储在内存中，
+> 主要用于后台管理系统展示和调试，不会写入真实数据库。
 
 ---
 

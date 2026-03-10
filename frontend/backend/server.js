@@ -354,10 +354,18 @@ app.get('/api/roles', authMiddleware, async (req, res) => {
 });
 
 // ----- 岗位 -----
+// 额外岗位字段的内存存储（仅用于模拟环境，不入库）
+// key: positionId, value: { city, workExperience, ... }
+const positionExtras = new Map();
 app.get('/api/positions', authMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, name, sort_order AS sortOrder FROM `position` ORDER BY sort_order, id');
-    return res.json(ok(rows));
+    // 将内存中的扩展字段合并到列表中，方便后台管理表单回显
+    const list = rows.map((r) => {
+      const extra = positionExtras.get(r.id) || {};
+      return { ...r, ...extra };
+    });
+    return res.json(ok(list));
   } catch (err) {
     console.error(err);
     return res.status(500).json(fail(500, '服务器错误'));
@@ -370,7 +378,61 @@ app.get('/api/positions/:id', authMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, name, sort_order AS sortOrder FROM `position` WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json(fail(404, '岗位不存在'));
-    return res.json(ok(rows[0]));
+
+    const row = rows[0];
+    const extra = positionExtras.get(row.id) || {};
+
+    /**
+     * 为了配合后台管理系统展示更丰富的岗位详情，这里在原有基础结构上
+     * 额外返回一组“模拟字段”。这些字段可以通过 GET 查询参数覆盖，
+     * 方便在本地调试不同文案，而无需真正修改数据库。
+     *
+     * 例如：
+     *   GET /api/positions/1?city=上海&salaryMin=30000&salaryMax=50000
+     */
+    const q = req.query || {};
+
+    const detail = {
+      // 原有结构（保持兼容）
+      id: row.id,
+      name: row.name,
+      sortOrder: row.sortOrder,
+      // 扩展的模拟字段，用于岗位详情展示（优先使用已保存的值，其次是查询参数，最后是默认值）
+      city: q.city || extra.city || '北京',
+      workExperience: q.workExperience || extra.workExperience || '3-5 年',
+      education: q.education || extra.education || '本科及以上',
+      salaryMin:
+        q.salaryMin !== undefined
+          ? Number(q.salaryMin)
+          : extra.salaryMin !== undefined
+          ? Number(extra.salaryMin)
+          : 20000,
+      salaryMax:
+        q.salaryMax !== undefined
+          ? Number(q.salaryMax)
+          : extra.salaryMax !== undefined
+          ? Number(extra.salaryMax)
+          : 40000,
+      responsibilities:
+        q.responsibilities ||
+        extra.responsibilities ||
+        '1. 负责 Web 前端需求分析与开发；2. 与产品和后端配合，持续优化用户体验；3. 推动前端工程化与性能优化。',
+      requirements:
+        q.requirements ||
+        extra.requirements ||
+        '1. 熟悉 HTML5/CSS3/JavaScript；2. 至少掌握一种前端框架（如 Vue/React）；3. 良好的编码习惯与沟通协作能力。',
+      tags:
+        (q.tags &&
+          String(q.tags)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)) ||
+        extra.tags ||
+        ['前端', '面试', '高薪'],
+      publishDate: q.publishDate || extra.publishDate || new Date().toISOString(),
+    };
+
+    return res.json(ok(detail));
   } catch (err) {
     console.error(err);
     return res.status(500).json(fail(500, '服务器错误'));
@@ -378,11 +440,51 @@ app.get('/api/positions/:id', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/positions', authMiddleware, adminMiddleware, async (req, res) => {
-  const { name, sortOrder } = req.body || {};
+  const {
+    name,
+    sortOrder,
+    city,
+    workExperience,
+    education,
+    salaryMin,
+    salaryMax,
+    responsibilities,
+    requirements,
+    tags,
+    publishDate,
+  } = req.body || {};
   if (!name) return res.json(fail(400, '岗位名称不能为空'));
   try {
     const [r] = await pool.query('INSERT INTO `position` (name, sort_order) VALUES (?, ?)', [name, sortOrder ?? 0]);
-    return res.json(ok({ id: r.insertId, name, sortOrder: sortOrder ?? 0 }));
+    const id = r.insertId;
+    // 在内存中保存扩展字段（不影响数据库结构）
+    positionExtras.set(id, {
+      city,
+      workExperience,
+      education,
+      salaryMin,
+      salaryMax,
+      responsibilities,
+      requirements,
+      tags,
+      publishDate,
+    });
+    return res.json(
+      ok({
+        id,
+        name,
+        sortOrder: sortOrder ?? 0,
+        city,
+        workExperience,
+        education,
+        salaryMin,
+        salaryMax,
+        responsibilities,
+        requirements,
+        tags,
+        publishDate,
+      })
+    );
   } catch (err) {
     console.error(err);
     return res.status(500).json(fail(500, '服务器错误'));
@@ -391,7 +493,19 @@ app.post('/api/positions', authMiddleware, adminMiddleware, async (req, res) => 
 
 app.put('/api/positions/:id', authMiddleware, adminMiddleware, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const { name, sortOrder } = req.body || {};
+  const {
+    name,
+    sortOrder,
+    city,
+    workExperience,
+    education,
+    salaryMin,
+    salaryMax,
+    responsibilities,
+    requirements,
+    tags,
+    publishDate,
+  } = req.body || {};
   if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
   try {
     const updates = [];
@@ -404,9 +518,27 @@ app.put('/api/positions/:id', authMiddleware, adminMiddleware, async (req, res) 
       updates.push('sort_order = ?');
       values.push(sortOrder);
     }
-    if (updates.length === 0) return res.json(ok(null));
-    values.push(id);
-    await pool.query(`UPDATE \`position\` SET ${updates.join(', ')} WHERE id = ?`, values);
+    if (updates.length) {
+      values.push(id);
+      await pool.query(`UPDATE \`position\` SET ${updates.join(', ')} WHERE id = ?`, values);
+    }
+
+    // 同步更新内存中的扩展字段
+    const prev = positionExtras.get(id) || {};
+    const nextExtras = {
+      ...prev,
+      ...(city !== undefined ? { city } : {}),
+      ...(workExperience !== undefined ? { workExperience } : {}),
+      ...(education !== undefined ? { education } : {}),
+      ...(salaryMin !== undefined ? { salaryMin } : {}),
+      ...(salaryMax !== undefined ? { salaryMax } : {}),
+      ...(responsibilities !== undefined ? { responsibilities } : {}),
+      ...(requirements !== undefined ? { requirements } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+      ...(publishDate !== undefined ? { publishDate } : {}),
+    };
+    positionExtras.set(id, nextExtras);
+
     return res.json(ok(null));
   } catch (err) {
     console.error(err);
@@ -709,14 +841,31 @@ app.post('/api/report', authMiddleware, async (req, res) => {
   }
 });
 
-// ----- 热门岗位（招聘信息，首页展示 & 搜索，使用 job 表） ----- 
+// ----- 热门岗位（招聘信息，首页展示 & 搜索，使用 job 表） -----
+// 将数据库中的公司名称映射为前端使用的 logo 标识（如 ByteDance / Alibaba 等）
+function withCompanyLogo(row) {
+  const logoMap = {
+    '字节跳动': 'ByteDance',
+    '阿里巴巴': 'Alibaba',
+    '腾讯': 'Tencent',
+    '美团': 'Meituan',
+    '华为': 'Huawei',
+    '网易': 'NetEase',
+    '滴滴': 'Didi',
+    '小米': 'Xiaomi',
+  };
+  const logo = row.companyLogo || logoMap[row.companyName] || null;
+  return { ...row, companyLogo: logo };
+}
+
 app.get('/api/jobs/hot', authMiddleware, async (req, res) => {
   const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
   try {
-    const [rows] = await pool.query(
+    const [rawRows] = await pool.query(
       'SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type FROM job ORDER BY id DESC LIMIT ?',
       [limit]
     );
+    const rows = rawRows.map(withCompanyLogo);
     return res.json(ok(rows));
   } catch (err) {
     console.error('获取热门岗位失败:', err);
@@ -756,7 +905,7 @@ app.get('/api/jobs/search', authMiddleware, async (req, res) => {
     const total = countRows[0].total || 0;
 
     const listParams = [...params, pageSize, offset];
-    const [rows] = await pool.query(
+    const [rawRows] = await pool.query(
       `SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type
        FROM job
        WHERE ${where}
@@ -765,6 +914,7 @@ app.get('/api/jobs/search', authMiddleware, async (req, res) => {
       listParams
     );
 
+    const rows = rawRows.map(withCompanyLogo);
     return res.json(ok({ list: rows, total }));
   } catch (err) {
     console.error('搜索岗位失败:', err);
@@ -776,12 +926,12 @@ app.get('/api/jobs/:id', authMiddleware, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
   try {
-    const [rows] = await pool.query(
+    const [rawRows] = await pool.query(
       'SELECT id, name, company_name AS companyName, company_logo AS companyLogo, salary_min AS salaryMin, salary_max AS salaryMax, job_content AS jobContent, type FROM job WHERE id = ?',
       [id]
     );
-    if (rows.length === 0) return res.status(404).json(fail(404, '岗位不存在'));
-    return res.json(ok(rows[0]));
+    if (rawRows.length === 0) return res.status(404).json(fail(404, '岗位不存在'));
+    return res.json(ok(withCompanyLogo(rawRows[0])));
   } catch (err) {
     console.error('获取岗位详情失败:', err);
     return res.status(500).json(fail(500, '服务器错误'));

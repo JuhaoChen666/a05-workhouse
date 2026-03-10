@@ -116,9 +116,9 @@ const pwdRules: FormRules = {
 async function loadProfile() {
   try {
     const res = await getProfileApi();
-    profile.value = res as UserInfo;
-    if (res && (res as UserInfo).avatarUrl) {
-      userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: (res as UserInfo).avatarUrl });
+    profile.value = res;
+    if (res?.avatarUrl) {
+      userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
     }
   } catch (e: any) {
     ElMessage.error(e.message || '获取用户信息失败');

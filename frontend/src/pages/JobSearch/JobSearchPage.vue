@@ -66,7 +66,15 @@
                   <div class="job-card-header">
                     <div>
                       <div class="job-name" v-html="highlightText(job.name)" />
-                      <div class="company-name" v-html="highlightText(job.companyName)" />
+                      <div class="company-name">
+                        <img
+                          v-if="job.companyLogo"
+                          :src="`/img/${job.companyLogo}.ico`"
+                          class="company-logo"
+                          alt="company logo"
+                        />
+                        <span v-html="highlightText(job.companyName)" />
+                      </div>
                     </div>
                     <el-tag v-if="job.type" size="small" type="info">
                       {{ formatJobType(job.type) }}
@@ -354,6 +362,13 @@ watch(
 .company-name {
   font-size: 12px;
   color: #909399;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.company-logo {
+  width: 16px;
+  height: 16px;
 }
 .job-desc {
   font-size: 13px;
