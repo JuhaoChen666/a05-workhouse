@@ -4,7 +4,8 @@ from datetime import datetime
 from pathlib import Path
 
 from pydub import AudioSegment
-
+# 设置 FFmpeg 路径
+os.environ["PATH"] += os.pathsep + "C:\\ffmpeg\\bin"
 
 def convert_webm_to_wav(webm_bytes: bytes, output_path: str) -> str:
     """
