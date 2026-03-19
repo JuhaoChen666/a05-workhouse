@@ -4,6 +4,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+
+# FastAPI Backend 项目忽略文件
+.env.example
+#Springboot Backend 项目忽略文件
+application.properties
+
 ### STS ###
 .apt_generated
 .classpath
