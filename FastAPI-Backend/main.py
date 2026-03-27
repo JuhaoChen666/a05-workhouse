@@ -1,70 +1,49 @@
-"""Emo2Vec-Agent - FastAPI + LangChain AI Agent."""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.api import interview_routes
 
-from app.api.v1.endpoints import agent, chat, system
-from app.core.config import settings
-from app.core.events import lifespan
+app = FastAPI(title="智能面试系统API", version="1.0.0")
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 注册路由
+app.include_router(interview_routes.router)
 
 
-def create_application() -> FastAPI:
-    """Create FastAPI application."""
-    app = FastAPI(
-        title=settings.API_TITLE,
-        description=settings.API_DESCRIPTION,
-        version=settings.APP_VERSION,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
-        lifespan=lifespan,
+@app.get("/")
+async def root():
+    return {
+        "message": "智能面试系统API",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    print("🚀 启动智能面试系统...")
+    print("📍 访问地址: http://localhost:8000")
+    print("📚 API文档: http://localhost:8000/docs")
+    print("🔧 按 Ctrl+C 停止服务")
+    print("-" * 50)
+
+    # ✅ 修改这里：传递字符串而不是app对象
+    uvicorn.run(
+        "main:app",  # 改为字符串格式
+        host="0.0.0.0",
+        port=8000,
+        reload=True
     )
-
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Include routers
-    app.include_router(
-        chat.router,
-        prefix=settings.API_V1_PREFIX,
-    )
-    app.include_router(
-        agent.router,
-        prefix=settings.API_V1_PREFIX,
-    )
-    app.include_router(
-        system.router,
-        prefix=settings.API_V1_PREFIX,
-    )
-
-    from app.api.v1.endpoints import voice  # 导入语音模块
-
-    app.include_router(
-        voice.router,  # 使用 voice 模块的路由
-        prefix=settings.API_V1_PREFIX,  # 前缀 /api/v1
-    )
-    @app.get("/")
-    async def root():
-        """Root endpoint."""
-        return {
-            "app": settings.APP_NAME,
-            "version": settings.APP_VERSION,
-            "docs": "/docs",
-            "api": settings.API_V1_PREFIX,
-        }
-
-    @app.get("/health")
-    async def health():
-        """Health check endpoint."""
-        return {"status": "healthy"}
-
-    return app
-
-
-app = create_application()

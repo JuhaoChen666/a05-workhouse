@@ -1,10 +1,10 @@
 import os
-
+from dotenv import load_dotenv
 from langchain_community.embeddings import DashScopeEmbeddings
-from openai import OpenAI
-from langchain_chroma import Chroma
-# 使用原生 OpenAI SDK 测试
+from app.RAG.document import process_markdown
 
+# 使用原生 OpenAI SDK 测试
+load_dotenv()
 
 def get_embedding():
     embeddings = DashScopeEmbeddings(
@@ -12,6 +12,7 @@ def get_embedding():
         dashscope_api_key=os.getenv("DASHSCOPE_API_KEY")
     )
     return embeddings
+
 
 
 if __name__ == "__main__":

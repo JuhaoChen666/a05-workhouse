@@ -1,7 +1,7 @@
 from langchain_community.document_loaders import DirectoryLoader, UnstructuredMarkdownLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
-from numba import double
+
 
 
 # Markdown 文件加载器
@@ -19,8 +19,10 @@ def process_markdown(file_path):
         content = f.read()
     # 定义切分规则
     headers_to_split_on=[
-        ("##","chapter"),
-        ("###","question")
+        ("#","岗位知识库名"),
+        ("##","大类"),
+        ("###","分类"),
+        ("####","小类"),
     ]
     markdown_splitter=MarkdownHeaderTextSplitter(
         headers_to_split_on=headers_to_split_on,

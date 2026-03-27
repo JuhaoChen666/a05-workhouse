@@ -6,7 +6,7 @@ target/
 
 
 # FastAPI Backend 项目忽略文件
-.env.example
+.env
 #Springboot Backend 项目忽略文件
 application.properties
 
