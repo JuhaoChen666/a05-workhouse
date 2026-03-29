@@ -135,7 +135,7 @@ pip install -e .
 
 1. 复制环境变量模板：
 ```bash
-cp .env.example .env
+cp .env .env
 ```
 
 2. 编辑 `.env` 文件，配置以下关键参数：

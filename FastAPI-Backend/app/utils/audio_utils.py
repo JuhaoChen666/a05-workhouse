@@ -5,7 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 from pydub import AudioSegment
-
+# 设置 FFmpeg 路径
+os.environ["PATH"] += os.pathsep + "C:\\ffmpeg\\bin"
 
 def _ensure_parent_dir(path: str) -> None:
     """Windows 上 dirname 为空时 os.makedirs('') 会触发 [Errno 22] Invalid argument。"""
@@ -74,40 +75,32 @@ def ensure_audio_dirs()->None:
         os.makedirs(dir_path, exist_ok=True)
 
 
-def generate_audio_path(user_id:str)->str:
+def generate_audio_path(user_id: str) -> str:
     """
-       生成音频文件的存储路径
+       生成音频文件的存储路径 (返回绝对路径以确保兼容性)
 
        参数:
            user_id: 用户标识，用于区分不同用户的文件
 
        返回:
-           完整的文件路径，格式：data/audio/YYYYMMDD/user_id_YYYYMMDD_HHMMSS.wav
-
-       示例:
-           >>> generate_audio_path("user123")
-           'data/audio/20250223/user123_20250223_203045.wav'
-       """
+           完整的文件绝对路径
+    """
     # 获取当前日期时间
     now = datetime.now()
-
-    # 格式化日期字符串：20250223
     date_str = now.strftime("%Y%m%d")
-
-    # 格式化时间字符串：203045
     time_str = now.strftime("%H%M%S")
 
-    # 构建文件名：user_id + 日期 + 时间
-    filename = f"{user_id}_{date_str}_{time_str}.wav"
+    # 构建文件名：清洗 user_id 中的非法字符
+    safe_user_id = "".join([c if c.isalnum() or c in ("-", "_") else "_" for c in user_id])
+    filename = f"{safe_user_id}_{date_str}_{time_str}.wav"
 
-    # 构建完整路径：按日期分文件夹，便于管理
-    filepath = f"data/audio/{date_str}/{filename}"
+    # 使用 Path 构建绝对路径
+    base_dir = Path("data/audio") / date_str
+    base_dir.mkdir(parents=True, exist_ok=True)
+    
+    filepath = (base_dir / filename).absolute()
 
-    # 确保目录存在
-    dir_path = os.path.dirname(filepath)
-    os.makedirs(dir_path, exist_ok=True)
-
-    return filepath
+    return str(filepath)
 
 def save_wav_file(
         audio_bytes: bytes,

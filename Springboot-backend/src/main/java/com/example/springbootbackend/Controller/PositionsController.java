@@ -22,7 +22,7 @@ public class PositionsController {
     }
 
     @GetMapping("/{id}")
-    public Result getPositionInfoById(@PathVariable int id) {
+    public Result getPositionInfoById(@PathVariable Integer id) {
         Positions_Info positionInfo = positionsService.getPosition_InfoById(id);
         if (positionInfo == null) {
             return Result.resourceNotExist();
@@ -30,7 +30,7 @@ public class PositionsController {
         return Result.success(positionInfo);
     }
     @DeleteMapping("/{id}")
-    public Result deletePosition(@PathVariable int id) {
+    public Result deletePosition(@PathVariable Integer id) {
         int result = positionsService.deletePosition(id);
         if (result == 0) {
             return Result.resourceNotExist();

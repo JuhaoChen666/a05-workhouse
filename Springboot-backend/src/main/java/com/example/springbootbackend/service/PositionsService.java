@@ -19,10 +19,10 @@ public class PositionsService {
     public List<Positions> getAllPositions() {
         return positionsMapper.getAllPositions();
     }
-    public Positions_Info getPosition_InfoById(int id) {
+    public Positions_Info getPosition_InfoById(Integer id) {
         return positions_infoMapper.getPositions_InfoById(id);
     }
-    public int deletePosition(int id) {
+    public int deletePosition(Integer id) {
         return positionsMapper.deletePosition(id);
     }
 }
