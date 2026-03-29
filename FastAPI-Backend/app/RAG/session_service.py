@@ -3,6 +3,7 @@ import asyncio
 from typing import Dict, List, Optional, AsyncGenerator
 from datetime import datetime
 from app.RAG.RAG_full import RAGService
+from app.RAG.voice_service import VoiceRAGService
 from app.models.interview_models import ConversationRecord, StreamEvent
 
 
@@ -55,8 +56,13 @@ class InterviewSession:
         return self.current_question
 
     async def process_answer(self, answer: str) -> AsyncGenerator[StreamEvent, None]:
-        """处理用户回答，返回流式事件"""
+        """处理用户文字回答"""
+        async for event in self._process_answer_logic(answer):
+            yield event
 
+    async def _process_answer_logic(self, answer: str, emotion_data: Optional[Dict] = None) -> AsyncGenerator[StreamEvent, None]:
+        """核心业务逻辑：处理回答，分析深度，生成追问或切换主题"""
+        
         if self.status != "questioning":
             yield StreamEvent(
                 type="error",
@@ -71,19 +77,27 @@ class InterviewSession:
             "question": self.current_question,
             "answer": answer,
             "topic": self.current_topic,
+            "emotion": emotion_data,
             "timestamp": datetime.now().isoformat()
         }
-        self.conversation_history.append(qa_record)
+        # 如果是文字输入，且没有 emotion_data，则不覆盖可能已由语音记录的 history (通常不会发生冲突)
+        # 为了简单，我们在这里统一追加。但在 process_voice_answer 中我们会先追加。
+        # 修正：逻辑内部不负责追加 history，或者负责全量追加。
+        # 考虑到流程，我们在逻辑开始处追加 history。
+        
+        # 检查是否已经在 history 中（由 process_voice_answer 事先存入）
+        if not any(h['round'] == qa_record['round'] for h in self.conversation_history):
+            self.conversation_history.append(qa_record)
 
         # 分析回答深度
         yield StreamEvent(
             type="analyzing",
-            data={"message": "正在分析回答深度..."},
+            data={"message": "正在分析回答深度" + (" (结合情感分析)" if emotion_data else "") + "..."},
             timestamp=datetime.now().isoformat()
         )
 
         analysis = await self.rag_service.analyze_answer_depth(
-            self.current_question, answer
+            self.current_question, answer, emotion_data=emotion_data
         )
 
         yield StreamEvent(
@@ -91,7 +105,8 @@ class InterviewSession:
             data={
                 "depth_score": analysis.get("depth_score", 5),
                 "is_vague": analysis.get("is_vague", False),
-                "need_followup": analysis.get("need_followup", False)
+                "need_followup": analysis.get("need_followup", False),
+                "feedback": analysis.get("feedback_to_candidate", "")
             },
             timestamp=datetime.now().isoformat()
         )
@@ -236,6 +251,48 @@ class InterviewSession:
                     },
                     timestamp=datetime.now().isoformat()
                 )
+
+    async def process_voice_answer(self, audio_path: str, voice_rag_service: VoiceRAGService) -> AsyncGenerator[StreamEvent, None]:
+        """处理语音回答，返回流式事件"""
+
+        if self.status != "questioning":
+            yield StreamEvent(
+                type="error",
+                data={"message": "当前状态无法接收回答"},
+                timestamp=datetime.now().isoformat()
+            )
+            return
+
+        # 1. 语音处理（ASR + 情感分析）
+        yield StreamEvent(
+            type="voice_processing",
+            data={"message": "正在录音转写并分析情感..."},
+            timestamp=datetime.now().isoformat()
+        )
+        
+        voice_result = await voice_rag_service.process_voice_input(audio_path)
+        asr_text = voice_result["asr_text"]
+        emotion_features = voice_result["emotion_features"]
+
+        # 2. 发送转写和情感结果 (提前给前端反馈)
+        yield StreamEvent(
+            type="voice_result",
+            data={
+                "asr_text": asr_text,
+                "emotion_features": emotion_features
+            },
+            timestamp=datetime.now().isoformat()
+        )
+
+        # 3. 调用核心面试逻辑 (传入 ASR 文本和情感数据)
+        async for event in self._process_answer_logic(asr_text, emotion_data=emotion_features):
+            yield event
+
+        yield StreamEvent(
+            type="complete",
+            data={"message": "语音回答处理完成"},
+            timestamp=datetime.now().isoformat()
+        )
 
     def get_session_info(self) -> dict:
         """获取会话信息"""

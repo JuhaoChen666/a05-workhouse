@@ -4,95 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="fix:gitignore修复">
-      <change afterPath="$PROJECT_DIR$/.idea/a05-workhouse.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8/storage_v2/_src_/schema/information_schema.FNRwLQ.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8/storage_v2/_src_/schema/mysql.osA4Bg.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8/storage_v2/_src_/schema/performance_schema.kIw0nw.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8/storage_v2/_src_/schema/sys.zb4BAA.meta" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/data_source_mapping.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/package-lock.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/后端开发工程师_知识库.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/后端开发工程师_问题库.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/移动端开发工程师_Android_知识库.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/移动端开发工程师_Android_问题库.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/_2026_3_3_17_15____.xml" beforeDir="false" />
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:文字对答面试部分✓">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__1.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__10.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__11.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__12.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__13.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__14.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__15.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__2.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__3.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__4.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__5.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__6.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__7.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__8.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/__init__9.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/agent.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/agent1.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/agent_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/audio_utils.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/base.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/base1.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/builder.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/chat.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/chat1.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/chat_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/chroma.sqlite3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/chroma_client.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/common.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/config.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/events.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/exceptions.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/frontend_test_user_20260224_022305.wav" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/logging.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/main.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/modelscope.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/modelscope_tools.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/redis_client.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/router.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/shelved.patch" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/state.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/system.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/voice.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/voice_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/web_search.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.vscode/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/.vscode/settings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/Chromadb.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/Chromadb.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_Service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_Service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/document.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/document.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/embeddings.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/embeddings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/llm/deepseek.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/llm/deepseek.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/llm/router.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/agent.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/chat.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/schemas/common.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/services/__init__.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/services/agent_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/services/chat_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/services/voice_service.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/data/chroma/chroma.sqlite3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/llm/modelscope.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/utils/audio_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/utils/audio_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/data/audio/20260224/frontend_test_user_20260224_022305.wav" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -135,6 +57,7 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
     &quot;Python.Chromadb.executor&quot;: &quot;Run&quot;,
     &quot;Python.RAG_Service.executor&quot;: &quot;Run&quot;,
@@ -146,6 +69,7 @@
     &quot;Python.ffmpeg_test.executor&quot;: &quot;Run&quot;,
     &quot;Python.main.executor&quot;: &quot;Run&quot;,
     &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.testASR.executor&quot;: &quot;Run&quot;,
     &quot;Python.test_import.executor&quot;: &quot;Run&quot;,
     &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
     &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
@@ -170,7 +94,7 @@
     &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.language.and.region&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;http.proxy&quot;,
     &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
     &quot;应用程序.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;
@@ -253,8 +177,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
-        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
+        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-IU-252.26199.169" />
       </set>
     </attachedChunks>
   </component>
@@ -326,6 +250,11 @@
       <workItem from="1774248735754" duration="161000" />
       <workItem from="1774249003261" duration="83000" />
       <workItem from="1774249108588" duration="3007000" />
+      <workItem from="1774615270959" duration="487000" />
+      <workItem from="1774619895930" duration="715000" />
+      <workItem from="1774620800260" duration="181000" />
+      <workItem from="1774699485611" duration="1499000" />
+      <workItem from="1774705814641" duration="2818000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -415,7 +344,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773930564280</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="fix:gitignore修复">
+      <option name="closed" value="true" />
+      <created>1774615585274</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1774615585274</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TerminalProjectNonSharedOptionsProvider">
@@ -451,16 +388,17 @@
     <option name="LAST_COMMIT_MESSAGE" value="fix:gitignore修复" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/a05_workhouse$embeddings.coverage" NAME="embeddings 覆盖结果" MODIFIED="1774007099819" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$test.coverage" NAME="test 覆盖结果" MODIFIED="1773735905080" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$RAG_full.coverage" NAME="RAG_full 覆盖结果" MODIFIED="1774075947748" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
     <SUITE FILE_PATH="coverage/a05_workhouse$document.coverage" NAME="main 覆盖结果" MODIFIED="1774084710187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$ffmpeg_test.coverage" NAME="ffmpeg_test 覆盖结果" MODIFIED="1773729509741" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$deepseek.coverage" NAME="deepseek 覆盖结果" MODIFIED="1774007365293" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/llm" />
     <SUITE FILE_PATH="coverage/a05_workhouse$RAG_Service.coverage" NAME="RAG_Service 覆盖结果" MODIFIED="1774015975387" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
     <SUITE FILE_PATH="coverage/a05_workhouse$Chromadb.coverage" NAME="Chromadb 覆盖结果" MODIFIED="1774010389599" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$embeddings.coverage" NAME="embeddings 覆盖结果" MODIFIED="1774007099819" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$test.coverage" NAME="test 覆盖结果" MODIFIED="1773735905080" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$testASR.coverage" NAME="testASR 覆盖结果" MODIFIED="1774620812330" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$RAG_full.coverage" NAME="RAG_full 覆盖结果" MODIFIED="1774075947748" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$ffmpeg_test.coverage" NAME="ffmpeg_test 覆盖结果" MODIFIED="1773729509741" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$deepseek.coverage" NAME="deepseek 覆盖结果" MODIFIED="1774007365293" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/llm" />
     <SUITE FILE_PATH="coverage/a05_workhouse$test_import.coverage" NAME="test_import 覆盖结果" MODIFIED="1774081571252" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
     <SUITE FILE_PATH="coverage/a05_workhouse$chroma_client.coverage" NAME="chroma_client 覆盖结果" MODIFIED="1774007768774" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1774104679667" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1774710115493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
   </component>
 </project>

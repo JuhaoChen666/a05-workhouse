@@ -1,6 +1,7 @@
 import json
 import asyncio
-from fastapi import APIRouter, HTTPException
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from app.models.interview_models import InterviewStartRequest, InterviewAnswerRequest
 from app.RAG.interview_service import InterviewService
@@ -9,6 +10,43 @@ router = APIRouter(prefix="/api/interview", tags=["面试"])
 
 # 创建服务实例（可以考虑使用依赖注入）
 interview_service = InterviewService()
+
+
+@router.post("/answer-voice")
+async def submit_voice_answer(
+    session_id: str = Form(...),
+    file: UploadFile = File(...)
+):
+    """提交语音回答并获取流式响应"""
+    
+    async def generate():
+        try:
+            # 读取文件字节内容
+            audio_bytes = await file.read()
+            
+            async for event in interview_service.process_voice_answer(session_id, audio_bytes):
+                # 将事件转换为JSON字符串并发送
+                yield json.dumps(event.dict(), ensure_ascii=False) + "\n"
+            
+            # 发送占位符顶出数据帧
+            yield "      \n\n"
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            # 在生成器中产生错误事件
+            yield json.dumps({
+                "type": "error",
+                "data": {"message": str(e)},
+                "timestamp": datetime.now().isoformat()
+            }, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.post("/start")

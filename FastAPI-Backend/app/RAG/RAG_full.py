@@ -48,6 +48,34 @@ class RAGService:
         }}
         """)
 
+        # 语音版结果深度评估器 (包含情感分析)
+        self.voice_answer_depth_analyzer_prompt = ChatPromptTemplate.from_template("""
+        你是一个专业的面试官，正在通过语音与候选人进行技术面试。
+        你需要评估候选人对技术问题的回答深度及其情感表现。
+
+        问题: {question}
+        候选人的回答（ASR自动转写）: {answer}
+        候选人的情感分析结果: {emotion_data}
+        标准答案参考: {knowledge_base}
+
+        请结合回答内容（ASR文本可能会有小误差）和候选人的情感特征（如自信、犹豫、紧张等），分析并判断：
+        1. 回答内容是否达到了要求的深度？（考虑ASR转写可能存在错别字）
+        2. 情感状态是否影响了表达？（如过于紧张导致逻辑不清）
+        3. 回答的深度评分（1-10分）
+        4. 是否需要针对未说清的点进行追问？
+        5. 对候选人给出一个口语化的、兼顾技术与情绪的简短反馈（feedback）。
+
+        输出JSON格式：
+        {{
+            "is_vague": true/false,
+            "depth_score": 1-10,
+            "need_followup": true/false,
+            "followup_point": "具体技术点",
+            "followup_direction": "详细的追问问题",
+            "feedback_to_candidate": "给候选人的口语化反馈"
+        }}
+        """)
+
         # 追问问题生成器
         self.followup_question_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，基于候选人的回答，需要提出一个更深入、更具体的问题。
@@ -185,16 +213,29 @@ class RAGService:
         topic = await chain.ainvoke({"question": question})
         return topic.strip()
 
-    async def analyze_answer_depth(self, question: str, answer: str) -> dict:
-        """分析回答深度"""
+    async def analyze_answer_depth(self, question: str, answer: str, emotion_data: Optional[Dict] = None) -> dict:
+        """分析回答深度 (支持语音情感数据)"""
         knowledge = self.retrieve_knowledge(f"{question} {answer}", k=3)
 
-        chain = self.answer_depth_analyzer_prompt | DeepSeek_LLM | StrOutputParser()
-        result = await chain.ainvoke({
-            "question": question,
-            "answer": answer,
-            "knowledge_base": knowledge
-        })
+        if emotion_data:
+            # 使用语音专用的评估提示词
+            chain = self.voice_answer_depth_analyzer_prompt | DeepSeek_LLM | StrOutputParser()
+            input_data = {
+                "question": question,
+                "answer": answer,
+                "knowledge_base": knowledge,
+                "emotion_data": json.dumps(emotion_data, ensure_ascii=False)
+            }
+        else:
+            # 使用标准文本评估提示词
+            chain = self.answer_depth_analyzer_prompt | DeepSeek_LLM | StrOutputParser()
+            input_data = {
+                "question": question,
+                "answer": answer,
+                "knowledge_base": knowledge
+            }
+
+        result = await chain.ainvoke(input_data)
 
         # 尝试解析JSON
         try:

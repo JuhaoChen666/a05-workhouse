@@ -1,6 +1,8 @@
 from typing import AsyncGenerator
 from app.RAG.RAG_full import RAGService
 from app.RAG.session_service import SessionService
+from app.RAG.voice_service import VoiceRAGService
+from app.utils.audio_utils import generate_audio_path, save_wav_file
 from datetime import datetime
 from app.models.interview_models import StreamEvent
 
@@ -11,6 +13,7 @@ class InterviewService:
     def __init__(self):
         self.rag_service = RAGService()
         self.session_service = SessionService(self.rag_service)
+        self.voice_rag_service = VoiceRAGService()
 
     def initialize_database(self, collection_name: str):
         """初始化数据库"""
@@ -53,6 +56,36 @@ class InterviewService:
 
         async for event in session.process_answer(answer):
             yield event
+
+    async def process_voice_answer(self, session_id: str, audio_bytes: bytes) -> AsyncGenerator[StreamEvent, None]:
+        """处理语音回答"""
+        session = self.session_service.get_session(session_id)
+        if not session:
+            yield StreamEvent(
+                type="error",
+                data={"message": f"会话 {session_id} 不存在"},
+                timestamp=datetime.now().isoformat()
+            )
+            return
+
+        try:
+            # 1. 保存音频文件 (使用安全的文件名并转换为绝对路径)
+            audio_path = generate_audio_path(str(session_id))
+            save_wav_file(audio_bytes, audio_path)
+
+            # 2. 调用会话的语音处理逻辑
+            async for event in session.process_voice_answer(audio_path, self.voice_rag_service):
+                yield event
+        except Exception as e:
+            import traceback
+            error_msg = f"语音处理系统错误: {str(e)}"
+            print(f"Error in process_voice_answer: {error_msg}")
+            traceback.print_exc()
+            yield StreamEvent(
+                type="error",
+                data={"message": error_msg},
+                timestamp=datetime.now().isoformat()
+            )
 
     def get_session_info(self, session_id: str) -> dict:
         """获取会话信息"""
