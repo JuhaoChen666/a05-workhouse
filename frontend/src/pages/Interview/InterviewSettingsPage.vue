@@ -4,163 +4,222 @@
       <template #header>
         <div class="card-header">
           <span>面试设置</span>
-          <el-button type="primary" link @click="backToJobDetail">
-            返回岗位详情
-          </el-button>
+          <el-button type="primary" link @click="backToJobDetail">返回岗位详情</el-button>
         </div>
       </template>
 
       <template v-if="job">
-        <div class="job-brief">
-          <div class="job-title-row">
-            <span class="job-name">{{ job.name }}</span>
-            <span class="company-name">{{ job.companyName }}</span>
-          </div>
-          <div class="salary">
-            {{ (job.salaryMin / 1000).toFixed(0) }}k -
-            {{ (job.salaryMax / 1000).toFixed(0) }}k / 月
-          </div>
-        </div>
+        <p class="intro">请确认岗位并提供简历信息（文字输入或上传 PDF/Word），系统会自动匹配题库集合并开始面试。</p>
 
-        <el-divider />
+        <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px" class="settings-form">
+          <el-form-item label="面试岗位" prop="positionName">
+            <el-input v-model="form.positionName" placeholder="例如：移动端开发工程师(Android)" clearable />
+          </el-form-item>
 
-        <el-row :gutter="20">
-          <!-- 左侧：简历上传/直接面试 -->
-          <el-col :span="14">
-            <h3>简历设置</h3>
-            <p class="desc">
-              可上传一份 PDF / Word 简历，用于后续简历分析与问答；也可以选择直接开始面试。
-            </p>
-
-            <el-radio-group v-model="mode" class="mode-radio-group">
-              <el-radio label="withResume">上传简历后开始面试</el-radio>
-              <el-radio label="noResume">不提交简历，直接面试</el-radio>
+          <el-form-item label="简历方式">
+            <el-radio-group v-model="resumeInputMode">
+              <el-radio label="text">文字输入</el-radio>
+              <el-radio label="file">上传 PDF/Word</el-radio>
             </el-radio-group>
+          </el-form-item>
 
-            <div
-              v-if="mode === 'withResume'"
-              class="upload-wrap"
+          <el-form-item v-if="resumeInputMode === 'text'" label="简历内容" prop="resumeText">
+            <el-input
+              v-model="form.resumeText"
+              type="textarea"
+              :rows="7"
+              placeholder="请输入简历摘要，例如：候选人张三，3年Android开发经验..."
+            />
+          </el-form-item>
+
+          <el-form-item v-else label="简历文件" required>
+            <el-upload
+              class="upload-block"
+              drag
+              :show-file-list="true"
+              :limit="1"
+              :auto-upload="false"
+              :file-list="fileList"
+              :on-change="handleFileChange"
+              :on-remove="handleFileRemove"
+              accept=".pdf,.doc,.docx"
             >
-              <el-upload
-                class="upload-block"
-                drag
-                :show-file-list="true"
-                :limit="1"
-                :auto-upload="false"
-                :file-list="fileList"
-                :on-change="handleFileChange"
-                :before-remove="handleBeforeRemove"
-                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              >
-                <el-icon class="upload-icon"><UploadFilled /></el-icon>
-                <div class="el-upload__text">
-                  将文件拖到此处或 <em>点击上传</em>
-                </div>
-                <div class="el-upload__tip">
-                  仅支持 PDF / Word，大小建议不超过 5MB（后端上传接口可后续接入）
-                </div>
-              </el-upload>
-            </div>
-          </el-col>
-
-          <!-- 右侧：简历优化入口 -->
-          <el-col :span="10">
-            <h3>简历优化（预留）</h3>
-            <p class="desc">
-              进入简历优化工具，对现有简历进行结构化调整和用词润色，再返回本页开始模拟面试。
-            </p>
-            <el-button type="primary" plain @click="goResumeOptimize">
-              打开简历优化页面（占位）
-            </el-button>
-          </el-col>
-        </el-row>
-
-        <el-divider />
+              <el-icon class="upload-icon"><UploadFilled /></el-icon>
+              <div class="el-upload__text">将文件拖到此处或 <em>点击上传</em></div>
+              <div class="el-upload__tip">支持 PDF / Word（docx 优先，doc 视内容可能解析失败）</div>
+            </el-upload>
+          </el-form-item>
+        </el-form>
 
         <div class="actions">
-          <el-button @click="backToJobDetail">返回岗位详情</el-button>
-          <el-button type="primary" @click="startInterview">
-            开始面试
-          </el-button>
+          <el-button @click="backToJobDetail">取消</el-button>
+          <el-button type="primary" :loading="starting" @click="onStartInterview">开始面试</el-button>
         </div>
       </template>
 
-      <el-empty
-        v-else-if="!loading"
-        description="岗位不存在或已下线"
-        :image-size="80"
-      />
+      <el-empty v-else-if="!loading" description="岗位不存在或已下线" :image-size="80" />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import type { UploadFile, UploadFiles } from 'element-plus';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ref, reactive, onMounted } from 'vue';
+import type { FormInstance, FormRules, UploadFile, UploadFiles } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
+import mammoth from 'mammoth/mammoth.browser';
+import * as pdfjsLib from 'pdfjs-dist';
 import { getJobDetailApi, type HotJobItem } from '@/api/jobs';
 
-// 路由对象
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
+
 const route = useRoute();
 const router = useRouter();
 
-// 状态：岗位与加载
-const loading = ref<boolean>(true);
+const loading = ref(true);
+const starting = ref(false);
 const job = ref<HotJobItem | null>(null);
-
-// 状态：简历模式和文件
-const mode = ref<'withResume' | 'noResume'>('withResume');
+const resumeInputMode = ref<'text' | 'file'>('text');
 const fileList = ref<UploadFiles>([]);
 
-// 返回岗位详情页
+const formRef = ref<FormInstance>();
+const form = reactive({
+  positionName: '',
+  resumeText: '',
+});
+
+const formRules: FormRules = {
+  positionName: [{ required: true, message: '请填写面试岗位', trigger: 'blur' }],
+  resumeText: [
+    {
+      validator: (_rule, value, cb) => {
+        if (resumeInputMode.value === 'text' && !String(value || '').trim()) {
+          cb(new Error('请填写简历内容'));
+          return;
+        }
+        cb();
+      },
+      trigger: 'blur',
+    },
+  ],
+};
+
 function backToJobDetail() {
   const id = route.params.id;
-  if (id) {
-    router.push({ name: 'JobDetail', params: { id: String(id) } });
-  } else {
-    router.push({ name: 'Home' });
-  }
+  if (id) router.push({ name: 'JobDetail', params: { id: String(id) } });
+  else router.push({ name: 'Home' });
 }
 
-// 进入简历优化页面（占位路由，后续可替换为真实地址）
-function goResumeOptimize() {
-  ElMessage.info('简历优化页面暂未实现，可在后续迭代中接入。');
-}
-
-// 处理文件选择
 function handleFileChange(_file: UploadFile, fileListInner: UploadFiles) {
+  fileList.value = fileListInner.slice(-1);
+}
+
+function handleFileRemove(_file: UploadFile, fileListInner: UploadFiles) {
   fileList.value = fileListInner;
 }
 
-// 删除文件前确认
-function handleBeforeRemove(file: UploadFile) {
-  return ElMessageBox.confirm(`确定移除文件「${file.name}」吗？`, '提示', {
-    type: 'warning',
-  });
+function inferCollectionNameByPosition(positionName: string) {
+  const text = (positionName || '').toLowerCase();
+  if (text.includes('android')) return 'android_engineer';
+  if (text.includes('后端') || text.includes('backend')) return 'backend_engineer';
+  return 'general_engineer';
 }
 
-// 开始面试：这里仅进行前端流程跳转，面试页面逻辑后续扩展
-function startInterview() {
-  if (mode.value === 'withResume' && fileList.value.length === 0) {
-    ElMessage.warning('请先上传简历，或选择“不提交简历，直接面试”。');
-    return;
+async function extractPdfText(file: File) {
+  const ab = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(ab) });
+  const pdf = await loadingTask.promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const page = await pdf.getPage(i);
+    // eslint-disable-next-line no-await-in-loop
+    const content = await page.getTextContent();
+    const txt = content.items
+      .map((it) => ('str' in it ? String(it.str) : ''))
+      .join(' ')
+      .trim();
+    if (txt) pages.push(txt);
   }
-  const id = route.params.id;
-  if (!id) {
+  return pages.join('\n');
+}
+
+async function extractWordText(file: File) {
+  const ab = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: ab });
+  return String(result.value || '').trim();
+}
+
+async function getResumeTextFromInput() {
+  if (resumeInputMode.value === 'text') {
+    const txt = form.resumeText.trim();
+    if (!txt) throw new Error('请填写简历内容');
+    return txt;
+  }
+
+  const raw = fileList.value[0]?.raw as File | undefined;
+  if (!raw) throw new Error('请先上传简历文件');
+  const name = raw.name.toLowerCase();
+  if (name.endsWith('.pdf')) {
+    return extractPdfText(raw);
+  }
+  if (name.endsWith('.docx') || name.endsWith('.doc')) {
+    return extractWordText(raw);
+  }
+  throw new Error('仅支持 PDF/Word 文件');
+}
+
+/** 拉取岗位后填充表单默认值 */
+function fillFormFromJob(j: HotJobItem) {
+  form.positionName = j.name || '';
+  form.resumeText =
+    `候选人，具有相关项目经验。目标岗位：${j.name || ''}。` +
+    `${j.jobContent ? `过往经验摘要：${j.jobContent.slice(0, 140)}` : ''}`;
+}
+
+async function onStartInterview() {
+  if (!job.value) return;
+  const valid = await formRef.value?.validate().catch(() => false);
+  if (!valid) return;
+
+  const idParam = route.params.id;
+  if (!idParam) {
     ElMessage.error('缺少岗位 ID');
     return;
   }
 
-  // 此处暂不真正上传简历和创建面试记录，后续可在此处接入后端接口
-  router.push({
-    name: 'InterviewSession',
-    params: { id: String(id) },
-    query: {
-      withResume: mode.value === 'withResume' ? '1' : '0',
-    },
-  });
+  starting.value = true;
+  try {
+    const resumeText = (await getResumeTextFromInput()).trim();
+    if (!resumeText) {
+      ElMessage.error('简历内容解析为空，请更换文件或改为手动输入');
+      return;
+    }
+    const position = form.positionName.trim();
+    const collection_name = inferCollectionNameByPosition(position);
+    const pendingStartPayload = JSON.stringify({
+      resume: resumeText,
+      position,
+      collection_name,
+    });
+    sessionStorage.setItem('pendingInterviewStart', pendingStartPayload);
+
+    router.push({
+      name: 'InterviewSession',
+      params: { id: String(idParam) },
+      query: {
+        jobName: position,
+      },
+    });
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '创建面试会话失败');
+  } finally {
+    starting.value = false;
+  }
 }
 
 onMounted(async () => {
@@ -173,6 +232,7 @@ onMounted(async () => {
   try {
     const res = await getJobDetailApi(id);
     job.value = res;
+    fillFormFromJob(res);
   } catch {
     job.value = null;
   } finally {
@@ -182,61 +242,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.interview-settings-page {
-  max-width: 960px;
-  margin: 0 auto;
-}
-.settings-card {
-  width: 100%;
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.job-brief {
-  margin-bottom: 8px;
-}
-.job-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.job-name {
-  font-weight: 600;
-}
-.company-name {
-  font-size: 13px;
-  color: #909399;
-}
-.salary {
-  color: #e6a23c;
-  font-weight: 500;
-}
-.desc {
-  font-size: 13px;
-  color: #606266;
-  margin: 4px 0 12px;
-}
-.mode-radio-group {
-  margin-bottom: 12px;
-}
-.upload-wrap {
-  max-width: 420px;
-}
-.upload-block {
-  width: 100%;
-}
-.upload-icon {
-  font-size: 32px;
-  color: #409eff;
-  margin-bottom: 8px;
-}
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
+.interview-settings-page { max-width: 720px; margin: 0 auto; }
+.settings-card { width: 100%; }
+.card-header { display: flex; align-items: center; justify-content: space-between; }
+.intro { font-size: 13px; color: #606266; margin: 0 0 16px; line-height: 1.5; }
+.settings-form { max-width: 100%; }
+.upload-block { width: 100%; max-width: 520px; }
+.upload-icon { font-size: 32px; color: #409eff; margin-bottom: 8px; }
+.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 </style>
-

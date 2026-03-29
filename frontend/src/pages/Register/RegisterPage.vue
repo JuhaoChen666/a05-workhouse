@@ -21,7 +21,7 @@
             <el-input v-model="form.emailCode" placeholder="请输入验证码" class="code-input" />
             <el-button
               class="code-btn"
-              :disabled="sendCodeLoading || !form.email || !!sendCodeTimer"
+              :disabled="sendCodeLoading || !form.username?.trim() || !form.email || !!sendCodeTimer"
               @click="onSendRegisterCode"
             >
               {{ sendCodeText }}
@@ -114,13 +114,21 @@ const rules: FormRules = {
 };
 
 const onSendRegisterCode = async () => {
-  if (!form.email || sendCodeLoading.value || sendCodeTimer) return;
-  // 先校验邮箱格式
+  if (!form.username?.trim() || !form.email || sendCodeLoading.value || sendCodeTimer) return;
+  await formRef.value?.validateField('username').catch(() => {});
   await formRef.value?.validateField('email').catch(() => {});
+  if (!form.username.trim()) {
+    ElMessage.warning('请先填写用户名');
+    return;
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return;
   sendCodeLoading.value = true;
   try {
-    await sendCodeApi({ scene: 'register', email: form.email });
+    await sendCodeApi({
+      scene: 'register',
+      email: form.email,
+      username: form.username.trim(),
+    });
     ElMessage.success('验证码已发送到邮箱，请查收');
     let left = 60;
     sendCodeText.value = `${left}s 后可重发`;

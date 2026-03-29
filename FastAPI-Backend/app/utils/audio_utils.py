@@ -1,9 +1,23 @@
+import re
 import wave
 import os
 from datetime import datetime
 from pathlib import Path
 
 from pydub import AudioSegment
+
+
+def _ensure_parent_dir(path: str) -> None:
+    """Windows 上 dirname 为空时 os.makedirs('') 会触发 [Errno 22] Invalid argument。"""
+    d = os.path.dirname(os.path.normpath(path))
+    if d:
+        os.makedirs(d, exist_ok=True)
+
+
+def _safe_path_segment(s: str, max_len: int = 80) -> str:
+    """去掉 Windows 文件名非法字符，避免 open/makedirs 异常。"""
+    t = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(s).strip())
+    return (t or "user")[:max_len]
 
 
 def convert_webm_to_wav(webm_bytes: bytes, output_path: str) -> str:
