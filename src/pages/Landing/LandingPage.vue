@@ -93,7 +93,7 @@
 
       <!-- Features Section -->
       <section id="features" class="features">
-        <h2 class="section-title">核心功能特性</h2>
+        <h2 class="section-title">核心功能及特性</h2>
         <div class="feature-grid">
           <div class="feature-card" v-for="(feature, index) in features" :key="index">
             <div class="icon-wrapper">
