@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const crypto = require('crypto');
 const pool = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
@@ -30,6 +31,303 @@ const upload = multer({
   storage,
   limits: { fileSize: 2 * 1024 * 1024 },
 });
+
+// 面试简历上传目录（PDF/Word，与头像分开）
+const INTERVIEW_RESUME_DIR = path.join(__dirname, 'uploads', 'interview-resume');
+if (!fs.existsSync(INTERVIEW_RESUME_DIR)) {
+  fs.mkdirSync(INTERVIEW_RESUME_DIR, { recursive: true });
+}
+const resumeStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, INTERVIEW_RESUME_DIR),
+  filename: (req, file, cb) => {
+    const uid = (req.user && req.user.id) || 'guest';
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const ext = path.extname(file.originalname || '') || '';
+    cb(null, `resume_${uid}_${id}${ext}`);
+  },
+});
+const uploadInterviewResume = multer({
+  storage: resumeStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+/**
+ * 豆包（火山方舟）OpenAPI：POST chat/completions
+ * - ARK_API_KEY：API Key（必填，走真实流式）
+ * - ARK_ENDPOINT_ID：推理接入点 ID，即请求体里的 model（如 ep-xxxx，必填）
+ * - ARK_CHAT_URL：可选，默认 https://ark.cn-beijing.volces.com/api/v3/chat/completions
+ * 兼容旧变量：DOUBAO_API_KEY / DOUBAO_ENDPOINT_ID
+ */
+const ARK_API_KEY =
+  process.env.ARK_API_KEY || process.env.DOUBAO_API_KEY || '';
+const ARK_ENDPOINT_ID =
+  process.env.ARK_ENDPOINT_ID || process.env.DOUBAO_ENDPOINT_ID || '';
+const ARK_CHAT_COMPLETIONS_URL =
+  process.env.ARK_CHAT_URL ||
+  'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+
+// AI 面试会话：内存存储，进程重启后清空
+// sessionId -> { userId, interviewMode, messages: [{role, content}], updatedAt }
+const interviewAiSessions = new Map();
+// 新版面试会话（按用户提供的新接口协议）
+// session_id -> { userId, resume, position, collection_name, status, total_rounds, current_topic, current_question, history }
+const interviewSessionsV2 = new Map();
+const AI_INTERVIEW_MAX_QUESTIONS = Number(process.env.AI_INTERVIEW_MAX_QUESTIONS || 10);
+const AI_INTERVIEW_SCORE_MIN = Number(process.env.AI_INTERVIEW_SCORE_MIN || 0);
+const AI_INTERVIEW_SCORE_MAX = Number(process.env.AI_INTERVIEW_SCORE_MAX || 10);
+
+function buildInterviewSystemPrompt(ctx) {
+  const resumeLine = ctx.resumeOriginalName
+    ? `候选人已上传简历文件：${ctx.resumeOriginalName}（服务端仅存文件，暂不解析正文）。`
+    : '候选人未上传简历或选择跳过简历。';
+  return `你是一名专业、友善的技术面试官，正在模拟真实面试场景。
+请根据以下候选人信息进行提问与追问，语言简洁专业，每次回复控制在合理长度。
+
+【岗位】${ctx.positionName || '未填写'}
+【薪资预期】${ctx.salaryExpected || '未填写'}
+【公司名称】${ctx.companyName || '未填写'}
+【工作内容 / JD 摘要】
+${ctx.jobContent || '未填写'}
+
+${resumeLine}
+
+面试模式说明：当前为「${ctx.interviewMode === 'voice' ? '语音面试（占位，仍按文本交互说明）' : '文本面试'}」。请一次只问 1～2 个相关问题，或针对候选人上一句回答做简短点评后再追问。`;
+}
+
+function ok200(data = null, message = 'success') {
+  return { code: 200, message, data };
+}
+
+function inferTopicByText(text) {
+  if (!text) return '通用技术能力';
+  const t = String(text);
+  if (/性能|卡顿|优化/.test(t)) return '前端性能优化\n用户体验设计';
+  if (/并发|异步|协程|RxJava/.test(t)) return 'Android异步并发管理';
+  if (/架构|组件|模块/.test(t)) return '架构设计与模块拆分';
+  return '项目经验分析\n技术问题解决';
+}
+
+function extractJsonObject(text) {
+  const raw = String(text || '').trim();
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    return JSON.parse(raw.slice(start, end + 1));
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function callArkChatOnce(messages) {
+  if (!ARK_API_KEY || !ARK_ENDPOINT_ID) return '';
+  try {
+    const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ARK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ARK_ENDPOINT_ID,
+        stream: false,
+        messages,
+      }),
+    });
+    if (!upstream.ok) return '';
+    const data = await upstream.json();
+    return (
+      data &&
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      String(data.choices[0].message.content || '')
+    );
+  } catch (_e) {
+    return '';
+  }
+}
+
+/** 无 API Key 时的模拟流式输出 */
+async function writeMockStream(res, fullText) {
+  const chunks = fullText.split(/(?=[。！？\n])|(?<=。)|(?<=！)|(?<=？)/).filter(Boolean);
+  const useChunks = chunks.length > 1 ? chunks : [fullText];
+  for (const c of useChunks) {
+    for (const ch of c) {
+      res.write(`data: ${JSON.stringify({ content: ch })}\n\n`);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 8));
+    }
+  }
+}
+
+/**
+ * 创建会话时生成 AI 首问：
+ * 1) 已配置方舟参数时，优先调用豆包（非流式）
+ * 2) 失败或未配置时，回退到本地模板
+ */
+async function generateOpeningQuestion({ systemContent, positionName, mode }) {
+  // 语音模式当前仍为占位文案
+  if (mode === 'voice') {
+    return '欢迎来到语音面试（占位模式）。当前版本先不做语音识别与情感分析，您可以先切换文本模式体验。';
+  }
+
+  const fallback =
+    `你好，我是本次面试官。我们先从自我介绍开始：请你用 1-2 分钟介绍一下你与「${positionName}」最相关的项目经历与技术亮点。`;
+
+  if (!ARK_API_KEY || !ARK_ENDPOINT_ID) {
+    return fallback;
+  }
+
+  try {
+    const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ARK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ARK_ENDPOINT_ID,
+        stream: false,
+        messages: [
+          { role: 'system', content: systemContent },
+          {
+            role: 'user',
+            content:
+              '请你作为面试官先手发起第一问。要求：1）只输出一段自然中文提问；2）不超过120字；3）紧贴候选人目标岗位；4）不要输出前缀标题。',
+          },
+        ],
+      }),
+    });
+
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => upstream.statusText);
+      console.error('生成首问失败（豆包）:', upstream.status, errText);
+      return fallback;
+    }
+
+    const data = await upstream.json();
+    const content =
+      data &&
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      data.choices[0].message.content;
+    const opening = content ? String(content).trim() : '';
+    return opening || fallback;
+  } catch (e) {
+    console.error('生成首问异常（豆包）:', e);
+    return fallback;
+  }
+}
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function scoreInterviewAnswer({ systemContent, question, answer }) {
+  const fallback = { score: 6, comment: '回答基本完整，建议增加量化结果与技术细节。' };
+  if (!ARK_API_KEY || !ARK_ENDPOINT_ID) return fallback;
+  try {
+    const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ARK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ARK_ENDPOINT_ID,
+        stream: false,
+        messages: [
+          { role: 'system', content: systemContent },
+          {
+            role: 'user',
+            content: `请对候选人回答评分（满分10分）。只输出 JSON：{"score": number, "comment": "一句话点评"}。\n上一个问题：${question}\n候选人回答：${answer}`,
+          },
+        ],
+      }),
+    });
+    if (!upstream.ok) return fallback;
+    const data = await upstream.json();
+    const content =
+      data &&
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      data.choices[0].message.content;
+    const parsed = safeJsonParse(String(content || '').trim());
+    if (!parsed || typeof parsed.score !== 'number') return fallback;
+    return {
+      score: Number(parsed.score),
+      comment: parsed.comment ? String(parsed.comment) : '',
+    };
+  } catch (_e) {
+    return fallback;
+  }
+}
+
+async function buildInterviewReportContent({ positionName, rounds, avgScore, scoreComments }) {
+  const fallback = {
+    totalScore: Math.max(0, Math.min(10, Number(avgScore.toFixed(1)))),
+    dimensions: [
+      { name: '表达与沟通', score: Math.max(0, Math.min(10, Math.round(avgScore))), comment: '表达较清晰，建议更结构化。' },
+      { name: '技术深度', score: Math.max(0, Math.min(10, Math.round(avgScore))), comment: '有一定技术细节，可补充性能与权衡。' },
+      { name: '问题解决', score: Math.max(0, Math.min(10, Math.round(avgScore))), comment: '能描述解决思路，建议增加复盘。' },
+    ],
+    summary: `本次模拟面试已完成，共 ${rounds} 轮问答，综合表现中等偏上。`,
+    suggestions: [
+      '使用 STAR 结构回答项目问题（背景、任务、行动、结果）',
+      '补充量化结果，如性能提升百分比、故障率下降等',
+      '回答中增加技术权衡与取舍说明',
+    ],
+  };
+  if (!ARK_API_KEY || !ARK_ENDPOINT_ID) return fallback;
+  try {
+    const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ARK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ARK_ENDPOINT_ID,
+        stream: false,
+        messages: [
+          {
+            role: 'user',
+            content:
+              `你是面试评审官。基于以下信息生成面试报告 JSON，不要输出额外文字。` +
+              `格式：{"totalScore":number,"dimensions":[{"name":"表达与沟通","score":number,"comment":"..."},{"name":"技术深度","score":number,"comment":"..."},{"name":"问题解决","score":number,"comment":"..."}],"summary":"...","suggestions":["...","..."]}` +
+              `岗位：${positionName || '未填写'}；轮次：${rounds}；平均分：${avgScore.toFixed(1)}；评分点评：${scoreComments.join(' | ')}`,
+          },
+        ],
+      }),
+    });
+    if (!upstream.ok) return fallback;
+    const data = await upstream.json();
+    const content =
+      data &&
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      data.choices[0].message.content;
+    const parsed = safeJsonParse(String(content || '').trim());
+    if (!parsed || typeof parsed !== 'object') return fallback;
+    return {
+      totalScore:
+        typeof parsed.totalScore === 'number' ? Math.max(0, Math.min(10, parsed.totalScore)) : fallback.totalScore,
+      dimensions: Array.isArray(parsed.dimensions) ? parsed.dimensions : fallback.dimensions,
+      summary: parsed.summary ? String(parsed.summary) : fallback.summary,
+      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : fallback.suggestions,
+    };
+  } catch (_e) {
+    return fallback;
+  }
+}
 
 // 简单的验证码存储（仅用于演示环境，进程重启后会丢失）
 // key 形如：register:email 或 reset:username
@@ -1135,6 +1433,841 @@ app.get('/api/admin/export/interview-record', authMiddleware, adminMiddleware, a
   }
 });
 
+// ----- 模拟面试 AI（豆包流式 / 本地回退） -----
+// 上传面试用简历（PDF/Word）
+app.post('/api/interview-ai/resume', authMiddleware, uploadInterviewResume.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json(fail(400, '请选择要上传的文件'));
+    }
+    return res.json(
+      ok({
+        originalName: req.file.originalname,
+        storedName: req.file.filename,
+        size: req.file.size,
+      })
+    );
+  } catch (err) {
+    console.error('面试简历上传失败:', err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+// 创建面试会话：写入 system 提示与候选人填写的岗位/薪资/公司/工作内容等
+app.post('/api/interview-ai/session', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const {
+    jobId,
+    positionName,
+    salaryExpected,
+    companyName,
+    jobContent,
+    interviewMode,
+    aiAvatar,
+    resumeStoredName,
+    resumeOriginalName,
+  } = req.body || {};
+
+  if (!positionName || !String(positionName).trim()) {
+    return res.json(fail(400, '请填写面试岗位'));
+  }
+  const mode = interviewMode === 'voice' ? 'voice' : 'text';
+  const avatar = aiAvatar ? String(aiAvatar) : 'girl-a';
+
+  const sessionId = crypto.randomUUID();
+  const systemContent = buildInterviewSystemPrompt({
+    positionName: String(positionName).trim(),
+    salaryExpected: salaryExpected != null ? String(salaryExpected) : '',
+    companyName: companyName != null ? String(companyName) : '',
+    jobContent: jobContent != null ? String(jobContent) : '',
+    interviewMode: mode,
+    resumeOriginalName: resumeOriginalName || null,
+  });
+
+  let interviewRecordId = null;
+  try {
+    if (jobId != null && Number(jobId) > 0) {
+      const startedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const [r] = await pool.query(
+        'INSERT INTO interview_record (user_id, position_id, started_at) VALUES (?, ?, ?)',
+        [Number(userId), Number(jobId), startedAt]
+      );
+      interviewRecordId = r.insertId;
+    }
+  } catch (e) {
+    console.error('创建 interview_record 失败（继续会话）:', e);
+  }
+
+  // 仅创建会话上下文，不在此处调用大模型；首问由前端进入会话页后请求 /interview-ai/opening-stream
+  interviewAiSessions.set(sessionId, {
+    userId,
+    jobId: jobId != null ? Number(jobId) : null,
+    interviewMode: mode,
+    aiAvatar: avatar,
+    resumeStoredName: resumeStoredName || null,
+    positionName: String(positionName).trim(),
+    interviewRecordId,
+    roundCount: 0,
+    scoreHistory: [],
+    scoreCommentHistory: [],
+    finished: false,
+    messages: [{ role: 'system', content: systemContent }],
+    updatedAt: Date.now(),
+  });
+
+  return res.json(
+    ok({
+      sessionId,
+      interviewMode: mode,
+      aiAvatar: avatar,
+      interviewRecordId,
+    })
+  );
+});
+
+// 进入会话页后调用：生成 AI 首问（豆包）；已存在 assistant 则幂等返回，避免重复扣费
+app.post('/api/interview-ai/opening', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.json(fail(400, 'sessionId 必填'));
+
+  const session = interviewAiSessions.get(sessionId);
+  if (!session || session.userId !== userId) {
+    return res.status(404).json(fail(404, '会话不存在或无权访问'));
+  }
+
+  const existing = (session.messages || []).find((m) => m.role === 'assistant');
+  if (existing && existing.content) {
+    return res.json(ok({ openingQuestion: existing.content }));
+  }
+
+  const systemMsg = (session.messages || []).find((m) => m.role === 'system');
+  const systemContent = systemMsg?.content || '';
+  const openingQuestion = await generateOpeningQuestion({
+    systemContent,
+    positionName: session.positionName || '',
+    mode: session.interviewMode,
+  });
+
+  session.messages.push({ role: 'assistant', content: openingQuestion });
+  session.updatedAt = Date.now();
+
+  return res.json(ok({ openingQuestion }));
+});
+
+// 进入会话页后调用：流式生成/恢复 AI 首问（展示效果与常规回答一致）
+app.post('/api/interview-ai/opening-stream', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.status(400).json(fail(400, 'sessionId 必填'));
+
+  const session = interviewAiSessions.get(sessionId);
+  if (!session || session.userId !== userId) {
+    return res.status(404).json(fail(404, '会话不存在或无权访问'));
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (res.flushHeaders) res.flushHeaders();
+
+  const sendError = (msg) => {
+    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  };
+
+  try {
+    const existing = (session.messages || []).find((m) => m.role === 'assistant');
+    if (existing && existing.content) {
+      await writeMockStream(res, existing.content);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const systemMsg = (session.messages || []).find((m) => m.role === 'system');
+    const systemContent = systemMsg?.content || '';
+
+    if (session.interviewMode === 'voice') {
+      const tip =
+        '欢迎来到语音面试（占位模式）。当前版本先不做语音识别与情感分析，您可以先切换文本模式体验。';
+      await writeMockStream(res, tip);
+      session.messages.push({ role: 'assistant', content: tip });
+      session.updatedAt = Date.now();
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const fallback =
+      `你好，我是本次面试官。我们先从自我介绍开始：请你用 1-2 分钟介绍一下你与「${session.positionName || '目标岗位'}」最相关的项目经历与技术亮点。`;
+
+    if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+      const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ARK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: ARK_ENDPOINT_ID,
+          stream: true,
+          messages: [
+            { role: 'system', content: systemContent },
+            {
+              role: 'user',
+              content:
+                '请你作为面试官先手发起第一问。要求：1）只输出一段自然中文提问；2）不超过120字；3）紧贴候选人目标岗位；4）不要输出前缀标题。',
+            },
+          ],
+        }),
+      });
+
+      if (!upstream.ok) {
+        const errText = await upstream.text().catch(() => upstream.statusText);
+        console.error('opening-stream 豆包 API 错误:', upstream.status, errText);
+        await writeMockStream(res, fallback);
+        session.messages.push({ role: 'assistant', content: fallback });
+        session.updatedAt = Date.now();
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      let fullAssistant = '';
+      const reader = upstream.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop() || '';
+        for (const block of parts) {
+          const line = block.trim().split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          const dataStr = line.replace(/^data:\s*/, '').trim();
+          if (dataStr === '[DONE]') {
+            const finalText = fullAssistant || fallback;
+            session.messages.push({ role: 'assistant', content: finalText });
+            session.updatedAt = Date.now();
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
+          }
+          try {
+            const json = JSON.parse(dataStr);
+            const piece =
+              json.choices &&
+              json.choices[0] &&
+              json.choices[0].delta &&
+              json.choices[0].delta.content;
+            if (piece) {
+              fullAssistant += piece;
+              res.write(`data: ${JSON.stringify({ content: piece })}\n\n`);
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      }
+
+      const finalText = fullAssistant || fallback;
+      if (!fullAssistant) {
+        await writeMockStream(res, finalText);
+      }
+      session.messages.push({ role: 'assistant', content: finalText });
+      session.updatedAt = Date.now();
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    await writeMockStream(res, fallback);
+    session.messages.push({ role: 'assistant', content: fallback });
+    session.updatedAt = Date.now();
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (e) {
+    console.error('opening-stream 异常:', e);
+    sendError(e.message || '流式输出失败');
+  }
+});
+
+// 获取会话信息：用于前端刷新后恢复首问、模式和头像
+app.get('/api/interview-ai/session/:sessionId', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { sessionId } = req.params;
+  const session = interviewAiSessions.get(sessionId);
+  if (!session || session.userId !== userId) {
+    return res.status(404).json(fail(404, '会话不存在或无权访问'));
+  }
+  const openingQuestion =
+    (session.messages || []).find((m) => m.role === 'assistant')?.content || '';
+  return res.json(
+    ok({
+      sessionId,
+      interviewMode: session.interviewMode,
+      aiAvatar: session.aiAvatar || 'girl-a',
+      openingQuestion,
+      interviewRecordId: session.interviewRecordId || null,
+      finished: !!session.finished,
+    })
+  );
+});
+
+// 流式对话：SSE，每行 data: {"content":"..."} ，结束 data: [DONE]
+app.post('/api/interview-ai/chat-stream', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { sessionId, message } = req.body || {};
+  if (!sessionId || !message || !String(message).trim()) {
+    return res.status(400).json(fail(400, 'sessionId 与 message 必填'));
+  }
+
+  const session = interviewAiSessions.get(sessionId);
+  if (!session || session.userId !== userId) {
+    return res.status(404).json(fail(404, '会话不存在或无权访问'));
+  }
+
+  const userText = String(message).trim();
+  if (session.finished) {
+    return res.status(400).json(fail(400, '本次面试已结束，请查看报告'));
+  }
+
+  const lastAssistant = [...(session.messages || [])].reverse().find((m) => m.role === 'assistant');
+  const systemMsg = (session.messages || []).find((m) => m.role === 'system');
+  const systemContent = systemMsg?.content || '';
+
+  session.messages.push({ role: 'user', content: userText });
+  session.updatedAt = Date.now();
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (res.flushHeaders) res.flushHeaders();
+
+  const sendError = (msg) => {
+    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  };
+
+  try {
+    const scoreResult = await scoreInterviewAnswer({
+      systemContent,
+      question: lastAssistant?.content || '开场问题',
+      answer: userText,
+    });
+    const rawScore = Number(scoreResult.score);
+    const scoreComment = scoreResult.comment ? String(scoreResult.comment) : '';
+    session.roundCount = Number(session.roundCount || 0) + 1;
+    session.scoreHistory = Array.isArray(session.scoreHistory) ? session.scoreHistory : [];
+    session.scoreCommentHistory = Array.isArray(session.scoreCommentHistory) ? session.scoreCommentHistory : [];
+    session.scoreHistory.push(rawScore);
+    if (scoreComment) session.scoreCommentHistory.push(scoreComment);
+
+    if (session.interviewRecordId) {
+      try {
+        await pool.query(
+          'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+          [session.interviewRecordId, session.roundCount * 2 - 1, 'candidate', userText, null, rawScore]
+        );
+      } catch (e) {
+        console.error('保存候选人回答明细失败:', e);
+      }
+    }
+
+    const shouldFinish =
+      rawScore > AI_INTERVIEW_SCORE_MAX ||
+      rawScore < AI_INTERVIEW_SCORE_MIN ||
+      session.roundCount >= AI_INTERVIEW_MAX_QUESTIONS;
+
+    if (shouldFinish) {
+      const validScores = (session.scoreHistory || []).filter((s) => typeof s === 'number' && !Number.isNaN(s));
+      const avgScore = validScores.length
+        ? validScores.reduce((a, b) => a + b, 0) / validScores.length
+        : 0;
+      const reportContent = await buildInterviewReportContent({
+        positionName: session.positionName || '',
+        rounds: session.roundCount,
+        avgScore,
+        scoreComments: session.scoreCommentHistory || [],
+      });
+
+      if (session.interviewRecordId) {
+        try {
+          const contentStr = JSON.stringify(reportContent);
+          await pool.query(
+            'INSERT INTO report (interview_record_id, content) VALUES (?, ?) ON DUPLICATE KEY UPDATE content = VALUES(content), updated_at = CURRENT_TIMESTAMP',
+            [session.interviewRecordId, contentStr]
+          );
+          const endedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          await pool.query('UPDATE interview_record SET ended_at = ?, total_score = ? WHERE id = ?', [
+            endedAt,
+            reportContent.totalScore ?? Math.max(0, Math.min(10, Number(avgScore.toFixed(1)))),
+            session.interviewRecordId,
+          ]);
+        } catch (e) {
+          console.error('保存面试报告失败:', e);
+        }
+      }
+
+      session.finished = true;
+      const endText =
+        `本轮回答评分：${rawScore}/10。${scoreComment ? `点评：${scoreComment}` : ''}\n` +
+        `本次面试已结束。点击查看本次面试报告。`;
+      await writeMockStream(res, endText);
+      session.messages.push({ role: 'assistant', content: endText });
+      if (session.interviewRecordId) {
+        try {
+          await pool.query(
+            'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+            [session.interviewRecordId, session.roundCount * 2, 'interviewer', endText, null, null]
+          );
+        } catch (e) {
+          console.error('保存面试官结束语失败:', e);
+        }
+      }
+      res.write(
+        `data: ${JSON.stringify({
+          event: 'interview_end',
+          interviewRecordId: session.interviewRecordId || null,
+          score: rawScore,
+        })}\n\n`
+      );
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const scorePrefix = `本轮回答评分：${rawScore}/10。${scoreComment ? `点评：${scoreComment}` : ''}\n`;
+    await writeMockStream(res, scorePrefix);
+
+    // 语音模式：仅占位——仍返回一段说明性文字（整段流式输出）
+    if (session.interviewMode === 'voice') {
+      const tip =
+        '【语音面试模式占位】当前版本尚未接入语音识别与情感分析。后续将支持：语音输入 → 情感判断 → AI 生成完整回复供数字人播报。请先切换到「文本面试」体验流式对话，或等待后续迭代。';
+      const finalTip = scorePrefix + tip;
+      await writeMockStream(res, tip);
+      session.messages.push({ role: 'assistant', content: finalTip });
+      if (session.interviewRecordId) {
+        try {
+          await pool.query(
+            'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+            [session.interviewRecordId, session.roundCount * 2, 'interviewer', finalTip, null, null]
+          );
+        } catch (e) {
+          console.error('保存语音占位回复失败:', e);
+        }
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const arkMessages = session.messages.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
+      content: m.content,
+    }));
+
+    if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+      const upstream = await fetch(ARK_CHAT_COMPLETIONS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ARK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: ARK_ENDPOINT_ID,
+          messages: arkMessages,
+          stream: true,
+        }),
+      });
+
+      if (!upstream.ok) {
+        const errText = await upstream.text().catch(() => upstream.statusText);
+        console.error('豆包 API 错误:', upstream.status, errText);
+        let assistantFallback =
+          '（豆包接口调用失败，已切换本地模拟回复）请简单介绍一下你与「' +
+          (session.messages[0] && session.messages[0].content.slice(0, 80)) +
+          '」相关的项目经验。';
+        await writeMockStream(res, assistantFallback);
+        const finalFallback = scorePrefix + assistantFallback;
+        session.messages.push({ role: 'assistant', content: finalFallback });
+        if (session.interviewRecordId) {
+          try {
+            await pool.query(
+              'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+              [session.interviewRecordId, session.roundCount * 2, 'interviewer', finalFallback, null, null]
+            );
+          } catch (e) {
+            console.error('保存面试官回退回复失败:', e);
+          }
+        }
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+
+      let fullAssistant = scorePrefix;
+      const reader = upstream.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop() || '';
+        for (const block of parts) {
+          const line = block.trim().split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          const dataStr = line.replace(/^data:\s*/, '').trim();
+          if (dataStr === '[DONE]') {
+            const finalAssistant = fullAssistant || scorePrefix + '（无回复内容）';
+            session.messages.push({ role: 'assistant', content: finalAssistant });
+            if (session.interviewRecordId) {
+              try {
+                await pool.query(
+                  'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+                  [session.interviewRecordId, session.roundCount * 2, 'interviewer', finalAssistant, null, null]
+                );
+              } catch (e) {
+                console.error('保存面试官回复失败:', e);
+              }
+            }
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
+          }
+          try {
+            const json = JSON.parse(dataStr);
+            const piece =
+              json.choices &&
+              json.choices[0] &&
+              json.choices[0].delta &&
+              json.choices[0].delta.content;
+            if (piece) {
+              fullAssistant += piece;
+              res.write(`data: ${JSON.stringify({ content: piece })}\n\n`);
+            }
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      }
+      const finalAssistant = fullAssistant || scorePrefix + '（无回复内容）';
+      session.messages.push({ role: 'assistant', content: finalAssistant });
+      if (session.interviewRecordId) {
+        try {
+          await pool.query(
+            'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+            [session.interviewRecordId, session.roundCount * 2, 'interviewer', finalAssistant, null, null]
+          );
+        } catch (e) {
+          console.error('保存面试官回复失败:', e);
+        }
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    // 未配置密钥：模拟面试官回复
+    const mock =
+      '感谢您的回答。结合您应聘的岗位，我想进一步了解：在最近一个项目中，您负责的核心模块是什么？遇到了哪些技术难点，又是如何解决的？';
+    await writeMockStream(res, mock);
+    const finalMock = scorePrefix + mock;
+    session.messages.push({ role: 'assistant', content: finalMock });
+    if (session.interviewRecordId) {
+      try {
+        await pool.query(
+          'INSERT INTO interview_detail (interview_record_id, round_index, role, content, emotion_data, score) VALUES (?, ?, ?, ?, ?, ?)',
+          [session.interviewRecordId, session.roundCount * 2, 'interviewer', finalMock, null, null]
+        );
+      } catch (e) {
+        console.error('保存面试官模拟回复失败:', e);
+      }
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (e) {
+    console.error('chat-stream 异常:', e);
+    sendError(e.message || '流式输出失败');
+  }
+});
+
+// ----- 新版面试接口（与最新联调文档对齐） -----
+app.post('/api/interview/start', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { resume, position, collection_name } = req.body || {};
+  if (!resume || !position || !collection_name) {
+    return res.status(400).json({ code: 400, message: 'resume、position、collection_name 必填', data: null });
+  }
+  const session_id = crypto.randomUUID();
+  let topic = inferTopicByText(`${position}\n${resume}`);
+  let firstQuestion =
+    `请结合你简历中提到的项目经验，谈谈你在应聘「${String(position)}」时，` +
+    '遇到过的一个技术挑战，以及你是如何分析并落地解决的？';
+  if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+    const aiText = await callArkChatOnce([
+      {
+        role: 'user',
+        content:
+          `你是技术面试官，请基于候选人信息给出第一道面试题，只输出 JSON：` +
+          `{"question":"...","topic":"..."}` +
+          `\n岗位：${String(position)}\n题库集合：${String(collection_name)}\n简历：${String(resume).slice(0, 2500)}`,
+      },
+    ]);
+    const obj = extractJsonObject(aiText);
+    if (obj && obj.question) {
+      firstQuestion = String(obj.question);
+      topic = String(obj.topic || topic);
+    }
+  }
+  interviewSessionsV2.set(session_id, {
+    userId,
+    resume: String(resume),
+    position: String(position),
+    collection_name: String(collection_name),
+    status: 'questioning',
+    total_rounds: 0,
+    current_topic: topic,
+    current_question: firstQuestion,
+    history: [],
+  });
+  return res.json(
+    ok200({
+      session_id,
+      status: 'questioning',
+      total_rounds: 0,
+      current_topic: topic,
+      current_question: firstQuestion,
+      history: [],
+    })
+  );
+});
+
+app.post('/api/interview/opening-stream', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.body || {};
+  if (!session_id) {
+    return res.status(400).json({ code: 400, message: 'session_id 必填', data: null });
+  }
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const writeEvt = (type, data) => {
+    res.write(`${JSON.stringify({ type, data, timestamp: new Date().toISOString() })}\n`);
+  };
+
+  try {
+    writeEvt('analyzing', { message: '正在准备开场问题...' });
+    await new Promise((r) => setTimeout(r, 140));
+
+    let topic = session.current_topic || inferTopicByText(`${session.position}\n${session.resume}`);
+    let question = session.current_question || '';
+
+    if (!question) {
+      question =
+        `请结合你简历中提到的项目经验，谈谈你在应聘「${String(session.position)}」时，` +
+        '遇到过的一个技术挑战，以及你是如何分析并落地解决的？';
+      if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+        const aiText = await callArkChatOnce([
+          {
+            role: 'user',
+            content:
+              `你是技术面试官，请基于候选人信息给出第一道面试题，只输出 JSON：` +
+              `{"question":"...","topic":"..."}` +
+              `\n岗位：${String(session.position)}\n题库集合：${String(session.collection_name)}\n简历：${String(session.resume).slice(0, 2500)}`,
+          },
+        ]);
+        const obj = extractJsonObject(aiText);
+        if (obj && obj.question) {
+          question = String(obj.question);
+          topic = String(obj.topic || topic);
+        }
+      }
+
+      session.current_topic = topic;
+      session.current_question = question;
+      session.total_rounds = 1;
+      session.status = 'questioning';
+    }
+
+    for (const ch of String(question)) {
+      writeEvt('question_chunk', { chunk: ch });
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    writeEvt('question', {
+      answer: question,
+      question,
+      is_followup: false,
+      topic: session.current_topic,
+      round: session.total_rounds || 1,
+    });
+    res.end();
+  } catch (e) {
+    console.error('/interview/opening-stream 异常:', e);
+    writeEvt('error', { message: e.message || '服务器错误' });
+    res.end();
+  }
+});
+
+app.post('/api/interview/answer', authMiddleware, async (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id, answer } = req.body || {};
+  if (!session_id || !answer || !String(answer).trim()) {
+    return res.status(400).json({ code: 400, message: 'session_id 与 answer 必填', data: null });
+  }
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  if (session.status === 'ended') {
+    return res.status(400).json({ code: 400, message: '会话已结束', data: null });
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const writeEvt = (type, data) => {
+    res.write(`${JSON.stringify({ type, data, timestamp: new Date().toISOString() })}\n`);
+  };
+
+  try {
+    writeEvt('analyzing', { message: '正在分析回答深度...' });
+    await new Promise((r) => setTimeout(r, 150));
+
+    const trimmed = String(answer).trim();
+    let depth_score = Math.max(1, Math.min(10, Math.round(Math.min(trimmed.length / 20, 10))));
+    let is_vague = depth_score <= 3;
+    let need_followup = is_vague || /不知道|不清楚|就这样/.test(trimmed);
+    // 先不立即下发，避免后续 AI 覆盖后出现重复 analysis_result 事件
+    await new Promise((r) => setTimeout(r, 120));
+
+    const round = Number(session.total_rounds || 1);
+    const currentQuestion = session.current_question;
+    const currentTopic = session.current_topic;
+    session.history.push({
+      round,
+      question: currentQuestion,
+      answer: trimmed,
+      topic: currentTopic,
+      timestamp: new Date().toISOString(),
+    });
+
+    const nextRound = round + 1;
+    let nextTopic = inferTopicByText(trimmed);
+    let followupMessage = '回答不够深入，准备追问...';
+    let followupQuestion = need_followup
+      ? `你提到了「${trimmed.slice(0, 20)}...」，请结合一个真实项目案例展开：背景、你做了什么、结果如何？`
+      : `你的回答不错。继续追问：在「${session.position}」相关项目里，遇到过最难的稳定性问题是什么，你如何定位并修复？`;
+
+    if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+      const aiText = await callArkChatOnce([
+        {
+          role: 'user',
+          content:
+            `你是技术面试官，请分析候选人回答并生成下一问，只输出 JSON：` +
+            `{"depth_score":1-10,"is_vague":true/false,"need_followup":true/false,"followup_message":"...","topic":"...","question":"..."}` +
+            `\n岗位：${session.position}\n题库集合：${session.collection_name}\n当前问题：${currentQuestion}\n候选人回答：${trimmed.slice(0, 3000)}`,
+        },
+      ]);
+      const obj = extractJsonObject(aiText);
+      if (obj) {
+        if (typeof obj.depth_score === 'number') depth_score = Math.max(1, Math.min(10, Number(obj.depth_score)));
+        if (typeof obj.is_vague === 'boolean') is_vague = obj.is_vague;
+        if (typeof obj.need_followup === 'boolean') need_followup = obj.need_followup;
+        if (obj.topic) nextTopic = String(obj.topic);
+        if (obj.question) followupQuestion = String(obj.question);
+        if (obj.followup_message) followupMessage = String(obj.followup_message);
+        writeEvt('analysis_result', { depth_score, is_vague, need_followup });
+      }
+    }
+    if (!(ARK_API_KEY && ARK_ENDPOINT_ID)) {
+      writeEvt('analysis_result', { depth_score, is_vague, need_followup });
+    }
+
+    if (need_followup) {
+      writeEvt('followup', { message: followupMessage });
+      await new Promise((r) => setTimeout(r, 120));
+    }
+
+    session.total_rounds = nextRound;
+    session.current_topic = nextTopic;
+    session.current_question = followupQuestion;
+    session.status = 'questioning';
+
+    writeEvt('question', {
+      answer: followupQuestion,
+      question: followupQuestion,
+      is_followup: need_followup,
+      topic: nextTopic,
+      round: nextRound,
+    });
+    res.end();
+  } catch (e) {
+    console.error('新版 /interview/answer 异常:', e);
+    writeEvt('error', { message: e.message || '服务器错误' });
+    res.end();
+  }
+});
+
+app.get('/api/interview/session/:session_id', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.params;
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  return res.json(
+    ok200({
+      session_id: String(session_id),
+      status: session.status,
+      total_rounds: session.total_rounds,
+      current_topic: session.current_topic,
+      current_question: session.current_question,
+      history: session.history || [],
+    })
+  );
+});
+
+app.delete('/api/interview/session/:session_id', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.params;
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  session.status = 'ended';
+  interviewSessionsV2.delete(String(session_id));
+  return res.json(ok200({ session_id: String(session_id), status: 'ended' }));
+});
+
 app.listen(PORT, () => {
   console.log(`Backend server is running at http://localhost:${PORT}`);
+  if (!ARK_API_KEY || !ARK_ENDPOINT_ID) {
+    console.log(
+      '[interview-ai] 未配置 ARK_API_KEY 或 ARK_ENDPOINT_ID，面试对话将使用本地模拟流式输出'
+    );
+  } else {
+    console.log(
+      `[interview-ai] 已启用方舟豆包流式：${ARK_CHAT_COMPLETIONS_URL}（model=${ARK_ENDPOINT_ID}）`
+    );
+  }
 });

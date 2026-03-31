@@ -516,6 +516,82 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
+### 模拟面试 AI（豆包 / 本地回退）
+
+用于 `/home/interview/settings/:id` → 开始面试后的文本流式对话。服务端在内存中保存会话与消息历史；进程重启后清空。
+
+**环境变量（可选，配置后走火山方舟豆包流式接口）**
+
+| 变量 | 说明 |
+|------|------|
+| `ARK_API_KEY` | 方舟 API Key（推荐；兼容旧名 `DOUBAO_API_KEY`） |
+| `ARK_ENDPOINT_ID` | 推理接入点 ID，对应请求体 `model`（如 `ep-xxxx`；兼容旧名 `DOUBAO_ENDPOINT_ID`） |
+| `ARK_CHAT_URL` | 可选，默认 `POST https://ark.cn-beijing.volces.com/api/v3/chat/completions` |
+
+未配置 `ARK_API_KEY` 或 `ARK_ENDPOINT_ID` 时，接口仍可用，后端使用**模拟流式输出**（逐字推送），便于本地联调。
+
+#### 20.1 开始面试
+
+**POST** `/interview/start`
+
+需要认证。请求体：
+
+```json
+{
+  "resume": "候选人张三，3年Android开发经验...",
+  "position": "移动端开发工程师(Android)",
+  "collection_name": "android_engineer"
+}
+```
+
+成功响应：
+
+`data: { session_id, question, topic, round, status, db_info }`
+
+---
+
+#### 20.2 回答问题（流式）
+
+**POST** `/interview/answer`
+
+需要认证。请求体：
+
+```json
+{
+  "session_id": "bd500e58-f57d-4828-a12f-fd0b04928045",
+  "answer": "Activity、Service、BroadcastReceiver、ContentProvider"
+}
+```
+
+响应为 **NDJSON 流**（逐行 JSON，不是统一 `{ code, message, data }` 包装），典型事件：
+
+- `{"type":"analyzing","data":{"message":"正在分析回答深度..."}, ...}`
+- `{"type":"analysis_result","data":{"depth_score":1,"is_vague":true,"need_followup":true}, ...}`
+- `{"type":"followup","data":{"message":"回答不够深入，准备追问..."}, ...}`
+- `{"type":"question","data":{"question":"...","is_followup":true,"topic":"...","round":2}, ...}`
+
+---
+
+#### 20.3 获取会话详情（用于中途加入/恢复）
+
+**GET** `/interview/session/:session_id`
+
+需要认证。成功响应：
+
+`data: { session_id, status, total_rounds, current_topic, current_question, history }`
+
+---
+
+#### 20.4 结束并删除会话
+
+**DELETE** `/interview/session/:session_id`
+
+需要认证。成功响应：
+
+`data: { session_id, status: "ended" }`
+
+---
+
 ### 报告（Report）
 
 #### 21. 获取某次面试的报告
