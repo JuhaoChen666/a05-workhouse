@@ -20,7 +20,7 @@ function normalizedRequestPath(config: InternalAxiosRequestConfig): string {
 
 export const apiOrigin =
   (import.meta.env.VITE_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  'http://10.105.2.13:8080';
+  'http://127.0.0.1:3000';
 
 /** 业务接口根路径（带 `/api`）；模拟面试 AI 见 `interviewApiJsonBase`（8000） */
 export const apiJsonBase = `${apiOrigin}/api`;
@@ -31,7 +31,10 @@ export const apiJsonBase = `${apiOrigin}/api`;
  */
 export const INTERVIEW_API_ORIGIN =
   (import.meta.env.VITE_INTERVIEW_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  'http://10.105.2.13:8000';
+  'http://127.0.0.1:3000';
+  /*
+  'http://10.105.2.13:8000'
+  */
 export const interviewApiJsonBase = `${INTERVIEW_API_ORIGIN}/api`;
 
 /**

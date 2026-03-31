@@ -540,13 +540,16 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 {
   "resume": "候选人张三，3年Android开发经验...",
   "position": "移动端开发工程师(Android)",
-  "collection_name": "android_engineer"
+  "collection_name": "android_engineer",
+  "interview_mode": "text"
 }
 ```
 
+`interview_mode` 可选：`text`（默认，文本+语音一体）/ `avatar`。
+
 成功响应：
 
-`data: { session_id, question, topic, round, status, db_info }`
+`data: { session_id, status, total_rounds, current_topic, current_question, interview_mode, history }`
 
 ---
 
@@ -578,7 +581,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 需要认证。成功响应：
 
-`data: { session_id, status, total_rounds, current_topic, current_question, history }`
+`data: { session_id, interview_mode, status, total_rounds, current_topic, current_question, history }`
 
 ---
 
@@ -589,6 +592,152 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 需要认证。成功响应：
 
 `data: { session_id, status: "ended" }`
+
+---
+
+#### 20.5 虚拟人会话初始化（方案A）
+
+**POST** `/interview/avatar/session/start`
+
+需要认证。用于虚拟人面试模式下获取前端直连流媒体所需的短时凭证。
+
+请求体：
+
+```json
+{
+  "session_id": "bd500e58-f57d-4828-a12f-fd0b04928045",
+  "avatar_id": "110592024"
+}
+```
+
+可选形象 ID（当前受后端白名单限制）：
+
+- `110592024`
+- `110117005`
+- `110017006`
+
+响应：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "session_id": "bd500e58-f57d-4828-a12f-fd0b04928045",
+    "avatar_session_id": "d67f...a42",
+    "vendor": "mock-xnrpt",
+    "avatar_id": "110592024",
+    "sdk_config": {
+      "app_id": "your_app_id",
+      "server_url": "wss://avatar.cn-huadong-1.xf-yun.com/v1/interact",
+      "signed_url": "wss://.../v1/interact?authorization=...&date=...&host=...",
+      "scene_id": "your_scene_id",
+      "vcn": "your_vcn",
+      "protocol": "xrtc",
+      "alpha": 1,
+      "token": "short_lived_token",
+      "expire_at": 1760000000
+    }
+  }
+}
+```
+
+---
+
+#### 20.6 虚拟人会话续签
+
+**POST** `/interview/avatar/session/refresh`
+
+需要认证。用于 SDK token 即将过期时续签。
+
+请求体：`{ session_id, avatar_session_id }`  
+响应：`data: { session_id, avatar_session_id, sdk_config: { token, expire_at } }`
+
+---
+
+#### 20.7 驱动虚拟人口播
+
+**POST** `/interview/avatar/speak`
+
+需要认证。将文本推送给虚拟人服务端（由后端持有厂商密钥）。
+
+请求体：
+
+```json
+{
+  "session_id": "bd500e58-f57d-4828-a12f-fd0b04928045",
+  "text": "下一题：请介绍一个你做过的性能优化案例",
+  "interrupt": true
+}
+```
+
+响应：`data: { accepted: true, task_id }`
+
+---
+
+#### 20.8 结束虚拟人会话
+
+**DELETE** `/interview/avatar/session/:session_id`
+
+需要认证。成功响应：`data: { session_id, status: "ended" }`
+
+---
+
+#### 20.9 语音回答（流式）
+
+**POST** `/interview/answer-voice`
+
+需要认证。`multipart/form-data`，字段：
+
+- `session_id`: string
+- `file`: 二进制音频文件
+
+响应为 NDJSON 流，典型事件：
+
+- `voice_processing`（可带 `transcript`）
+- `analyzing`
+- `analysis_result`（包含 `feedback`）
+- `followup`
+- `question`
+- `error`
+
+---
+
+#### 20.10 后端开发要求（虚拟人方案A）
+
+1. **密钥只在后端**：`apiKey/apiSecret` 不得下发前端，仅用于后端换取短时凭证。  
+2. **前端直连流媒体**：后端返回 `sdk_config`（含 `server_url/signed_url/token/expire_at`），前端 `start({ wrapper })` 后由 SDK 自动拉流播放。  
+3. **会话绑定**：`avatar_session` 必须绑定 `session_id + userId`；所有 speak/refresh/stop 都要校验归属。  
+4. **续签机制**：建议 token 到期前 30s 续签；接口失败时前端提示并降级文本/语音模式。  
+5. **可观测性**：记录 `avatar_session_id`、`task_id`、关键耗时与错误码，便于排查厂商侧问题。  
+6. **降级策略**：虚拟人初始化失败不阻断面试主链路，允许继续文本/语音问答。
+
+**建议环境变量**
+
+| 变量 | 说明 |
+|------|------|
+| `AVATAR_APP_ID` | 虚拟人平台 appId（用于前端 SDK 初始化） |
+| `AVATAR_API_KEY` | 虚拟人平台 APIKey（仅后端使用，不下发前端） |
+| `AVATAR_API_SECRET` | 虚拟人平台 APISecret（仅后端使用，不下发前端） |
+| `AVATAR_VENDOR` | 厂商标识，仅用于日志与返回展示 |
+| `AVATAR_SERVER_URL` | 交互接口地址，默认 `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact` |
+| `AVATAR_TOKEN_TTL_SEC` | 短时 token 过期秒数，默认 300 |
+
+**前端环境变量**
+
+| 变量 | 说明 |
+|------|------|
+| `VITE_AVATAR_SDK_SCRIPT_URL` | 虚拟人 Web SDK 脚本地址（会话页动态加载） |
+
+**前端 SDK 初始化顺序（与官方文档一致）**
+
+1. 创建 SDK 实例（`new AvatarPlatform({ useInlinePlayer: true })`）  
+2. 设置监听（如 `playNotAllowed`）  
+3. `setApiInfo`（`appId/sceneId/serverUrl/signedUrl`）  
+4. `setGlobalParams`（`stream.protocol/alpha`、`avatar.avatar_id`、`tts.vcn`）  
+5. `start({ wrapper })` 启动显示  
+6. `writeText(text, { nlp: true, interrupt: true|false })` 驱动播报  
+7. 结束时 `stop/destroy`
 
 ---
 

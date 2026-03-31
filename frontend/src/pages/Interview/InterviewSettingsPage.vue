@@ -16,6 +16,24 @@
             <el-input v-model="form.positionName" placeholder="例如：移动端开发工程师(Android)" clearable />
           </el-form-item>
 
+          <el-form-item label="面试模式">
+            <el-radio-group v-model="interviewMode">
+              <el-radio label="text">常规面试（文本+语音）</el-radio>
+              <el-radio label="avatar">虚拟人面试</el-radio>
+            </el-radio-group>
+            <div class="mode-tip">
+              常规面试内置文本与语音输入；虚拟人面试会在会话页展示虚拟人口播区域，鉴权由后端完成。
+            </div>
+          </el-form-item>
+
+          <el-form-item v-if="interviewMode === 'avatar'" label="虚拟人形象">
+            <el-select v-model="avatarId" placeholder="请选择虚拟人形象" class="avatar-select">
+              <el-option label="虚拟人A（110592024）" value="110592024" />
+              <el-option label="虚拟人B（110117005）" value="110117005" />
+              <el-option label="虚拟人C（110017006）" value="110017006" />
+            </el-select>
+          </el-form-item>
+
           <el-form-item label="简历方式">
             <el-radio-group v-model="resumeInputMode">
               <el-radio label="text">文字输入</el-radio>
@@ -85,6 +103,8 @@ const starting = ref(false);
 const job = ref<HotJobItem | null>(null);
 const resumeInputMode = ref<'text' | 'file'>('text');
 const fileList = ref<UploadFiles>([]);
+const interviewMode = ref<'text' | 'avatar'>('text');
+const avatarId = ref<'110592024' | '110117005' | '110017006'>('110592024');
 
 const formRef = ref<FormInstance>();
 const form = reactive({
@@ -205,6 +225,8 @@ async function onStartInterview() {
       resume: resumeText,
       position,
       collection_name,
+      interview_mode: interviewMode.value,
+      avatar_id: avatarId.value,
     });
     sessionStorage.setItem('pendingInterviewStart', pendingStartPayload);
 
@@ -213,6 +235,8 @@ async function onStartInterview() {
       params: { id: String(idParam) },
       query: {
         jobName: position,
+        interviewMode: interviewMode.value,
+        avatarId: avatarId.value,
       },
     });
   } catch (e: unknown) {
@@ -250,4 +274,6 @@ onMounted(async () => {
 .upload-block { width: 100%; max-width: 520px; }
 .upload-icon { font-size: 32px; color: #409eff; margin-bottom: 8px; }
 .actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.mode-tip { margin-top: 6px; color: #909399; font-size: 12px; line-height: 1.4; }
+.avatar-select { width: 320px; }
 </style>

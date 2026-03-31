@@ -50,6 +50,11 @@ const uploadInterviewResume = multer({
   storage: resumeStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+// 语音回答上传：仅做内存解析，不落盘（与 FastAPI 的 UploadFile.read() 语义一致）
+const uploadInterviewVoice = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 /**
  * 豆包（火山方舟）OpenAPI：POST chat/completions
@@ -59,12 +64,22 @@ const uploadInterviewResume = multer({
  * 兼容旧变量：DOUBAO_API_KEY / DOUBAO_ENDPOINT_ID
  */
 const ARK_API_KEY =
-  process.env.ARK_API_KEY || process.env.DOUBAO_API_KEY || '';
+  '2fa1baf7-49f1-4c32-8f53-d759d4a1b336'
 const ARK_ENDPOINT_ID =
-  process.env.ARK_ENDPOINT_ID || process.env.DOUBAO_ENDPOINT_ID || '';
+ 'doubao-seed-2-0-code-preview-260215'
 const ARK_CHAT_COMPLETIONS_URL =
   process.env.ARK_CHAT_URL ||
   'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const AVATAR_VENDOR = process.env.AVATAR_VENDOR || 'mock-xnrpt';
+const AVATAR_TOKEN_TTL_SEC = Number(process.env.AVATAR_TOKEN_TTL_SEC || 300);
+const AVATAR_APP_ID = process.env.AVATAR_APP_ID || '';
+// 仅后端使用：用于生成 signedUrl / token，禁止下发前端
+const AVATAR_API_KEY = process.env.AVATAR_API_KEY || '';
+const AVATAR_API_SECRET = process.env.AVATAR_API_SECRET || '';
+const AVATAR_SCENE_ID = process.env.AVATAR_SCENE_ID || '';
+const AVATAR_VCN = process.env.AVATAR_VCN || '';
+const AVATAR_SERVER_URL = process.env.AVATAR_SERVER_URL || 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact';
+const AVATAR_ALLOWED_IDS = new Set(['110592024', '110117005', '110017006']);
 
 // AI 面试会话：内存存储，进程重启后清空
 // sessionId -> { userId, interviewMode, messages: [{role, content}], updatedAt }
@@ -72,6 +87,9 @@ const interviewAiSessions = new Map();
 // 新版面试会话（按用户提供的新接口协议）
 // session_id -> { userId, resume, position, collection_name, status, total_rounds, current_topic, current_question, history }
 const interviewSessionsV2 = new Map();
+// 虚拟人会话（方案A：后端签发短时凭证，前端直连流媒体）
+// session_id -> { userId, avatar_session_id, avatar_id, token, expire_at, stream_url, ws_url, status }
+const avatarInterviewSessions = new Map();
 const AI_INTERVIEW_MAX_QUESTIONS = Number(process.env.AI_INTERVIEW_MAX_QUESTIONS || 10);
 const AI_INTERVIEW_SCORE_MIN = Number(process.env.AI_INTERVIEW_SCORE_MIN || 0);
 const AI_INTERVIEW_SCORE_MAX = Number(process.env.AI_INTERVIEW_SCORE_MAX || 10);
@@ -117,6 +135,51 @@ function extractJsonObject(text) {
   } catch (_e) {
     return null;
   }
+}
+
+function buildAvatarToken() {
+  return crypto.randomBytes(20).toString('hex');
+}
+
+function buildAvatarSignedUrl(serverUrl, apiKey, apiSecret) {
+  if (!serverUrl || !apiKey || !apiSecret) return '';
+  try {
+    const u = new URL(serverUrl);
+    const host = u.host;
+    const path = u.pathname || '/';
+    const date = new Date().toUTCString();
+    const signatureOrigin = `host: ${host}\ndate: ${date}\nGET ${path} HTTP/1.1`;
+    const signatureSha = crypto
+      .createHmac('sha256', apiSecret)
+      .update(signatureOrigin, 'utf8')
+      .digest('base64');
+    const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureSha}"`;
+    const authorization = Buffer.from(authorizationOrigin, 'utf8').toString('base64');
+    const qs = new URLSearchParams({
+      authorization,
+      date,
+      host,
+    }).toString();
+    return `${u.origin}${path}?${qs}`;
+  } catch (_e) {
+    return '';
+  }
+}
+
+function buildAvatarSdkConfig(_session_id, _avatar_session_id, token, expire_at) {
+  const signed_url = buildAvatarSignedUrl(AVATAR_SERVER_URL, AVATAR_API_KEY, AVATAR_API_SECRET);
+  return {
+    app_id: AVATAR_APP_ID,
+    has_server_auth_config: Boolean(AVATAR_API_KEY && AVATAR_API_SECRET),
+    server_url: AVATAR_SERVER_URL,
+    signed_url,
+    scene_id: AVATAR_SCENE_ID,
+    vcn: AVATAR_VCN,
+    protocol: 'xrtc',
+    alpha: 1,
+    token,
+    expire_at,
+  };
 }
 
 async function callArkChatOnce(messages) {
@@ -361,15 +424,23 @@ function checkCode(key, code) {
 // 根据相对路径生成完整可访问的头像链接；如无则返回默认头像链接
 function buildAvatarUrl(req, avatarPath) {
   const base = `${req.protocol}://${req.get('host')}`;
-  const pathOrDefault = avatarPath || '/api/avatar-file/default-avatar.png';
+  const pathOrDefault = avatarPath || '/avatar-file/default-avatar.png';
   if (pathOrDefault.startsWith('http')) return pathOrDefault;
   return base + pathOrDefault;
 }
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
+// 兼容无 /api 前缀请求：将 /auth/*、/interview/* 等自动映射到 /api/*
+app.use((req, _res, next) => {
+  if (req.url === '/api' || req.url.startsWith('/api/')) return next();
+  if (req.url === '/avatar-file' || req.url.startsWith('/avatar-file/')) return next();
+  req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
+  next();
+});
 // 对外暴露头像静态文件
 app.use('/api/avatar-file', express.static(AVATAR_DIR));
+app.use('/avatar-file', express.static(AVATAR_DIR));
 
 function ok(data = null, message = 'ok') {
   return { code: 0, message, data };
@@ -614,7 +685,7 @@ app.post('/api/auth/avatar', authMiddleware, upload.single('file'), async (req, 
 
     if (req.file) {
       // 表单上传文件
-      avatarUrl = `/api/avatar-file/${req.file.filename}`;
+      avatarUrl = `/avatar-file/${req.file.filename}`;
     } else if (req.body && req.body.avatar) {
       // base64 字符串
       const base64 = req.body.avatar;
@@ -624,7 +695,7 @@ app.post('/api/auth/avatar', authMiddleware, upload.single('file'), async (req, 
       const filename = `avatar_${id}_${Date.now()}.png`;
       const filepath = path.join(AVATAR_DIR, filename);
       fs.writeFileSync(filepath, buf);
-      avatarUrl = `/api/avatar-file/${filename}`;
+      avatarUrl = `/avatar-file/${filename}`;
     } else {
       return res.json(fail(400, '请上传文件或提供 avatar 字段'));
     }
@@ -2004,7 +2075,7 @@ app.post('/api/interview-ai/chat-stream', authMiddleware, async (req, res) => {
 // ----- 新版面试接口（与最新联调文档对齐） -----
 app.post('/api/interview/start', authMiddleware, async (req, res) => {
   const userId = String(req.user.id);
-  const { resume, position, collection_name } = req.body || {};
+  const { resume, position, collection_name, interview_mode } = req.body || {};
   if (!resume || !position || !collection_name) {
     return res.status(400).json({ code: 400, message: 'resume、position、collection_name 必填', data: null });
   }
@@ -2034,6 +2105,7 @@ app.post('/api/interview/start', authMiddleware, async (req, res) => {
     resume: String(resume),
     position: String(position),
     collection_name: String(collection_name),
+    interview_mode: interview_mode === 'avatar' ? 'avatar' : interview_mode === 'voice' ? 'voice' : 'text',
     status: 'questioning',
     total_rounds: 0,
     current_topic: topic,
@@ -2047,6 +2119,7 @@ app.post('/api/interview/start', authMiddleware, async (req, res) => {
       total_rounds: 0,
       current_topic: topic,
       current_question: firstQuestion,
+      interview_mode: interview_mode === 'avatar' ? 'avatar' : interview_mode === 'voice' ? 'voice' : 'text',
       history: [],
     })
   );
@@ -2196,11 +2269,17 @@ app.post('/api/interview/answer', authMiddleware, async (req, res) => {
         if (obj.topic) nextTopic = String(obj.topic);
         if (obj.question) followupQuestion = String(obj.question);
         if (obj.followup_message) followupMessage = String(obj.followup_message);
-        writeEvt('analysis_result', { depth_score, is_vague, need_followup });
+        const feedback = need_followup
+          ? '感谢你的回答。当前信息还不够具体，请补充一个真实项目里的技术细节与决策过程。'
+          : '你的回答较完整，表达清晰。下面我继续追问一个更深入的问题。';
+        writeEvt('analysis_result', { depth_score, is_vague, need_followup, feedback });
       }
     }
     if (!(ARK_API_KEY && ARK_ENDPOINT_ID)) {
-      writeEvt('analysis_result', { depth_score, is_vague, need_followup });
+      const feedback = need_followup
+        ? '感谢你的回答。当前信息还不够具体，请补充一个真实项目里的技术细节与决策过程。'
+        : '你的回答较完整，表达清晰。下面我继续追问一个更深入的问题。';
+      writeEvt('analysis_result', { depth_score, is_vague, need_followup, feedback });
     }
 
     if (need_followup) {
@@ -2228,6 +2307,141 @@ app.post('/api/interview/answer', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/interview/answer-voice', authMiddleware, uploadInterviewVoice.single('file'), async (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.body || {};
+  const voiceFile = req.file;
+  if (!session_id) {
+    return res.status(400).json({ code: 400, message: 'session_id 必填', data: null });
+  }
+  if (!voiceFile || !voiceFile.buffer || voiceFile.buffer.length === 0) {
+    return res.status(400).json({ code: 400, message: 'file 必填', data: null });
+  }
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  if (session.status === 'ended') {
+    return res.status(400).json({ code: 400, message: '会话已结束', data: null });
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const writeEvt = (type, data) => {
+    res.write(`${JSON.stringify({ type, data, timestamp: new Date().toISOString() })}\n`);
+  };
+
+  try {
+    const approxSecs = Math.max(1, Math.round((voiceFile.size || voiceFile.buffer.length) / 16000));
+    const transcript =
+      `（模拟转写）我在最近项目中负责核心模块设计与性能优化，` +
+      `通过日志与链路追踪定位瓶颈，并完成分阶段改造，最终提升了系统稳定性。`;
+
+    writeEvt('voice_processing', {
+      message: '正在录音转写并分析情感...',
+      transcript,
+      audio_seconds: approxSecs,
+      filename: voiceFile.originalname || 'fronten.wav',
+    });
+    await new Promise((r) => setTimeout(r, 180));
+
+    writeEvt('analyzing', {
+      message: '正在分析回答深度（结合情感分析）...',
+      transcript,
+    });
+    await new Promise((r) => setTimeout(r, 150));
+
+    const trimmed = transcript.trim();
+    let depth_score = Math.max(1, Math.min(10, Math.round(Math.min(trimmed.length / 24, 10))));
+    let is_vague = depth_score <= 3;
+    let need_followup = is_vague;
+
+    const round = Number(session.total_rounds || 1);
+    const currentQuestion = session.current_question;
+    const currentTopic = session.current_topic;
+    session.history.push({
+      round,
+      question: currentQuestion,
+      answer: trimmed,
+      topic: currentTopic,
+      timestamp: new Date().toISOString(),
+    });
+
+    const nextRound = round + 1;
+    let nextTopic = inferTopicByText(trimmed);
+    let followupQuestion =
+      `你提到了性能优化，请具体说明：当时最关键的瓶颈指标是什么，` +
+      `你如何验证优化真的生效？`;
+    let followupMessage = '回答不够深入，准备追问...';
+
+    if (ARK_API_KEY && ARK_ENDPOINT_ID) {
+      const aiText = await callArkChatOnce([
+        {
+          role: 'user',
+          content:
+            `你是技术面试官，请分析候选人回答并生成下一问，只输出 JSON：` +
+            `{"depth_score":1-10,"is_vague":true/false,"need_followup":true/false,"followup_message":"...","topic":"...","question":"..."}` +
+            `\n岗位：${session.position}\n题库集合：${session.collection_name}\n当前问题：${currentQuestion}\n候选人回答：${trimmed.slice(0, 3000)}`,
+        },
+      ]);
+      const obj = extractJsonObject(aiText);
+      if (obj) {
+        if (typeof obj.depth_score === 'number') depth_score = Math.max(1, Math.min(10, Number(obj.depth_score)));
+        if (typeof obj.is_vague === 'boolean') is_vague = obj.is_vague;
+        if (typeof obj.need_followup === 'boolean') need_followup = obj.need_followup;
+        if (obj.topic) nextTopic = String(obj.topic);
+        if (obj.question) followupQuestion = String(obj.question);
+        if (obj.followup_message) followupMessage = String(obj.followup_message);
+      }
+    } else {
+      need_followup = depth_score <= 5;
+      is_vague = depth_score <= 3;
+    }
+
+    const feedback = need_followup
+      ? '你的回答方向正确，但还不够具体。建议补充技术选型依据、关键实现细节与量化结果。'
+      : '你的回答较完整，逻辑清晰。下一题我会继续追问更深层的技术决策。';
+    writeEvt('analysis_result', {
+      depth_score,
+      is_vague,
+      need_followup,
+      feedback,
+      transcript,
+    });
+    await new Promise((r) => setTimeout(r, 120));
+
+    if (need_followup) {
+      writeEvt('followup', { message: followupMessage, transcript });
+      await new Promise((r) => setTimeout(r, 120));
+    }
+
+    session.total_rounds = nextRound;
+    session.current_topic = nextTopic;
+    session.current_question = followupQuestion;
+    session.status = 'questioning';
+
+    writeEvt('question', {
+      answer: followupQuestion,
+      question: followupQuestion,
+      is_followup: need_followup,
+      topic: nextTopic,
+      round: nextRound,
+      transcript,
+    });
+    // 与真实后端保持一致：结尾发送空白帧，减少客户端丢末尾块概率
+    res.write('      \n\n');
+    await new Promise((r) => setTimeout(r, 300));
+    res.end();
+  } catch (e) {
+    console.error('新版 /interview/answer-voice 异常:', e);
+    writeEvt('error', { message: e.message || '服务器错误' });
+    res.end();
+  }
+});
+
 app.get('/api/interview/session/:session_id', authMiddleware, (req, res) => {
   const userId = String(req.user.id);
   const { session_id } = req.params;
@@ -2238,6 +2452,7 @@ app.get('/api/interview/session/:session_id', authMiddleware, (req, res) => {
   return res.json(
     ok200({
       session_id: String(session_id),
+      interview_mode: session.interview_mode || 'text',
       status: session.status,
       total_rounds: session.total_rounds,
       current_topic: session.current_topic,
@@ -2256,6 +2471,112 @@ app.delete('/api/interview/session/:session_id', authMiddleware, (req, res) => {
   }
   session.status = 'ended';
   interviewSessionsV2.delete(String(session_id));
+  avatarInterviewSessions.delete(String(session_id));
+  return res.json(ok200({ session_id: String(session_id), status: 'ended' }));
+});
+
+// ----- 虚拟人面试（方案A：后端鉴权，前端直连流媒体） -----
+app.post('/api/interview/avatar/session/start', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id, avatar_id } = req.body || {};
+  if (!session_id) {
+    return res.status(400).json({ code: 400, message: 'session_id 必填', data: null });
+  }
+  const interviewSession = interviewSessionsV2.get(String(session_id));
+  if (!interviewSession || interviewSession.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+
+  const avatar_session_id = crypto.randomUUID();
+  const token = buildAvatarToken();
+  const expire_at = Math.floor(Date.now() / 1000) + AVATAR_TOKEN_TTL_SEC;
+  const pickedAvatarId = AVATAR_ALLOWED_IDS.has(String(avatar_id)) ? String(avatar_id) : '110592024';
+  const sdk_config = buildAvatarSdkConfig(String(session_id), avatar_session_id, token, expire_at);
+  avatarInterviewSessions.set(String(session_id), {
+    userId,
+    avatar_session_id,
+    avatar_id: pickedAvatarId,
+    token,
+    expire_at,
+    stream_url: sdk_config.stream_url,
+    ws_url: sdk_config.ws_url,
+    status: 'connected',
+  });
+
+  return res.json(
+    ok200({
+      session_id: String(session_id),
+      avatar_session_id,
+      vendor: AVATAR_VENDOR,
+      avatar_id: pickedAvatarId,
+      sdk_config,
+    })
+  );
+});
+
+app.post('/api/interview/avatar/session/refresh', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id, avatar_session_id } = req.body || {};
+  if (!session_id || !avatar_session_id) {
+    return res.status(400).json({ code: 400, message: 'session_id 与 avatar_session_id 必填', data: null });
+  }
+  const item = avatarInterviewSessions.get(String(session_id));
+  if (!item || item.userId !== userId || item.avatar_session_id !== String(avatar_session_id)) {
+    return res.status(404).json({ code: 404, message: '虚拟人会话不存在或无权访问', data: null });
+  }
+  const token = buildAvatarToken();
+  const expire_at = Math.floor(Date.now() / 1000) + AVATAR_TOKEN_TTL_SEC;
+  item.token = token;
+  item.expire_at = expire_at;
+  const sdk_config = {
+    token,
+    expire_at,
+  };
+  return res.json(
+    ok200({
+      session_id: String(session_id),
+      avatar_session_id: item.avatar_session_id,
+      sdk_config,
+    })
+  );
+});
+
+app.post('/api/interview/avatar/speak', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id, text, interrupt } = req.body || {};
+  if (!session_id || !String(text || '').trim()) {
+    return res.status(400).json({ code: 400, message: 'session_id 与 text 必填', data: null });
+  }
+  const interviewSession = interviewSessionsV2.get(String(session_id));
+  if (!interviewSession || interviewSession.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  const avatarSession = avatarInterviewSessions.get(String(session_id));
+  if (!avatarSession || avatarSession.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '虚拟人会话未初始化', data: null });
+  }
+  if (avatarSession.expire_at <= Math.floor(Date.now() / 1000)) {
+    return res.status(401).json({ code: 401, message: '虚拟人凭证已过期，请先刷新会话', data: null });
+  }
+  const task_id = crypto.randomUUID();
+  avatarSession.last_task = {
+    task_id,
+    text: String(text).trim(),
+    interrupt: Boolean(interrupt),
+    created_at: new Date().toISOString(),
+  };
+  return res.json(ok200({ accepted: true, task_id }));
+});
+
+app.delete('/api/interview/avatar/session/:session_id', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.params;
+  const item = avatarInterviewSessions.get(String(session_id));
+  if (!item || item.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '虚拟人会话不存在或无权访问', data: null });
+  }
+  item.status = 'ended';
+  avatarInterviewSessions.delete(String(session_id));
   return res.json(ok200({ session_id: String(session_id), status: 'ended' }));
 });
 
