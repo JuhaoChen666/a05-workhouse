@@ -1,6 +1,7 @@
 <template>
   <div class="auth-page">
     <el-card class="auth-card">
+      <el-button @click="goLanding">返回</el-button>
       <h2 class="title">登录</h2>
       <!-- 登录表单 -->
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px" @keyup.enter="onSubmit">
@@ -77,6 +78,9 @@ const goRegister = () => {
 
 const goForgot = () => {
   router.push({ name: 'ForgotPassword' });
+};
+const goLanding = () => {
+  router.push({ name: 'Landing' });
 };
 </script>
 
