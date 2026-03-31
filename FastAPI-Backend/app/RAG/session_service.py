@@ -5,30 +5,59 @@ from datetime import datetime
 from app.RAG.RAG_full import RAGService
 from app.RAG.voice_service import VoiceRAGService
 from app.models.interview_models import ConversationRecord, StreamEvent
-
+from app.infrastructure.mapper.session_mapper import SessionMapper
 
 class SessionService:
     """会话管理服务"""
 
     def __init__(self, rag_service: RAGService):
         self.rag_service = rag_service
-        self.sessions: Dict[str, 'InterviewSession'] = {}
+        # 不再使用本地内存存储：
+        # self.sessions: Dict[str, 'InterviewSession'] = {}
 
-    def create_session(self, resume: str, position: str) -> str:
-        """创建新会话"""
+    async def create_session(self, resume: str, position: str, user_id: int = None) -> str:
+        """创建新会话（写入数据库）"""
         session_id = str(uuid.uuid4())
-        session = InterviewSession(session_id, resume, position, self.rag_service)
-        self.sessions[session_id] = session
+        await SessionMapper.insert_session({
+            "session_id": session_id,
+            "user_id": user_id,
+            "resume": resume,
+            "position": position,
+            "status": "initializing"
+        })
         return session_id
 
-    def get_session(self, session_id: str) -> Optional['InterviewSession']:
-        """获取会话"""
-        return self.sessions.get(session_id)
+    async def get_session(self, session_id: str) -> Optional['InterviewSession']:
+        """获取会话（从数据库拉取并组装）"""
+        session_model = await SessionMapper.get_session_with_history(session_id)
+        if not session_model:
+            return None
+        
+        # 将DB模型重组为InterviewSession业务对象
+        session = InterviewSession(session_id, session_model.resume, session_model.position, self.rag_service)
+        session.status = session_model.status
+        session.current_topic = session_model.current_topic
+        session.current_question = session_model.current_question
+        
+        # 根据round排序组合历史记录
+        records = sorted(session_model.history_records, key=lambda x: x.round)
+        session.conversation_history = [
+            {
+                "round": r.round,
+                "question": r.question,
+                "answer": r.answer,
+                "topic": r.topic,
+                "emotion": r.emotion,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else datetime.now().isoformat()
+            } for r in records
+        ]
+        return session
 
-    def delete_session(self, session_id: str):
+    async def delete_session(self, session_id: str):
         """删除会话"""
-        if session_id in self.sessions:
-            del self.sessions[session_id]
+        # 注意：这里可以选择实现数据库软删除/硬删除，或者为了合规保留记录。
+        # 暂时只重置状态即可
+        await SessionMapper.update_session(session_id, {"status": "completed"})
 
 
 class InterviewSession:
@@ -53,6 +82,13 @@ class InterviewSession:
         )
         self.current_topic = await self.rag_service.extract_topic(self.current_question)
         self.status = "questioning"
+        
+        # 同步数据库
+        await SessionMapper.update_session(self.session_id, {
+            "current_question": self.current_question,
+            "current_topic": self.current_topic,
+            "status": self.status
+        })
         return self.current_question
 
     async def process_answer(self, answer: str) -> AsyncGenerator[StreamEvent, None]:
@@ -80,14 +116,12 @@ class InterviewSession:
             "emotion": emotion_data,
             "timestamp": datetime.now().isoformat()
         }
-        # 如果是文字输入，且没有 emotion_data，则不覆盖可能已由语音记录的 history (通常不会发生冲突)
-        # 为了简单，我们在这里统一追加。但在 process_voice_answer 中我们会先追加。
-        # 修正：逻辑内部不负责追加 history，或者负责全量追加。
-        # 考虑到流程，我们在逻辑开始处追加 history。
         
         # 检查是否已经在 history 中（由 process_voice_answer 事先存入）
         if not any(h['round'] == qa_record['round'] for h in self.conversation_history):
             self.conversation_history.append(qa_record)
+            # 持久化到 MySQL 对话记录表
+            await SessionMapper.insert_chat_record(self.session_id, qa_record)
 
         # 分析回答深度
         yield StreamEvent(
@@ -133,6 +167,12 @@ class InterviewSession:
 
             self.current_question = followup_question
             self.status = "questioning"
+            
+            # 持久化新的问题和状态
+            await SessionMapper.update_session(self.session_id, {
+                "current_question": self.current_question,
+                "status": self.status
+            })
 
             yield StreamEvent(
                 type="question",
@@ -193,6 +233,8 @@ class InterviewSession:
                 )
 
                 self.status = "completed"
+                # 更新状态为 completed
+                await SessionMapper.update_session(self.session_id, {"status": self.status})
                 return
 
             # 生成下一个主题的问题
@@ -211,6 +253,13 @@ class InterviewSession:
             self.current_question = next_question
             self.current_topic = await self.rag_service.extract_topic(self.current_question)
             self.status = "questioning"
+            
+            # 持久化下一个主题和问题
+            await SessionMapper.update_session(self.session_id, {
+                "current_question": self.current_question,
+                "current_topic": self.current_topic,
+                "status": self.status
+            })
 
             yield StreamEvent(
                 type="question",
@@ -240,6 +289,12 @@ class InterviewSession:
                 )
                 self.current_question = followup_question
                 self.status = "questioning"
+                
+                # 持久化新的问题
+                await SessionMapper.update_session(self.session_id, {
+                    "current_question": self.current_question,
+                    "status": self.status
+                })
 
                 yield StreamEvent(
                     type="question",

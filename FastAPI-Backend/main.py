@@ -1,8 +1,23 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import interview_routes
+from app.RAG.interview_service import InterviewService
 
-app = FastAPI(title="智能面试系统API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ✅ 在启动时初始化面试服务（这里会加载模型）
+    print("⏳ 正在初始化面试系统（加载 AI 模型）...")
+    app.state.interview_service = InterviewService()
+    print("✅ 面试系统初始化完成！")
+    yield
+    # 可以在这里做清理工作
+
+app = FastAPI(
+    title="智能面试系统API", 
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # 配置CORS
 app.add_middleware(
@@ -35,15 +50,15 @@ if __name__ == "__main__":
     import uvicorn
 
     print("🚀 启动智能面试系统...")
-    print("📍 访问地址: http://localhost:8000")
-    print("📚 API文档: http://localhost:8000/docs")
+    print("📍 访问地址: http://127.0.0.1:8000")
+    print("📚 API文档: http://127.0.0.1:8000/docs")
     print("🔧 按 Ctrl+C 停止服务")
     print("-" * 50)
 
-    # ✅ 修改这里：传递字符串而不是app对象
+    # 🔧 诊断重置：使用 127.0.0.1 和新端口 8010，并直接传递 app 对象
     uvicorn.run(
-        "main:app",  # 改为字符串格式
-        host="0.0.0.0",
+        app, 
+        host="127.0.0.1",
         port=8000,
-        reload=True
+        reload=False
     )

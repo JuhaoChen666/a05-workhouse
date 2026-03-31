@@ -7,6 +7,7 @@ class InterviewStartRequest(BaseModel):
     resume: str
     position: str
     collection_name: str
+    user_id: Optional[int] = None
 
 class InterviewAnswerRequest(BaseModel):
     """提交回答请求"""
