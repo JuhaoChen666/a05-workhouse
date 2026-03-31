@@ -20,7 +20,7 @@ function normalizedRequestPath(config: InternalAxiosRequestConfig): string {
 
 export const apiOrigin =
   (import.meta.env.VITE_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  'http://127.0.0.1:3000';
+  'http://10.105.2.13:8080';
 
 /** 业务接口根路径（带 `/api`）；模拟面试 AI 见 `interviewApiJsonBase`（8000） */
 export const apiJsonBase = `${apiOrigin}/api`;
@@ -31,7 +31,7 @@ export const apiJsonBase = `${apiOrigin}/api`;
  */
 export const INTERVIEW_API_ORIGIN =
   (import.meta.env.VITE_INTERVIEW_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  'http://127.0.0.1:3000';
+  'http://10.105.2.13:8000';
   /*
   'http://10.105.2.13:8000'
   */
@@ -116,11 +116,23 @@ function unwrapResponse<T = unknown>(response: { data: unknown }) {
 }
 
 function formatAxiosError(error: unknown): Error {
-  const ax = error as { response?: { data?: unknown; status?: number }; message?: string };
+  const ax = error as {
+    response?: { data?: unknown; status?: number };
+    message?: string;
+    code?: string;
+  };
   const status = ax.response?.status;
   const body = ax.response?.data;
   if (body != null && typeof body === 'object' && ('code' in body || pickErrorMessage(body))) {
     return new Error(formatApiErrorText(body, status));
+  }
+  if (status == null) {
+    const code =
+      (typeof ax.code === 'string' && ax.code.trim()) ||
+      (typeof ax.message === 'string' && /network error/i.test(ax.message) ? 'NETWORK_ERROR' : '') ||
+      'NETWORK_ERROR';
+    const detail = pickErrorMessage(body) || ax.message || '无法连接后端服务';
+    return new Error(`[${code}] ${detail}`);
   }
   const msg =
     pickErrorMessage(body) ||

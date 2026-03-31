@@ -162,7 +162,6 @@ import {
   endInterviewSessionApi,
   startAvatarInterviewSessionApi,
   refreshAvatarInterviewSessionApi,
-  speakAvatarApi,
   endAvatarInterviewSessionApi,
   type StartInterviewBody,
   type InterviewAnswerStreamEvent,
@@ -672,7 +671,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (feedback) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(feedback, false);
-          void speakAvatarApi(effectiveSessionId.value, feedback, false).catch(() => {});
         }
         uiChain = uiChain.then(async () => {
           await renderStreamingText(feedback);
@@ -686,7 +684,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (msg) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(msg, false);
-          void speakAvatarApi(effectiveSessionId.value, msg, false).catch(() => {});
         }
         uiChain = uiChain.then(async () => {
           await renderStreamingText(msg);
@@ -700,7 +697,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (msg) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(msg, true);
-          void speakAvatarApi(effectiveSessionId.value, msg, true).catch(() => {});
         }
         uiChain = uiChain.then(async () => {
           await renderStreamingText(msg);

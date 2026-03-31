@@ -12,6 +12,7 @@ export interface StartInterviewBody {
   resume: string;
   position: string;
   collection_name: string;
+  user_id?: string | number;
   interview_mode?: 'text' | 'voice' | 'avatar';
   avatar_id?: string;
 }
@@ -41,6 +42,14 @@ export interface InterviewSessionInfo {
   current_question: string;
   history: InterviewSessionHistoryItem[];
   interview_mode?: 'text' | 'voice' | 'avatar';
+}
+
+export interface UserInterviewSessionItem {
+  session_id: string;
+  position: string;
+  status: 'questioning' | 'ended' | string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AvatarSessionStartRes {
@@ -95,6 +104,11 @@ export function startInterviewApi(body: StartInterviewBody) {
 
 export function getInterviewSessionApi(sessionId: string) {
   return interviewRequest.get<InterviewSessionInfo>(`/interview/session/${sessionId}`);
+}
+
+/** 获取某个用户的历史面试会话（按时间倒序） */
+export function getUserInterviewSessionsApi(userId: string | number) {
+  return interviewRequest.get<UserInterviewSessionItem[]>(`/interview/user/${userId}/sessions`);
 }
 
 export function endInterviewSessionApi(sessionId: string) {

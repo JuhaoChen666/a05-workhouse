@@ -89,6 +89,7 @@ import { useRoute, useRouter } from 'vue-router';
 import mammoth from 'mammoth/mammoth.browser';
 import * as pdfjsLib from 'pdfjs-dist';
 import { getJobDetailApi, type HotJobItem } from '@/api/jobs';
+import { useUserStore } from '@/store/user';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -97,6 +98,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 
 const loading = ref(true);
 const starting = ref(false);
@@ -225,6 +227,7 @@ async function onStartInterview() {
       resume: resumeText,
       position,
       collection_name,
+      user_id: userStore.userInfo?.id,
       interview_mode: interviewMode.value,
       avatar_id: avatarId.value,
     });
