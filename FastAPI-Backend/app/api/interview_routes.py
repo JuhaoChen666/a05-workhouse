@@ -1,21 +1,23 @@
 import json
 import asyncio
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request, Depends
 from fastapi.responses import StreamingResponse
 from app.models.interview_models import InterviewStartRequest, InterviewAnswerRequest
 from app.RAG.interview_service import InterviewService
 
 router = APIRouter(prefix="/api/interview", tags=["面试"])
 
-# 创建服务实例（可以考虑使用依赖注入）
-interview_service = InterviewService()
+def get_interview_service(request: Request) -> InterviewService:
+    return request.app.state.interview_service
 
 
 @router.post("/answer-voice")
 async def submit_voice_answer(
+    request: Request,
     session_id: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    interview_service: InterviewService = Depends(get_interview_service)
 ):
     """提交语音回答并获取流式响应"""
     
@@ -50,11 +52,14 @@ async def submit_voice_answer(
 
 
 @router.post("/start")
-async def start_interview(request: InterviewStartRequest):
+async def start_interview(
+    request: InterviewStartRequest,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
     """开始面试"""
     try:
         # 开始面试
-        result = interview_service.start_interview(
+        result = await interview_service.start_interview(
             request.resume,
             request.position,
             request.collection_name
@@ -66,7 +71,7 @@ async def start_interview(request: InterviewStartRequest):
         question = await interview_service.initialize_session_question(session_id)
 
         # 获取会话信息
-        session_info = interview_service.get_session_info(session_id)
+        session_info = await interview_service.get_session_info(session_id)
 
         return {
             "code": 200,
@@ -85,7 +90,10 @@ async def start_interview(request: InterviewStartRequest):
 
 
 @router.post("/answer")
-async def submit_answer(request: InterviewAnswerRequest):
+async def submit_answer(
+    request: InterviewAnswerRequest,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
     """提交回答并获取流式响应"""
 
     async def generate():
@@ -94,12 +102,16 @@ async def submit_answer(request: InterviewAnswerRequest):
                 # 将事件转换为JSON字符串并发送
                 yield json.dumps(event.dict(), ensure_ascii=False) + "\n"
             
-            # 为防止Apifox或Node底层客户端在TCP断开时丢弃缓冲区最后一个有效块
-            # 我们在这里发送连续的空白换行和占位符顶出真正的数据帧
             yield "      \n\n"
             await asyncio.sleep(0.5)
         except Exception as e:
-            raise e
+            import traceback
+            traceback.print_exc()
+            yield json.dumps({
+                "type": "error",
+                "data": {"message": f"系统内部错误: {str(e)}"},
+                "timestamp": datetime.now().isoformat()
+            }, ensure_ascii=False) + "\n"
 
     return StreamingResponse(
         generate(),
@@ -112,9 +124,12 @@ async def submit_answer(request: InterviewAnswerRequest):
 
 
 @router.get("/session/{session_id}")
-async def get_session_info(session_id: str):
+async def get_session_info(
+    session_id: str,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
     """获取会话信息"""
-    session_info = interview_service.get_session_info(session_id)
+    session_info = await interview_service.get_session_info(session_id)
     if not session_info:
         raise HTTPException(status_code=404, detail="会话不存在")
 
@@ -126,10 +141,32 @@ async def get_session_info(session_id: str):
 
 
 @router.delete("/session/{session_id}")
-async def end_session(session_id: str):
+async def end_session(
+    session_id: str,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
     """结束会话"""
-    interview_service.end_session(session_id)
+    await interview_service.end_session(session_id)
     return {
         "code": 200,
         "message": "会话已结束"
+    }
+
+@router.get("/user/{user_id}/sessions")
+async def get_user_sessions(user_id: int):
+    """获取用户过往的历史面试会话记录"""
+    from app.infrastructure.mapper.session_mapper import SessionMapper
+    sessions = await SessionMapper.get_sessions_by_user_id(user_id)
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [
+            {
+                "session_id": s.session_id,
+                "position": s.position,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "updated_at": s.updated_at.isoformat() if s.updated_at else None
+            } for s in sessions
+        ]
     }

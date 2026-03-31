@@ -4,17 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:文字对答面试部分✓">
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="fix:gitignore">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/llm/modelscope.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/utils/audio_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/utils/audio_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/data/audio/20260224/frontend_test_user_20260224_022305.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -113,8 +113,8 @@
       <recent name="D:\a05-workhouse\Springboot-backend\src\main\resources\Assets" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="D:\a05-workhouse\FastAPI-Backend\app\RAG" />
       <recent name="D:\a05-workhouse" />
+      <recent name="D:\a05-workhouse\FastAPI-Backend\app\RAG" />
       <recent name="D:\a05-workhouse\FastAPI-Backend" />
     </key>
     <key name="CopyClassDialog.RECENTS_KEY">
@@ -168,17 +168,12 @@
     <list>
       <item itemvalue="Python.main" />
     </list>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Python.main" />
-      </list>
-    </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
-        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-IU-252.26199.169" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
+        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
       </set>
     </attachedChunks>
   </component>
@@ -255,6 +250,10 @@
       <workItem from="1774620800260" duration="181000" />
       <workItem from="1774699485611" duration="1499000" />
       <workItem from="1774705814641" duration="2818000" />
+      <workItem from="1774790543989" duration="391000" />
+      <workItem from="1774869591204" duration="2631000" />
+      <workItem from="1774960299059" duration="121000" />
+      <workItem from="1774960660847" duration="380000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -352,7 +351,23 @@
       <option name="project" value="LOCAL" />
       <updated>1774615585274</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="feat:语音对答面试部分✓">
+      <option name="closed" value="true" />
+      <created>1774790669925</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1774790669925</updated>
+    </task>
+    <task id="LOCAL-00014" summary="fix:gitignore">
+      <option name="closed" value="true" />
+      <created>1774790921056</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1774790921056</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TerminalProjectNonSharedOptionsProvider">
@@ -385,7 +400,9 @@
     <MESSAGE value="feat：添加文档切分器,更新了嵌入式模型导入方式,并重构RAG目录" />
     <MESSAGE value="feat：RAG模型初步构建完成" />
     <MESSAGE value="fix:gitignore修复" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix:gitignore修复" />
+    <MESSAGE value="feat:语音对答面试部分✓" />
+    <MESSAGE value="fix:gitignore" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix:gitignore" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/a05_workhouse$document.coverage" NAME="main 覆盖结果" MODIFIED="1774084710187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
@@ -399,6 +416,6 @@
     <SUITE FILE_PATH="coverage/a05_workhouse$deepseek.coverage" NAME="deepseek 覆盖结果" MODIFIED="1774007365293" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/llm" />
     <SUITE FILE_PATH="coverage/a05_workhouse$test_import.coverage" NAME="test_import 覆盖结果" MODIFIED="1774081571252" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
     <SUITE FILE_PATH="coverage/a05_workhouse$chroma_client.coverage" NAME="chroma_client 覆盖结果" MODIFIED="1774007768774" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1774710115493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1774960726445" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
   </component>
 </project>

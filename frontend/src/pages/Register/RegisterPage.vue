@@ -1,6 +1,9 @@
 <template>
   <div class="auth-page">
     <el-card class="auth-card">
+      <div class="button">
+        <el-button @click="goLanding">返回</el-button>
+      </div>
       <h2 class="title">注册</h2>
       <!-- 注册表单 -->
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px" @keyup.enter="onSubmit">
@@ -172,6 +175,9 @@ const onSubmit = throttle(doSubmit, 500);
 const goLogin = () => {
   router.push({ name: 'Login' });
 };
+const goLanding = () => {
+  router.push({ name: 'Landing' });
+};
 </script>
 
 <style scoped>
@@ -200,4 +206,5 @@ const goLogin = () => {
   white-space: nowrap;
   padding: 0 12px;
 }
+
 </style>
