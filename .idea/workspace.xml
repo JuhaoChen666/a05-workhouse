@@ -4,17 +4,21 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="fix:gitignore">
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shelf/在进行更新之前于_2026_3_3_17_15_取消提交了更改_[更改]/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -125,7 +129,7 @@
       <recent name="com.example.springbootbackend.config" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.main">
+  <component name="RunManager" selected="Spring Boot.SpringbootBackendApplication">
     <configuration default="true" type="JetRunConfigurationType">
       <method v="2">
         <option name="Make" enabled="true" />
@@ -166,14 +170,14 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="Python.main" />
+      <item itemvalue="Spring Boot.SpringbootBackendApplication" />
     </list>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
-        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
+        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-IU-252.26199.169" />
       </set>
     </attachedChunks>
   </component>
@@ -253,7 +257,11 @@
       <workItem from="1774790543989" duration="391000" />
       <workItem from="1774869591204" duration="2631000" />
       <workItem from="1774960299059" duration="121000" />
-      <workItem from="1774960660847" duration="380000" />
+      <workItem from="1774960660847" duration="991000" />
+      <workItem from="1774968055799" duration="14000" />
+      <workItem from="1775030919377" duration="1039000" />
+      <workItem from="1775047269712" duration="604000" />
+      <workItem from="1775127315410" duration="7060000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -367,7 +375,23 @@
       <option name="project" value="LOCAL" />
       <updated>1774790921056</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="feat:面试过程链接数据库，保存会话ID与用户ID绑定">
+      <option name="closed" value="true" />
+      <created>1774961186007</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1774961186007</updated>
+    </task>
+    <task id="LOCAL-00016" summary="feat:面试过程链接数据库，保存会话ID与用户ID绑定">
+      <option name="closed" value="true" />
+      <created>1774961226282</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1774961226282</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TerminalProjectNonSharedOptionsProvider">
@@ -402,7 +426,8 @@
     <MESSAGE value="fix:gitignore修复" />
     <MESSAGE value="feat:语音对答面试部分✓" />
     <MESSAGE value="fix:gitignore" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix:gitignore" />
+    <MESSAGE value="feat:面试过程链接数据库，保存会话ID与用户ID绑定" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat:面试过程链接数据库，保存会话ID与用户ID绑定" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/a05_workhouse$document.coverage" NAME="main 覆盖结果" MODIFIED="1774084710187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />

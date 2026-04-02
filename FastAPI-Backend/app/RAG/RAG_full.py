@@ -148,20 +148,68 @@ class RAGService:
         self.final_evaluation_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，请根据整个面试过程给出综合评价。
 
-        岗位: {position}
+        岗位：{position}
         面试对话历史:
         {full_history}
 
-        请输出JSON格式：
+        请输出 JSON 格式：
         {{
             "technical_evaluation": "技术能力评价",
             "communication_evaluation": "沟通表达能力评价",
             "overall_score": 85,
             "recommendation": "强烈推荐/推荐/待定/不推荐",
-            "strengths": ["优点1", "优点2"],
-            "weaknesses": ["不足1", "不足2"],
+            "strengths": ["优点 1", "优点 2"],
+            "weaknesses": ["不足 1", "不足 2"],
             "detailed_comment": "详细评语"
         }}
+        """)
+
+        # 综合评价生成器（多维度、多主题、分轮次）
+        self.comprehensive_evaluation_prompt = ChatPromptTemplate.from_template("""
+        你是资深技术面试官，请基于完整的面试过程生成 comprehensive 综合评价。
+
+        岗位：{position}
+        面试概况:
+        - 总轮次：{total_rounds}轮
+        - 时长：{duration_minutes:.1f}分钟
+        - 涉及主题：{topics}
+
+        详细面试记录:
+        {full_history}
+
+        请从以下维度进行评价并输出 JSON 格式：
+        {{
+            "overall_score": 0-10,
+            "technical_competency": 0-10,
+            "communication_skill": 0-10,
+            "problem_solving": 0-10,
+            "depth_of_knowledge": 0-10,
+            "topic_coverage": ["主题 1", "主题 2"],
+            "strong_topics": ["掌握好的主题"],
+            "weak_topics": ["需要加强的主题"],
+            "strengths": ["优势 1", "优势 2"],
+            "weaknesses": ["不足 1", "不足 2"],
+            "suggestions": ["建议 1", "建议 2"],
+            "technical_evaluation": "详细的技术能力评价（100-300 字）",
+            "communication_evaluation": "详细的沟通能力评价（100-300 字）",
+            "overall_comment": "综合点评（200-500 字，包含具体例子）",
+            "recommendation": "强烈推荐/推荐/待定/不推荐",
+            "confidence_level": "高/中/低",
+            "round_evaluations": [
+                {{
+                    "round": 1,
+                    "topic": "主题名",
+                    "comment": "本轮点评（50-100 字，指出亮点和改进点）"
+                }}
+            ]
+        }}
+
+        注意：
+        1. 评分要客观公正，区分度高
+        2. 点评要结合具体例子，不要空话套话
+        3. 每轮点评要指出亮点和改进点
+        4. 录用建议要与评分一致
+        5. 考虑面试时长和轮次的合理性
         """)
 
     def initialize_database(self, collection_name: str):
@@ -361,3 +409,90 @@ class RAGService:
             }
 
         return evaluation
+
+    async def generate_comprehensive_evaluation(
+        self, 
+        position: str,
+        conversation_history: List[Dict],
+        total_rounds: int,
+        duration_minutes: float
+    ) -> dict:
+        """生成 comprehensive 综合评价（多维度、多主题、分轮次）"""
+        
+        # 提取所有主题
+        topics = list(set([q.get('topic', '未知') for q in conversation_history]))
+        
+        # 构建详细的面试历史记录
+        full_history = "\n\n".join([
+            f"第{qa.get('round', i+1)}轮 - 主题：{qa.get('topic', '未知')}\n"
+            f"问：{qa.get('question', '')}\n"
+            f"答：{qa.get('answer', '')}"
+            for i, qa in enumerate(conversation_history)
+        ])
+        
+        # 使用 LCEL 链式调用（与现有代码风格一致）
+        chain = self.comprehensive_evaluation_prompt | DeepSeek_LLM | StrOutputParser()
+        
+        result = await chain.ainvoke({
+            "position": position,
+            "total_rounds": total_rounds,
+            "duration_minutes": duration_minutes,
+            "topics": ", ".join(topics),
+            "full_history": full_history
+        })
+        
+        # 解析 JSON 结果（与现有代码相同的解析逻辑）
+        try:
+            json_match = re.search(r'\{.*\}', result, re.DOTALL)
+            if json_match:
+                llm_evaluation = json.loads(json_match.group())
+            else:
+                llm_evaluation = {}
+        except:
+            llm_evaluation = {}
+        
+        # 计算基础统计数据用于补充评分
+        round_scores = []
+        for qa in conversation_history:
+            answer_length = len(qa.get('answer', ''))
+            has_technical_terms = any(term in qa.get('answer', '').lower() 
+                                    for term in ['java', 'android', 'api', 'code', 'system', 'data'])
+            
+            technical_score = min(10, max(1, (answer_length / 50) + (3 if has_technical_terms else 0)))
+            depth_score = min(10, max(1, (answer_length / 80) + 2))
+            clarity_score = min(10, max(1, 5 + (1 if len(qa.get('answer', '').split('\n')) > 2 else 0)))
+            
+            round_scores.append({
+                "round": qa.get('round', 1),
+                "topic": qa.get('topic', '未知'),
+                "technical_score": round(technical_score, 1),
+                "depth_score": round(depth_score, 1),
+                "clarity_score": round(clarity_score, 1)
+            })
+        
+        # 合并 LLM 评价和计算评分
+        avg_technical = sum([r['technical_score'] for r in round_scores]) / len(round_scores) if round_scores else 0
+        
+        comprehensive_result = {
+            "overall_score": float(llm_evaluation.get("overall_score", avg_technical)),
+            "technical_competency": float(llm_evaluation.get("technical_competency", avg_technical)),
+            "communication_skill": float(llm_evaluation.get("communication_skill", 5.0)),
+            "problem_solving": float(llm_evaluation.get("problem_solving", 5.0)),
+            "depth_of_knowledge": float(llm_evaluation.get("depth_of_knowledge", 5.0)),
+            "topic_coverage": llm_evaluation.get("topic_coverage", topics),
+            "strong_topics": llm_evaluation.get("strong_topics", []),
+            "weak_topics": llm_evaluation.get("weak_topics", []),
+            "strengths": llm_evaluation.get("strengths", ["面试表现良好"]),
+            "weaknesses": llm_evaluation.get("weaknesses", ["仍有提升空间"]),
+            "suggestions": llm_evaluation.get("suggestions", ["继续深入学习相关知识"]),
+            "technical_evaluation": llm_evaluation.get("technical_evaluation", "技术能力评价"),
+            "communication_evaluation": llm_evaluation.get("communication_evaluation", "沟通能力评价"),
+            "overall_comment": llm_evaluation.get("overall_comment", "综合评价"),
+            "recommendation": llm_evaluation.get("recommendation", "待定"),
+            "confidence_level": llm_evaluation.get("confidence_level", "中"),
+            "round_evaluations": llm_evaluation.get("round_evaluations", []),
+            "total_rounds": total_rounds,
+            "duration_minutes": round(duration_minutes, 1)
+        }
+        
+        return comprehensive_result

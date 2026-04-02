@@ -145,12 +145,15 @@ class InterviewSession:
             timestamp=datetime.now().isoformat()
         )
 
-        # 获取当前主题的QA历史
+        # 获取当前主题的 QA 历史
         topic_qa_history = [q for q in self.conversation_history
                             if q['topic'] == self.current_topic]
 
-        # 判断是否需要追问
-        if analysis.get("need_followup", False) and len(topic_qa_history) < self.max_depth_per_topic:
+        # 检查是否已达到当前主题的最大深度
+        is_max_depth_reached = len(topic_qa_history) >= self.max_depth_per_topic
+        
+        # 判断是否需要追问（但不超过最大深度）
+        if analysis.get("need_followup", False) and not is_max_depth_reached:
             yield StreamEvent(
                 type="followup",
                 data={"message": "回答不够深入，准备追问..."},
@@ -204,7 +207,7 @@ class InterviewSession:
         )
 
         # 决定下一步
-        if completeness.get("is_sufficient", False) or len(topic_qa_history) >= self.max_depth_per_topic:
+        if completeness.get("is_sufficient", False) or is_max_depth_reached:
             # 当前主题结束
             yield StreamEvent(
                 type="topic_completed",
@@ -218,7 +221,11 @@ class InterviewSession:
             if len(completed_topics) >= 5:
                 yield StreamEvent(
                     type="interview_complete",
-                    data={"message": "面试考察完成"},
+                    data={
+                        "message": "面试考察完成",
+                        "total_rounds": len(self.conversation_history),
+                        "covered_topics": completed_topics
+                    },
                     timestamp=datetime.now().isoformat()
                 )
 

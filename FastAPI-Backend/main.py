@@ -50,15 +50,15 @@ if __name__ == "__main__":
     import uvicorn
 
     print("🚀 启动智能面试系统...")
-    print("📍 访问地址: http://127.0.0.1:8000")
-    print("📚 API文档: http://127.0.0.1:8000/docs")
+    print("📍 访问地址: http://0.0.0.0:8000")
+    print("📚 API文档: http://0.0.0.0:8000/docs")
     print("🔧 按 Ctrl+C 停止服务")
     print("-" * 50)
 
-    # 🔧 诊断重置：使用 127.0.0.1 和新端口 8010，并直接传递 app 对象
+
     uvicorn.run(
         app, 
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
         reload=False
     )
