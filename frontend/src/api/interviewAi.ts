@@ -12,6 +12,9 @@ export interface StartInterviewBody {
   resume: string;
   position: string;
   collection_name: string;
+  user_id?: string | number;
+  interview_mode?: 'text' | 'voice' | 'avatar';
+  avatar_id?: string;
 }
 
 export interface StartInterviewRes {
@@ -38,6 +41,42 @@ export interface InterviewSessionInfo {
   current_topic: string;
   current_question: string;
   history: InterviewSessionHistoryItem[];
+  interview_mode?: 'text' | 'voice' | 'avatar';
+}
+
+export interface UserInterviewSessionItem {
+  session_id: string;
+  position: string;
+  status: 'questioning' | 'ended' | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvatarSessionStartRes {
+  session_id: string;
+  avatar_session_id: string;
+  vendor: string;
+  avatar_id: string;
+  sdk_config: {
+    app_id: string;
+    server_url: string;
+    signed_url: string;
+    scene_id: string;
+    vcn: string;
+    protocol: 'xrtc' | 'webrtc';
+    alpha: 0 | 1;
+    token: string;
+    expire_at: number;
+  };
+}
+
+export interface AvatarSessionRefreshRes {
+  session_id: string;
+  avatar_session_id: string;
+  sdk_config: {
+    token: string;
+    expire_at: number;
+  };
 }
 
 /**
@@ -67,9 +106,45 @@ export function getInterviewSessionApi(sessionId: string) {
   return interviewRequest.get<InterviewSessionInfo>(`/interview/session/${sessionId}`);
 }
 
+/** 获取某个用户的历史面试会话（按时间倒序） */
+export function getUserInterviewSessionsApi(userId: string | number) {
+  return interviewRequest.get<UserInterviewSessionItem[]>(`/interview/user/${userId}/sessions`);
+}
+
 export function endInterviewSessionApi(sessionId: string) {
   return interviewRequest.delete<{ session_id: string; status: 'ended' }>(
     `/interview/session/${sessionId}`
+  );
+}
+
+export function startAvatarInterviewSessionApi(
+  sessionId: string,
+  avatarId = '110592024'
+) {
+  return interviewRequest.post<AvatarSessionStartRes>('/interview/avatar/session/start', {
+    session_id: sessionId,
+    avatar_id: avatarId,
+  });
+}
+
+export function refreshAvatarInterviewSessionApi(sessionId: string, avatarSessionId: string) {
+  return interviewRequest.post<AvatarSessionRefreshRes>('/interview/avatar/session/refresh', {
+    session_id: sessionId,
+    avatar_session_id: avatarSessionId,
+  });
+}
+
+export function speakAvatarApi(sessionId: string, text: string, interrupt = true) {
+  return interviewRequest.post<{ accepted: boolean; task_id: string }>('/interview/avatar/speak', {
+    session_id: sessionId,
+    text,
+    interrupt,
+  });
+}
+
+export function endAvatarInterviewSessionApi(sessionId: string) {
+  return interviewRequest.delete<{ session_id: string; status: 'ended' }>(
+    `/interview/avatar/session/${sessionId}`
   );
 }
 

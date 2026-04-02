@@ -32,6 +32,9 @@ export const apiJsonBase = `${apiOrigin}/api`;
 export const INTERVIEW_API_ORIGIN =
   (import.meta.env.VITE_INTERVIEW_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
   'http://10.105.2.13:8000';
+  /*
+  'http://10.105.2.13:8000'
+  */
 export const interviewApiJsonBase = `${INTERVIEW_API_ORIGIN}/api`;
 
 /**
@@ -113,11 +116,23 @@ function unwrapResponse<T = unknown>(response: { data: unknown }) {
 }
 
 function formatAxiosError(error: unknown): Error {
-  const ax = error as { response?: { data?: unknown; status?: number }; message?: string };
+  const ax = error as {
+    response?: { data?: unknown; status?: number };
+    message?: string;
+    code?: string;
+  };
   const status = ax.response?.status;
   const body = ax.response?.data;
   if (body != null && typeof body === 'object' && ('code' in body || pickErrorMessage(body))) {
     return new Error(formatApiErrorText(body, status));
+  }
+  if (status == null) {
+    const code =
+      (typeof ax.code === 'string' && ax.code.trim()) ||
+      (typeof ax.message === 'string' && /network error/i.test(ax.message) ? 'NETWORK_ERROR' : '') ||
+      'NETWORK_ERROR';
+    const detail = pickErrorMessage(body) || ax.message || '无法连接后端服务';
+    return new Error(`[${code}] ${detail}`);
   }
   const msg =
     pickErrorMessage(body) ||

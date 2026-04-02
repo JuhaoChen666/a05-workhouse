@@ -2,7 +2,7 @@
   <div class="home-layout">
     <el-container>
       <!-- 左侧深蓝菜单 -->
-      <el-aside width="200px" class="aside">
+      <el-aside v-if="!isInterviewSessionPage" width="200px" class="aside">
         <div class="logo">AI 面试平台</div>
         <el-menu
           :default-active="activeMenu"
@@ -26,8 +26,8 @@
           </el-menu-item>
         </el-menu>
       </el-aside>
-      <el-container direction="vertical" class="main-wrapper">
-        <el-header class="header">
+      <el-container direction="vertical" class="main-wrapper" :class="{ 'main-wrapper-full': isInterviewSessionPage }">
+        <el-header v-if="!isInterviewSessionPage" class="header">
           <div class="header-right">
             <el-dropdown trigger="hover" @command="handleUserCommand">
               <span class="avatar-wrap">
@@ -54,9 +54,9 @@
             </el-dropdown>
           </div>
         </el-header>
-        <el-main class="main">
-          <el-scrollbar class="main-scrollbar" always>
-            <div class="main-inner">
+        <el-main class="main" :class="{ 'main-full': isInterviewSessionPage }">
+          <el-scrollbar class="main-scrollbar" always :class="{ 'main-scrollbar-full': isInterviewSessionPage }">
+            <div class="main-inner" :class="{ 'main-inner-full': isInterviewSessionPage }">
               <router-view v-slot="{ Component }">
                 <transition name="fade" mode="out-in">
                   <component :is="Component" />
@@ -89,6 +89,7 @@ const router = useRouter();
 const userStore = useUserStore();
 
 const activeMenu = computed(() => route.path);
+const isInterviewSessionPage = computed(() => route.name === 'InterviewSession');
 
 const avatarSrc = computed(() => userStore.userInfo?.avatarUrl || undefined);
 
@@ -127,6 +128,7 @@ function handleUserCommand(command: string) {
   min-height: 0;
   overflow: hidden;
 }
+.main-wrapper-full { width: 100%; }
 .aside {
   background-color: #0d2137;
   height: 100vh;
@@ -191,6 +193,16 @@ function handleUserCommand(command: string) {
 }
 .main-inner {
   padding: 20px;
+}
+.main-inner-full {
+  padding: 0;
+  height: 100%;
+}
+.main-full { height: 100%; }
+.main-scrollbar-full,
+.main-scrollbar-full :deep(.el-scrollbar__wrap),
+.main-scrollbar-full :deep(.el-scrollbar__view) {
+  height: 100%;
 }
 .fade-enter-active,
 .fade-leave-active {
