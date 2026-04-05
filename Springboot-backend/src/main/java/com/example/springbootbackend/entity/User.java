@@ -19,6 +19,23 @@ public class User implements UserDetails {
         private Integer role_id;
         private String confirmPassword;
 
+        // 为了兼容 MyBatis 的驼峰命名和简化属性名，添加这些方法
+        public Integer getId() {
+            return userID;
+        }
+
+        public void setId(Integer id) {
+            this.userID = id;
+        }
+        
+        public Integer getRoleId() {
+            return role_id;
+        }
+
+        public void setRoleId(Integer roleId) {
+            this.role_id = roleId;
+        }
+
 
 
     @Override

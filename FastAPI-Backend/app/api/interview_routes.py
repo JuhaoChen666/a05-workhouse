@@ -170,3 +170,37 @@ async def get_user_sessions(user_id: int):
             } for s in sessions
         ]
     }
+
+@router.get("/session/{session_id}/evaluation")
+async def get_comprehensive_evaluation(
+    session_id: str,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
+    """获取已结束会话的综合评价报告（多维度、多主题、分轮次点评）"""
+    try:
+        # 先检查会话是否存在
+        session_info = await interview_service.get_session_info(session_id)
+        if not session_info:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        
+        # 检查是否已结束
+        if session_info.get("status") not in ["completed", "ended"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"面试尚未结束，当前状态：{session_info.get('status')}"
+            )
+        
+        # 生成综合评价（使用 LCEL 方式）
+        evaluation = await interview_service.generate_session_evaluation(session_id)
+        
+        return {
+            "code": 200,
+            "message": "success",
+            "data": evaluation
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"生成评价失败：{str(e)}")

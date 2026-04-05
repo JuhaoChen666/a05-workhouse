@@ -96,3 +96,33 @@ class InterviewService:
     async def end_session(self, session_id: str):
         """结束会话"""
         await self.session_service.delete_session(session_id)
+
+    async def generate_session_evaluation(self, session_id: str) -> dict:
+        """生成会话的综合评价（多维度、多主题、分轮次）"""
+        session_info = await self.get_session_info(session_id)
+        if not session_info:
+            raise ValueError(f"会话 {session_id} 不存在")
+        
+        # 获取会话的数据库记录（包含时间信息）
+        from app.infrastructure.mapper.session_mapper import SessionMapper
+        session_model = await SessionMapper.get_session_with_history(session_id)
+        if not session_model:
+            raise ValueError("会话数据库记录不存在")
+        
+        # 计算时间
+        start_time = session_model.created_at or datetime.now()
+        end_time = session_model.updated_at or datetime.now()
+        duration_minutes = (end_time - start_time).total_seconds() / 60
+        
+        # 生成综合评价（使用 LCEL 方式）
+        evaluation = await self.rag_service.generate_comprehensive_evaluation(
+            position=session_model.position,
+            conversation_history=session_info.get("history", []),
+            total_rounds=len(session_info.get("history", [])),
+            duration_minutes=duration_minutes
+        )
+        
+        # 填入 session_id
+        evaluation["session_id"] = session_id
+        
+        return evaluation
