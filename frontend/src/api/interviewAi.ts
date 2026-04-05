@@ -225,7 +225,7 @@ export async function streamInterviewAnswer(
 /**
  * 语音回答：multipart/form-data，与 Apifox 一致
  * - session_id：字符串
- * - file：二进制文件（示例文件名 fronten.wav）
+ * - file：二进制文件（文件名应与真实 MIME 对应，如 .webm/.wav）
  */
 export async function streamInterviewVoiceAnswer(
   sessionId: string,
@@ -238,7 +238,7 @@ export async function streamInterviewVoiceAnswer(
 
   const fd = new FormData();
   fd.append('session_id', sessionId);
-  const uploadName = audioFile.name?.trim() || 'fronten.wav';
+  const uploadName = audioFile.name?.trim() || 'frontend-record.webm';
   fd.append('file', audioFile, uploadName);
 
   const voiceUrl = `${interviewApiJsonBase}/interview/answer-voice`;

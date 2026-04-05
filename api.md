@@ -875,13 +875,176 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 用户管理（管理员）
 
-#### 27. 用户列表（管理员）
+以下接口均需 **认证** 且 **`roleId === 2`（管理员）**。
+
+管理后台「用户管理」页（`/admin/users`）联调说明：
+
+- 角色下拉：复用 **「角色列表」** `GET /roles`（见上文 #### 5）。
+- 用户 CRUD：使用本节 `GET/POST/PUT/DELETE /users...`。
+
+> **路径前缀**：本文档统一以 `Base URL = http://localhost:3000/api` 为准，即完整地址形如 `http://localhost:3000/api/users`。若生产环境网关去掉 `/api` 前缀（例如根路径直接挂到 `8080`），则等价路径为 `http://localhost:8080/users`，请求体与响应结构不变。
+
+#### 27. 用户列表（分页）
 
 **GET** `/users?page=1&pageSize=10`
 
-需要认证 + 管理员。`pageSize` 最大 50。
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 10，最大 50 |
 
-响应：`data: { list: [{ id, username, email?, roleId, roleName }], total }`
+成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@example.com",
+        "avatar": "/avatar-file/avatar_1_1700000000000.png",
+        "roleId": 2,
+        "roleName": "管理员"
+      }
+    ],
+    "total": 100
+  }
+}
+```
+
+- `list[].id`：数字类型用户 ID。
+- `avatar`：可选；为库中存储的相对路径（或可访问路径），具体以后端为准。列表展示头像时可与站点域名拼接为完整 URL（与 `/auth/profile` 的 `avatarUrl` 处理类似，由后端或前端统一约定）。
+
+---
+
+#### 28. 用户详情
+
+**GET** `/users/:id`
+
+| 路径参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| id | number | 是 | 用户 ID |
+
+成功：`data: { id, username, email?, roleId, avatar? }`。
+
+错误：`1005` 用户不存在。
+
+---
+
+#### 29. 创建用户
+
+**POST** `/users`
+
+`Content-Type: application/json`
+
+| 请求体 | 类型 | 必填 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| username | string | 是 | - | 用户名 |
+| password | string | 是 | - | 密码（生产环境建议后端 BCrypt 等加密存储） |
+| email | string | 否 | null | 邮箱 |
+| roleId | number | 否 | 1 | `1` 普通用户，`2` 管理员 |
+
+成功示例：
+
+```json
+{
+  "code": 0,
+  "message": "创建用户成功",
+  "data": null
+}
+```
+
+错误：`1001` 用户名或密码不能为空；`1003` 用户名已存在。
+
+---
+
+#### 30. 更新用户
+
+**PUT** `/users/:id`
+
+`Content-Type: application/json`
+
+请求体字段均为可选（按需局部更新）：
+
+| 请求体 | 类型 | 说明 |
+|--------|------|------|
+| username | string | 新用户名；**不得与其他用户重复** |
+| email | string | 新邮箱 |
+| roleId | number | 新角色（1 / 2） |
+| password | string | 新密码；**不传或空字符串则保持原密码** |
+
+**注意**：
+
+- 允许修改 `username`，但会校验唯一性。
+- **不允许通过本接口修改头像**：即使传入 `avatar` 也应被后端忽略（与业务文档一致）。
+- 仅提交需要变更的字段即可。
+
+成功示例：
+
+```json
+{
+  "code": 0,
+  "message": "更新用户成功",
+  "data": null
+}
+```
+
+错误：`1005` 用户不存在；`1003` 用户名已存在；`1001` 等参数不合法。
+
+---
+
+#### 31. 删除用户
+
+**DELETE** `/users/:id`
+
+成功示例：
+
+```json
+{
+  "code": 0,
+  "message": "删除用户成功",
+  "data": null
+}
+```
+
+错误：`1005` 用户不存在。
+
+**删除保护**：建议禁止删除当前登录的管理员本人。当前模拟后端行为：`400`，`message: 不允许删除当前登录管理员`。
+
+---
+
+#### 31.1 调用示例（curl）
+
+管理员先登录拿到 `token` 后：
+
+```bash
+# 用户列表
+curl -X GET "http://localhost:3000/api/users?page=1&pageSize=10" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+
+# 用户详情
+curl -X GET "http://localhost:3000/api/users/1" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+
+# 创建用户
+curl -X POST "http://localhost:3000/api/users" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"123456","email":"test@example.com","roleId":1}'
+
+# 更新用户
+curl -X PUT "http://localhost:3000/api/users/2" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"newname","roleId":2}'
+
+# 删除用户
+curl -X DELETE "http://localhost:3000/api/users/2" \
+  -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
+```
 
 ---
 
@@ -889,7 +1052,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 以下接口均需认证且 `roleId === 2`。
 
-#### 28. 全部面试记录列表（管理员）
+#### 32. 全部面试记录列表（管理员）
 
 **GET** `/admin/interview-record?page=1&pageSize=10&userId=1&positionId=2`
 
@@ -899,7 +1062,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ---
 
-#### 29. 导出面试记录（管理员）
+#### 33. 导出面试记录（管理员）
 
 **GET** `/admin/export/interview-record?userId=1&positionId=2&limit=500`
 
@@ -911,10 +1074,11 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ## 六、前端请求封装说明
 
-- `baseURL`: `http://localhost:3000/api`
+- `baseURL`: `http://localhost:3000/api`（可通过环境变量 `VITE_API_ORIGIN` 等调整，见前端 `request.ts`）
 - 请求拦截器：自动注入 `Authorization: Bearer <token>`
 - 响应拦截器：`code !== 0` 时抛出 `Error(data.message)`，成功时返回 `data.data`
+- 管理后台用户管理：`src/pages/Admin/UserManagePage.vue` 使用 `src/api/admin.ts` 中的 `getUserListApi`、`getUserDetailApi`、`createUserApi`、`updateUserApi`、`deleteUserApi` 及 `getRolesApi`
 
 ---
 
-*文档根据当前后端 server.js 整理，日期：2026-03-04*
+*文档根据当前后端 server.js 与后台管理页整理，日期：2026-04-05*
