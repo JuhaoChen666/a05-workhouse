@@ -47,7 +47,7 @@
                 <div class="job-card-header">
                   <span class="job-name">{{ j.name }}</span>
                   <span class="job-salary">
-                    {{ (j.salaryMin / 1000).toFixed(0) }}k - {{ (j.salaryMax / 1000).toFixed(0) }}k / 月
+                    {{ formatSalaryRange(j.salaryMin, j.salaryMax) }}
                   </span>
                 </div>
                 <div class="company-name">
@@ -81,15 +81,9 @@
                 </div>
                 <div class="score-label">综合得分</div>
               </div>
-<<<<<<< HEAD
-              <p class="job-desc">{{ (j.jobContent || '').slice(0, 60) }}...</p>
-              <div class="job-salary">
-                {{ formatSalaryRange(j.salaryMin, j.salaryMax) }}
-=======
               <p class="report-summary">{{ latestReport.summary || '暂无总结' }}</p>
               <div class="report-action">
                 <button class="full-btn" @click="goReport">查看完整报告</button>
->>>>>>> 56c54ffcfe9b5ce8eae19d73141e2ac53a704a35
               </div>
             </template>
             <el-empty v-else description="暂无面试报告" :image-size="80" />
@@ -115,13 +109,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-<<<<<<< HEAD
-import { Search } from '@element-plus/icons-vue';
-import { getHotJobsApi, formatSalaryRange, type HotJobItem } from '@/api/jobs';
-=======
 import { Search, ArrowRight, Platform } from '@element-plus/icons-vue';
-import { getHotJobsApi, type HotJobItem } from '@/api/jobs';
->>>>>>> 56c54ffcfe9b5ce8eae19d73141e2ac53a704a35
+import { getHotJobsApi, formatSalaryRange, type HotJobItem } from '@/api/jobs';
 import { getReportByRecordIdApi } from '@/api/report';
 import { getInterviewRecordListApi } from '@/api/interview';
 
