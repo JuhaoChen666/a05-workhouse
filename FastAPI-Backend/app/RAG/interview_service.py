@@ -98,23 +98,28 @@ class InterviewService:
         await self.session_service.delete_session(session_id)
 
     async def generate_session_evaluation(self, session_id: str) -> dict:
-        """生成会话的综合评价（多维度、多主题、分轮次）"""
-        session_info = await self.get_session_info(session_id)
-        if not session_info:
-            raise ValueError(f"会话 {session_id} 不存在")
-        
-        # 获取会话的数据库记录（包含时间信息）
+        """生成并保存会话的综合评价"""
         from app.infrastructure.mapper.session_mapper import SessionMapper
+        
+        # 1. 尝试从数据库获取已有的评价
+        existing_eval = await SessionMapper.get_evaluation_by_session_id(session_id)
+        if existing_eval:
+            return existing_eval.evaluation_json
+            
+        # 2. 如果数据库没有，则进行生成
         session_model = await SessionMapper.get_session_with_history(session_id)
         if not session_model:
             raise ValueError("会话数据库记录不存在")
+        
+        # 获取会话信息以便计算轮次和处理历史
+        session_info = await self.get_session_info(session_id)
         
         # 计算时间
         start_time = session_model.created_at or datetime.now()
         end_time = session_model.updated_at or datetime.now()
         duration_minutes = (end_time - start_time).total_seconds() / 60
         
-        # 生成综合评价（使用 LCEL 方式）
+        # 调用 RAG 生成综合评价
         evaluation = await self.rag_service.generate_comprehensive_evaluation(
             position=session_model.position,
             conversation_history=session_info.get("history", []),
@@ -122,7 +127,8 @@ class InterviewService:
             duration_minutes=duration_minutes
         )
         
-        # 填入 session_id
+        # 3. 填入 session_id 并保存到数据库
         evaluation["session_id"] = session_id
+        await SessionMapper.insert_evaluation(session_id, evaluation, user_id=session_model.user_id)
         
         return evaluation

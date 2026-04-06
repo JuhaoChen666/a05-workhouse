@@ -34,7 +34,7 @@ class SessionService:
             return None
         
         # 将DB模型重组为InterviewSession业务对象
-        session = InterviewSession(session_id, session_model.resume, session_model.position, self.rag_service)
+        session = InterviewSession(session_id, session_model.resume, session_model.position, self.rag_service, user_id=session_model.user_id)
         session.status = session_model.status
         session.current_topic = session_model.current_topic
         session.current_question = session_model.current_question
@@ -63,8 +63,9 @@ class SessionService:
 class InterviewSession:
     """面试会话类"""
 
-    def __init__(self, session_id: str, resume: str, position: str, rag_service: RAGService):
+    def __init__(self, session_id: str, resume: str, position: str, rag_service: RAGService, user_id: Optional[int] = None):
         self.session_id = session_id
+        self.user_id = user_id
         self.resume = resume
         self.position = position
         self.rag_service = rag_service
@@ -233,6 +234,11 @@ class InterviewSession:
                 evaluation = await self.rag_service.generate_final_evaluation(
                     self.position, self.conversation_history
                 )
+                
+                # 持久化到数据库 (修复 bug: 之前未在此保存，且现在加入了 user_id)
+                evaluation["session_id"] = self.session_id
+                await SessionMapper.insert_evaluation(self.session_id, evaluation, user_id=self.user_id)
+                
                 yield StreamEvent(
                     type="evaluation",
                     data=evaluation,
