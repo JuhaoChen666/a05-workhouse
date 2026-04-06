@@ -4,21 +4,26 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="">
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:后台管理系统(用户部分),最终报告生成器功能">
+      <change beforePath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MarsCodeWorkspaceAppSettings.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/mapper/session_mapper.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/mapper/session_mapper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/session_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/session_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/PositionsController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/PositionsController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/UserController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/UserController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/config/SecurityConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/User.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/UserMapper.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/UserService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/Positions_Info.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/entity/Positions_Info.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/PositionsMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/PositionsMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/Positions_infoMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/Positions_infoMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/PositionsService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/PositionsService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/用户管理 API 接口文档.md" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/用户管理 API 接口文档.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,8 +34,8 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Interface" />
-        <option value="Class" />
         <option value="Python Script" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -98,7 +103,7 @@
     &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;http.proxy&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
     &quot;应用程序.SpringbootBackendApplication.executor&quot;: &quot;Run&quot;
@@ -129,7 +134,7 @@
       <recent name="com.example.springbootbackend.config" />
     </key>
   </component>
-  <component name="RunManager" selected="Spring Boot.SpringbootBackendApplication">
+  <component name="RunManager" selected="Python.main">
     <configuration default="true" type="JetRunConfigurationType">
       <method v="2">
         <option name="Make" enabled="true" />
@@ -170,14 +175,14 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="Spring Boot.SpringbootBackendApplication" />
+      <item itemvalue="Python.main" />
     </list>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
-        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-IU-252.26199.169" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
+        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
       </set>
     </attachedChunks>
   </component>
@@ -261,7 +266,13 @@
       <workItem from="1774968055799" duration="14000" />
       <workItem from="1775030919377" duration="1039000" />
       <workItem from="1775047269712" duration="604000" />
-      <workItem from="1775127315410" duration="7060000" />
+      <workItem from="1775127315410" duration="7557000" />
+      <workItem from="1775308723726" duration="960000" />
+      <workItem from="1775310929402" duration="77000" />
+      <workItem from="1775311046585" duration="627000" />
+      <workItem from="1775311691461" duration="4169000" />
+      <workItem from="1775373832848" duration="8844000" />
+      <workItem from="1775464624307" duration="3078000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -391,7 +402,15 @@
       <option name="project" value="LOCAL" />
       <updated>1774961226282</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="feat:后台管理系统(用户部分),最终报告生成器功能">
+      <option name="closed" value="true" />
+      <created>1775137993024</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1775137993024</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TerminalProjectNonSharedOptionsProvider">
@@ -427,7 +446,8 @@
     <MESSAGE value="feat:语音对答面试部分✓" />
     <MESSAGE value="fix:gitignore" />
     <MESSAGE value="feat:面试过程链接数据库，保存会话ID与用户ID绑定" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat:面试过程链接数据库，保存会话ID与用户ID绑定" />
+    <MESSAGE value="feat:后台管理系统(用户部分),最终报告生成器功能" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat:后台管理系统(用户部分),最终报告生成器功能" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/a05_workhouse$document.coverage" NAME="main 覆盖结果" MODIFIED="1774084710187" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
@@ -441,6 +461,6 @@
     <SUITE FILE_PATH="coverage/a05_workhouse$deepseek.coverage" NAME="deepseek 覆盖结果" MODIFIED="1774007365293" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/llm" />
     <SUITE FILE_PATH="coverage/a05_workhouse$test_import.coverage" NAME="test_import 覆盖结果" MODIFIED="1774081571252" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
     <SUITE FILE_PATH="coverage/a05_workhouse$chroma_client.coverage" NAME="chroma_client 覆盖结果" MODIFIED="1774007768774" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1774960726445" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1775478127329" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
   </component>
 </project>

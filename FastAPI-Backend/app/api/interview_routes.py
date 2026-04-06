@@ -62,7 +62,8 @@ async def start_interview(
         result = await interview_service.start_interview(
             request.resume,
             request.position,
-            request.collection_name
+            request.collection_name,
+            request.user_id
         )
 
         session_id = result["session_id"]
@@ -204,3 +205,142 @@ async def get_comprehensive_evaluation(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"生成评价失败：{str(e)}")
+
+@router.get("/session/{session_id}/evaluation/radar")
+async def get_radar_chart_data(
+    session_id: str,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
+    """获取雷达图所需的维度评分数据"""
+    from app.infrastructure.mapper.session_mapper import SessionMapper
+    evaluation = await SessionMapper.get_evaluation_by_session_id(session_id)
+    if not evaluation:
+        # 如果数据库没有，尝试生成一个
+        try:
+            eval_data = await interview_service.generate_session_evaluation(session_id)
+            # 重新查询以获取模型对象进行字段提取（或者直接从 eval_data 提取）
+            radar_data = {
+                "technical_competency": eval_data.get("technical_competency", 0.0),
+                "communication_skill": eval_data.get("communication_skill", 0.0),
+                "problem_solving": eval_data.get("problem_solving", 0.0),
+                "depth_of_knowledge": eval_data.get("depth_of_knowledge", 0.0),
+                "overall_score": eval_data.get("overall_score", 0.0)
+            }
+        except Exception:
+            raise HTTPException(status_code=404, detail="评价尚未生成或会话不存在")
+    else:
+        radar_data = {
+            "technical_competency": evaluation.technical_competency,
+            "communication_skill": evaluation.communication_skill,
+            "problem_solving": evaluation.problem_solving,
+            "depth_of_knowledge": evaluation.depth_of_knowledge,
+            "overall_score": evaluation.overall_score
+        }
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "radar": {
+                "indicator": [
+                    {"name": "技术能力", "max": 10},
+                    {"name": "沟通表现", "max": 10},
+                    {"name": "问题解决", "max": 10},
+                    {"name": "知识深度", "max": 10},
+                    {"name": "综合得分", "max": 10}
+                ]
+            },
+            "series": [
+                {
+                    "name": "面试表现",
+                    "type": "radar",
+                    "data": [
+                        {
+                            "value": [
+                                radar_data["technical_competency"],
+                                radar_data["communication_skill"],
+                                radar_data["problem_solving"],
+                                radar_data["depth_of_knowledge"],
+                                radar_data["overall_score"]
+                            ],
+                            "name": "评分结果"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+@router.get("/user/{user_id}/evaluation/trend")
+async def get_user_evaluation_trend(user_id: int):
+    """获取用户最近5次面试的评分趋势数据（ECharts格式）"""
+    from app.infrastructure.mapper.session_mapper import SessionMapper
+    records = await SessionMapper.get_user_evaluation_trend(user_id, limit=5)
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "xAxis": {
+                "type": "category",
+                "data": [r.created_at.strftime("%Y-%m-%d") for r in records]
+            },
+            "yAxis": {
+                "type": "value"
+            },
+            "series": [
+                {
+                    "data": [r.overall_score for r in records],
+                    "type": "line",
+                    "smooth": True
+                }
+            ]
+        }
+    }
+
+@router.get("/user/{user_id}/sessions/page")
+async def get_user_sessions_paginated(
+    user_id: int, 
+    page: int = 1, 
+    page_size: int = 10
+):
+    """(分页)查询用户面试会话列表"""
+    from app.infrastructure.mapper.session_mapper import SessionMapper
+    sessions = await SessionMapper.get_sessions_paginated(user_id, page, page_size)
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [
+            {
+                "session_id": s.session_id,
+                "position": s.position,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "updated_at": s.updated_at.isoformat() if s.updated_at else None
+            } for s in sessions
+        ]
+    }
+
+@router.get("/session/{session_id}/history")
+async def get_session_history_paginated(
+    session_id: str, 
+    page: int = 1, 
+    page_size: int = 10
+):
+    """(分页)查询单次会话的所有聊天历史（按时间正序排列）"""
+    from app.infrastructure.mapper.session_mapper import SessionMapper
+    history = await SessionMapper.get_chat_history_paginated(session_id, page, page_size)
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [
+            {
+                "round": r.round,
+                "question": r.question,
+                "answer": r.answer,
+                "topic": r.topic,
+                "emotion": r.emotion,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None
+            } for r in history
+        ]
+    }
