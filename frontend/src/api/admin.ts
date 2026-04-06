@@ -24,11 +24,20 @@ export interface AdminPositionItem {
 
 // 用户列表项
 export interface AdminUserItem {
-  id: string;
+  id: number;
+  username: string;
+  email?: string;
+  avatar?: string;
+  roleId: number;
+  roleName: string;
+}
+
+export interface AdminUserDetail {
+  id: number;
   username: string;
   email?: string;
   roleId: number;
-  roleName: string;
+  avatar?: string;
 }
 
 // 题库列表项
@@ -69,6 +78,39 @@ export function getRolesApi() {
 /** 管理员获取用户列表（分页） */
 export function getUserListApi(params: { page?: number; pageSize?: number }) {
   return request.get<{ list: AdminUserItem[]; total: number }>('/users', { params });
+}
+
+/** 管理员获取用户详情 */
+export function getUserDetailApi(id: number) {
+  return request.get<AdminUserDetail>(`/users/${id}`);
+}
+
+/** 管理员创建用户 */
+export function createUserApi(data: {
+  username: string;
+  password: string;
+  email?: string;
+  roleId?: number;
+}) {
+  return request.post('/users', data);
+}
+
+/** 管理员更新用户 */
+export function updateUserApi(
+  id: number,
+  data: {
+    username?: string;
+    email?: string;
+    roleId?: number;
+    password?: string;
+  }
+) {
+  return request.put(`/users/${id}`, data);
+}
+
+/** 管理员删除用户 */
+export function deleteUserApi(id: number) {
+  return request.delete(`/users/${id}`);
 }
 
 /** 获取全部岗位列表 */

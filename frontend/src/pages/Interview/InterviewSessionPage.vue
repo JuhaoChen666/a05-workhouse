@@ -193,6 +193,9 @@ const avatarStageRef = ref<HTMLElement | null>(null);
 const avatarMountedBySdk = ref(false);
 const AVATAR_SDK_SCRIPT_URL =
   (import.meta.env.VITE_AVATAR_SDK_SCRIPT_URL as string | undefined)?.trim() || '';
+// 按当前需求：在前端写死虚拟人鉴权信息（注意：存在泄露风险，仅建议内网/临时联调）
+const AVATAR_API_KEY_HARDCODED = 'edd0a5f6b5dc07c433756fedfb59887c';
+const AVATAR_API_SECRET_HARDCODED = 'NmRmZTY4YzMyNDM0NDI5ZWYzZWQyNzQ5';
 let avatarRefreshTimer: number | null = null;
 let avatarSdkInstance: { destroy?: () => void; stop?: () => void; updateToken?: (token: string) => void } | null =
   null;
@@ -489,9 +492,11 @@ async function initAvatarSdk(started: {
   if (typeof (avatarSdkInstance as { setApiInfo?: (p: unknown) => void }).setApiInfo === 'function') {
     (avatarSdkInstance as { setApiInfo: (p: unknown) => void }).setApiInfo({
       appId: started.sdk_config.app_id,
+      apiKey: AVATAR_API_KEY_HARDCODED,
+      apiSecret: AVATAR_API_SECRET_HARDCODED,
       sceneId: started.sdk_config.scene_id,
       serverUrl: started.sdk_config.server_url,
-      signedUrl: started.sdk_config.signed_url || undefined,
+      signedUrl: undefined,
     });
   }
   if (
@@ -581,6 +586,13 @@ function formatVoiceDuration(sec?: number): string {
 
 function createVoicePlaceholderMessage(voiceDurationSec?: number): ChatMessage {
   return { role: 'user', content: '语音消息', kind: 'voice', voiceDurationSec };
+}
+
+function extByMimeType(mimeType: string): 'webm' | 'ogg' | 'wav' {
+  const t = (mimeType || '').toLowerCase();
+  if (t.includes('wav')) return 'wav';
+  if (t.includes('ogg')) return 'ogg';
+  return 'webm';
 }
 
 function pickTranscriptText(data: Record<string, unknown>): string {
@@ -827,8 +839,9 @@ async function finalizeRecordingAndSendVoice() {
     ElMessage.warning('录音过短或未采集到音频');
     return;
   }
-  // 与 Apifox 示例 `fronten.wav` 一致；实际多为 webm 数据，type 保持真实 MIME，供后端识别转码
-  const file = new File([blob], 'fronten.wav', { type: mimeType });
+  // 文件后缀与真实 MIME 一致，避免后端按错误容器解码导致“噪音”
+  const ext = extByMimeType(mimeType);
+  const file = new File([blob], `frontend-record.${ext}`, { type: mimeType });
   await sendVoiceFile(file, durationSec);
 }
 

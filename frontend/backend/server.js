@@ -1404,17 +1404,131 @@ app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
     const [countRows] = await pool.query('SELECT COUNT(*) AS total FROM `user`');
     const total = countRows[0].total;
     const [rows] = await pool.query(
-      'SELECT u.id, u.username, u.email, u.role_id AS roleId, r.name AS roleName FROM `user` u JOIN role r ON u.role_id = r.id ORDER BY u.id LIMIT ? OFFSET ?',
+      'SELECT u.id, u.username, u.email, u.avatar_url AS avatar, u.role_id AS roleId, r.name AS roleName FROM `user` u JOIN role r ON u.role_id = r.id ORDER BY u.id LIMIT ? OFFSET ?',
       [pageSize, offset]
     );
     const list = rows.map((u) => ({
-      id: String(u.id),
+      id: Number(u.id),
       username: u.username,
       email: u.email || undefined,
+      avatar: u.avatar || undefined,
       roleId: u.roleId,
       roleName: u.roleName,
     }));
     return res.json(ok({ list, total }));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+app.get('/api/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, username, email, role_id AS roleId, avatar_url AS avatar FROM `user` WHERE id = ?',
+      [id]
+    );
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+    const user = rows[0];
+    return res.json(
+      ok({
+        id: Number(user.id),
+        username: user.username,
+        email: user.email || undefined,
+        roleId: Number(user.roleId),
+        avatar: user.avatar || undefined,
+      })
+    );
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+app.post('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
+  const { username, password, email, roleId } = req.body || {};
+  if (!String(username || '').trim() || !String(password || '').trim()) {
+    return res.json(fail(1001, '用户名或密码不能为空'));
+  }
+  const safeRoleId = Number(roleId) === 2 ? 2 : 1;
+  try {
+    const [exists] = await pool.query('SELECT id FROM `user` WHERE username = ?', [String(username).trim()]);
+    if (exists.length > 0) {
+      return res.json(fail(1003, '用户名已存在'));
+    }
+    await pool.query('INSERT INTO `user` (username, password, email, role_id) VALUES (?, ?, ?, ?)', [
+      String(username).trim(),
+      String(password),
+      email ? String(email).trim() : null,
+      safeRoleId,
+    ]);
+    return res.json(ok(null, '创建用户成功'));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+app.put('/api/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
+
+  const { username, email, roleId, password } = req.body || {};
+  try {
+    const [rows] = await pool.query('SELECT id FROM `user` WHERE id = ?', [id]);
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+
+    if (username !== undefined) {
+      const name = String(username).trim();
+      if (!name) return res.json(fail(1001, '用户名不能为空'));
+      const [sameNameRows] = await pool.query('SELECT id FROM `user` WHERE username = ? AND id <> ?', [name, id]);
+      if (sameNameRows.length > 0) {
+        return res.json(fail(1003, '用户名已存在'));
+      }
+    }
+
+    const updates = [];
+    const values = [];
+    if (username !== undefined) {
+      updates.push('username = ?');
+      values.push(String(username).trim());
+    }
+    if (email !== undefined) {
+      updates.push('email = ?');
+      values.push(email ? String(email).trim() : null);
+    }
+    if (roleId !== undefined) {
+      updates.push('role_id = ?');
+      values.push(Number(roleId) === 2 ? 2 : 1);
+    }
+    if (password !== undefined) {
+      updates.push('password = ?');
+      values.push(String(password));
+    }
+    if (updates.length === 0) return res.json(ok(null, '更新用户成功'));
+
+    values.push(id);
+    await pool.query(`UPDATE \`user\` SET ${updates.join(', ')} WHERE id = ?`, values);
+    return res.json(ok(null, '更新用户成功'));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(fail(500, '服务器错误'));
+  }
+});
+
+app.delete('/api/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json(fail(400, '无效 ID'));
+  try {
+    const [rows] = await pool.query('SELECT id FROM `user` WHERE id = ?', [id]);
+    if (rows.length === 0) return res.json(fail(1005, '用户不存在'));
+    if (Number(req.user.id) === id) {
+      return res.status(400).json(fail(400, '不允许删除当前登录管理员'));
+    }
+    await pool.query('DELETE FROM `user` WHERE id = ?', [id]);
+    return res.json(ok(null, '删除用户成功'));
   } catch (err) {
     console.error(err);
     return res.status(500).json(fail(500, '服务器错误'));
