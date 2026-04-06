@@ -144,7 +144,6 @@ class RAGService:
         只输出问题内容。
         """)
 
-        # 最终评价生成器
         self.final_evaluation_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，请根据整个面试过程给出综合评价。
 
@@ -152,15 +151,20 @@ class RAGService:
         面试对话历史:
         {full_history}
 
+        要求：
+        1. 所有评分量程均为 0-10 分（0为最差，10为满分）。
+        2. 如果候选人回答内容极少、重复或与问题无关，总分应在 0-3 分之间。
+        3. 建议（recommendation）若为“不推荐”，总分必须小于 4 分。
+
         请输出 JSON 格式：
         {{
             "technical_evaluation": "技术能力评价",
             "communication_evaluation": "沟通表达能力评价",
-            "overall_score": 85,
+            "overall_score": 2.5,
             "recommendation": "强烈推荐/推荐/待定/不推荐",
             "strengths": ["优点 1", "优点 2"],
             "weaknesses": ["不足 1", "不足 2"],
-            "detailed_comment": "详细评语"
+            "overall_comment": "详细评语"
         }}
         """)
 
@@ -173,6 +177,11 @@ class RAGService:
         - 总轮次：{total_rounds}轮
         - 时长：{duration_minutes:.1f}分钟
         - 涉及主题：{topics}
+
+        要求：
+        1. 所有评分量程（包括主评分和各子维度）均为 0-10 分。
+        2. 如果 candidate 回答缺乏内容、逻辑混乱或重复，各维度评分应在 0-4 分之间。
+        3. 严禁出现子维度分均为 0 但总分为 10 的逻辑错误。
 
         详细面试记录:
         {full_history}
@@ -203,13 +212,6 @@ class RAGService:
                 }}
             ]
         }}
-
-        注意：
-        1. 评分要客观公正，区分度高
-        2. 点评要结合具体例子，不要空话套话
-        3. 每轮点评要指出亮点和改进点
-        4. 录用建议要与评分一致
-        5. 考虑面试时长和轮次的合理性
         """)
 
     def initialize_database(self, collection_name: str):
@@ -395,7 +397,7 @@ class RAGService:
                     "recommendation": "待定",
                     "strengths": [],
                     "weaknesses": [],
-                    "detailed_comment": result[:500]
+                    "overall_comment": result[:500]
                 }
         except:
             evaluation = {
@@ -405,7 +407,7 @@ class RAGService:
                 "recommendation": "待定",
                 "strengths": [],
                 "weaknesses": [],
-                "detailed_comment": result[:500]
+                "overall_comment": result[:500]
             }
 
         return evaluation
@@ -453,14 +455,31 @@ class RAGService:
         
         # 计算基础统计数据用于补充评分
         round_scores = []
+        last_answer = ""
         for qa in conversation_history:
-            answer_length = len(qa.get('answer', ''))
-            has_technical_terms = any(term in qa.get('answer', '').lower() 
-                                    for term in ['java', 'android', 'api', 'code', 'system', 'data'])
+            answer = qa.get('answer', '').strip()
+            answer_length = len(answer)
             
-            technical_score = min(10, max(1, (answer_length / 50) + (3 if has_technical_terms else 0)))
-            depth_score = min(10, max(1, (answer_length / 80) + 2))
-            clarity_score = min(10, max(1, 5 + (1 if len(qa.get('answer', '').split('\n')) > 2 else 0)))
+            # 检测复读机行为（如果本次回答与上次高度相似，或者字数极少）
+            is_repetitive = (answer == last_answer) and answer_length > 0
+            is_empty_or_too_short = answer_length < 10
+            
+            has_technical_terms = any(term in answer.lower() 
+                                    for term in ['java', 'android', 'api', 'code', 'system', 'data', 'spring', 'vue'])
+            
+            # 基础分降低，严厉打击低质量回答
+            base_score = 1.0
+            if is_repetitive:
+                base_score = 0.5
+            elif is_empty_or_too_short:
+                base_score = 0.2
+
+            technical_score = min(10, max(base_score, (answer_length / 100) + (1.5 if has_technical_terms else 0)))
+            if is_repetitive:
+                technical_score *= 0.5
+
+            depth_score = min(10, max(base_score, (answer_length / 150) + 1.0))
+            clarity_score = min(10, max(base_score, 3.0 + (1.0 if "\n" in answer else 0)))
             
             round_scores.append({
                 "round": qa.get('round', 1),
@@ -469,13 +488,21 @@ class RAGService:
                 "depth_score": round(depth_score, 1),
                 "clarity_score": round(clarity_score, 1)
             })
+            last_answer = answer
         
-        # 合并 LLM 评价和计算评分
+        # 合并 LLM 评价和计算评分（自动检测百分制并修正）
         avg_technical = sum([r['technical_score'] for r in round_scores]) / len(round_scores) if round_scores else 0
         
+        raw_overall = float(llm_evaluation.get("overall_score", avg_technical))
+        # 修正百分制 bug：如果分值 > 10，自动视为百分制并压缩
+        overall_score = raw_overall / 10.0 if raw_overall > 10 else raw_overall
+        
+        raw_tech_comp = float(llm_evaluation.get("technical_competency", avg_technical))
+        technical_competency = raw_tech_comp / 10.0 if raw_tech_comp > 10 else raw_tech_comp
+
         comprehensive_result = {
-            "overall_score": float(llm_evaluation.get("overall_score", avg_technical)),
-            "technical_competency": float(llm_evaluation.get("technical_competency", avg_technical)),
+            "overall_score": round(overall_score, 1),
+            "technical_competency": round(technical_competency, 1),
             "communication_skill": float(llm_evaluation.get("communication_skill", 5.0)),
             "problem_solving": float(llm_evaluation.get("problem_solving", 5.0)),
             "depth_of_knowledge": float(llm_evaluation.get("depth_of_knowledge", 5.0)),

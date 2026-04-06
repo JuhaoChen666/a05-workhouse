@@ -2,12 +2,15 @@ package com.example.springbootbackend.Controller;
 
 import com.example.springbootbackend.entity.Positions;
 import com.example.springbootbackend.entity.Positions_Info;
+import com.example.springbootbackend.exception.ServiceException;
 import com.example.springbootbackend.service.PositionsService;
+import com.example.springbootbackend.utils.PermissionUtil;
 import com.example.springbootbackend.utils.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/positions")
@@ -29,12 +32,5 @@ public class PositionsController {
         }
         return Result.success(positionInfo);
     }
-    @DeleteMapping("/{id}")
-    public Result deletePosition(@PathVariable Integer id) {
-        int result = positionsService.deletePosition(id);
-        if (result == 0) {
-            return Result.resourceNotExist();
-        }
-        return Result.success();
-    }
 }
+

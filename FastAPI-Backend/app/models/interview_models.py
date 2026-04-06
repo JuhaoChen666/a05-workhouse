@@ -42,7 +42,7 @@ class InterviewEvaluation(BaseModel):
     recommendation: str
     strengths: List[str]
     weaknesses: List[str]
-    detailed_comment: str
+    overall_comment: str
 
 class ConversationRecord(BaseModel):
     """对话记录"""
