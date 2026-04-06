@@ -1,8 +1,9 @@
-import request from './request';
+import request, { adminRequest } from './request';
 
 /**
  * 后台管理 - 岗位、题库、学习资源、用户等接口封装。
- * 这里统一复用主项目的 request 实例，返回值类型均为已解包的 data 字段。
+ * - 用户、角色、**岗位**：真实后端挂在 **`/admin`** 下（`adminRequest` / `VITE_ADMIN_API_PREFIX`）
+ * - 题库、学习资源：仍走默认 **`/api`**
  */
 
 // 岗位列表项 / 详情项
@@ -10,7 +11,7 @@ export interface AdminPositionItem {
   id: number;
   name: string;
   sortOrder: number;
-  // 以下字段来自 /positions/:id 详情结构，用于后台管理编辑
+  // 以下字段来自 admin `/positions/:id` 详情结构，用于后台管理编辑
   city?: string;
   workExperience?: string;
   education?: string;
@@ -70,19 +71,14 @@ export interface AdminInterviewRecordItem {
   totalScore: number | null;
 }
 
-/** 获取角色列表（下拉使用） */
-export function getRolesApi() {
-  return request.get<{ id: number; name: string }[]>('/roles');
-}
-
-/** 管理员获取用户列表（分页） */
+/** 管理员获取用户列表（分页） — `GET {origin}/admin/users` */
 export function getUserListApi(params: { page?: number; pageSize?: number }) {
-  return request.get<{ list: AdminUserItem[]; total: number }>('/users', { params });
+  return adminRequest.get<{ list: AdminUserItem[]; total: number }>('/users', { params });
 }
 
 /** 管理员获取用户详情 */
 export function getUserDetailApi(id: number) {
-  return request.get<AdminUserDetail>(`/users/${id}`);
+  return adminRequest.get<AdminUserDetail>(`/users/${id}`);
 }
 
 /** 管理员创建用户 */
@@ -92,7 +88,7 @@ export function createUserApi(data: {
   email?: string;
   roleId?: number;
 }) {
-  return request.post('/users', data);
+  return adminRequest.post('/users', data);
 }
 
 /** 管理员更新用户 */
@@ -105,22 +101,22 @@ export function updateUserApi(
     password?: string;
   }
 ) {
-  return request.put(`/users/${id}`, data);
+  return adminRequest.put(`/users/${id}`, data);
 }
 
 /** 管理员删除用户 */
 export function deleteUserApi(id: number) {
-  return request.delete(`/users/${id}`);
+  return adminRequest.delete(`/users/${id}`);
 }
 
-/** 获取全部岗位列表 */
+/** 获取全部岗位列表 — `GET {origin}/admin/positions` */
 export function getPositionListApi() {
-  return request.get<AdminPositionItem[]>('/positions');
+  return adminRequest.get<AdminPositionItem[]>('/positions');
 }
 
 /** 获取单个岗位详情（包含扩展字段） */
 export function getPositionDetailApi(id: number) {
-  return request.get<AdminPositionItem>(`/positions/${id}`);
+  return adminRequest.get<AdminPositionItem>(`/positions/${id}`);
 }
 
 /** 新增岗位（管理员） */
@@ -139,7 +135,7 @@ export function createPositionApi(
     publishDate?: string;
   }
 ) {
-  return request.post<AdminPositionItem>('/positions', data);
+  return adminRequest.post<AdminPositionItem>('/positions', data);
 }
 
 /** 更新岗位（管理员） */
@@ -159,12 +155,12 @@ export function updatePositionApi(
     publishDate?: string;
   }
 ) {
-  return request.put(`/positions/${id}`, data);
+  return adminRequest.put(`/positions/${id}`, data);
 }
 
 /** 删除岗位（管理员） */
 export function deletePositionApi(id: number) {
-  return request.delete(`/positions/${id}`);
+  return adminRequest.delete(`/positions/${id}`);
 }
 
 /** 获取题库列表（分页 + 岗位筛选） */

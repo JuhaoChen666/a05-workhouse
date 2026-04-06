@@ -1,4 +1,5 @@
 import request from './request';
+import { apiOrigin } from './request';
 
 // 热门岗位 / 招聘岗位基础结构（与 api.md 24、25、25.1 一致）
 export interface HotJobItem {
@@ -6,8 +7,8 @@ export interface HotJobItem {
   name: string;
   companyName: string;
   companyLogo: string;
-  salaryMin: number;
-  salaryMax: number;
+  salaryMin: number | string;
+  salaryMax: number | string;
   jobContent: string;
   type?: string;
 }
@@ -71,11 +72,13 @@ function searchFallbackLocal(params: SearchJobsParams): SearchJobsResult {
   return { list: list.slice(start, start + pageSize), total };
 }
 
-/** GET /jobs/hot；失败时使用 FALLBACK_HOT_JOBS */
+/** GET {apiOrigin}/jobs（无 /api 前缀）；失败时使用 FALLBACK_HOT_JOBS */
 export async function getHotJobsApi(params?: { limit?: number }) {
   try {
-    const data = await request.get<HotJobItem[]>('/jobs/hot', { params });
-    return Array.isArray(data) ? data : [];
+    const data = await request.get<HotJobItem[]>(`${apiOrigin}/jobs`);
+    const list = Array.isArray(data) ? data : [];
+    const limit = Math.max(1, Number(params?.limit ?? list.length ?? 6));
+    return list.slice(0, limit);
   } catch {
     const limit = Math.max(1, Number(params?.limit ?? FALLBACK_HOT_JOBS.length));
     return FALLBACK_HOT_JOBS.slice(0, limit);
@@ -100,4 +103,24 @@ export async function searchJobsApi(params: SearchJobsParams) {
   } catch {
     return searchFallbackLocal(params);
   }
+}
+
+function formatSalaryOne(value: number | string): string {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return '--';
+    return value >= 1000 ? `${Math.round(value / 1000)}K` : String(value);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) return '--';
+  const upper = raw.toUpperCase();
+  if (/[KWM万千]/.test(upper)) return raw;
+  const n = Number(upper.replace(/,/g, ''));
+  if (Number.isFinite(n)) {
+    return n >= 1000 ? `${Math.round(n / 1000)}K` : String(n);
+  }
+  return raw;
+}
+
+export function formatSalaryRange(min: number | string, max: number | string): string {
+  return `${formatSalaryOne(min)} - ${formatSalaryOne(max)} / 月`;
 }

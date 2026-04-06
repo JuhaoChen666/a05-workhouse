@@ -56,7 +56,12 @@
         </el-form-item>
         <el-form-item label="角色" prop="roleId">
           <el-select v-model="form.roleId" placeholder="请选择角色" style="width: 100%">
-            <el-option v-for="role in roles" :key="role.id" :label="role.name" :value="role.id" />
+            <el-option
+              v-for="role in ADMIN_ROLE_OPTIONS"
+              :key="role.id"
+              :label="role.name"
+              :value="role.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item :label="editId ? '新密码' : '密码'" prop="password">
@@ -81,7 +86,6 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
-  getRolesApi,
   getUserListApi,
   getUserDetailApi,
   createUserApi,
@@ -90,13 +94,17 @@ import {
   type AdminUserItem,
 } from '@/api/admin';
 
+/** 后台用户管理：角色固定为 1 普通用户 / 2 管理员，不再请求 /roles */
+const ADMIN_ROLE_OPTIONS: { id: number; name: string }[] = [
+  { id: 1, name: '普通用户' },
+  { id: 2, name: '管理员' },
+];
+
 const loading = ref(false);
 const list = ref<AdminUserItem[]>([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(10);
-
-const roles = ref<{ id: number; name: string }[]>([]);
 
 const dialogVisible = ref(false);
 const editId = ref<number | null>(null);
@@ -111,8 +119,29 @@ const form = reactive({
   password: '',
 });
 
+/** 非空时校验邮箱格式（与 HTML5 input[type=email] 常见规则接近） */
+const EMAIL_RE =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
 const formRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  email: [
+    {
+      validator: (_rule, value, callback) => {
+        const s = String(value ?? '').trim();
+        if (!s) {
+          callback();
+          return;
+        }
+        if (!EMAIL_RE.test(s)) {
+          callback(new Error('请输入正确的邮箱格式'));
+          return;
+        }
+        callback();
+      },
+      trigger: ['blur', 'change'],
+    },
+  ],
   roleId: [{ required: true, message: '请选择角色', trigger: 'change' }],
   password: [
     {
@@ -137,10 +166,6 @@ async function fetchList() {
   } finally {
     loading.value = false;
   }
-}
-
-async function loadRoles() {
-  roles.value = await getRolesApi();
 }
 
 async function openDialog(row?: AdminUserItem) {
@@ -209,10 +234,7 @@ async function onDelete(row: AdminUserItem) {
   fetchList();
 }
 
-onMounted(() => {
-  loadRoles();
-  fetchList();
-});
+onMounted(fetchList);
 </script>
 
 <style scoped>

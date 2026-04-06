@@ -3,7 +3,7 @@ import { useUserStore } from '@/store/user';
 
 /**
  * 认证：`{apiOrigin}/auth/login`（**无** `/api` 段），与多数远程网关一致。
- * 业务：`{apiOrigin}/api/positions` 等，见 apiJsonBase。
+ * 业务：`{apiOrigin}/...`（不再追加 `/api` 前缀；岗位管理走 `adminJsonBase`）。
  */
 const PUBLIC_AUTH_PATHS = new Set([
   '/auth/login',
@@ -22,8 +22,19 @@ export const apiOrigin =
   (import.meta.env.VITE_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
   'http://10.105.2.13:8080';
 
-/** 业务接口根路径（带 `/api`）；模拟面试 AI 见 `interviewApiJsonBase`（8000） */
-export const apiJsonBase = `${apiOrigin}/api`;
+/** 业务接口根路径（无 `/api` 前缀）；模拟面试 AI 见 `interviewApiJsonBase`（8000） */
+export const apiJsonBase = `${apiOrigin}`;
+
+/**
+ * 管理后台接口根路径（带 `/admin`），与真实后端用户/角色等文档一致。
+ * 覆盖：`.env` 中 `VITE_ADMIN_API_PREFIX=/admin` 或 `admin`（默认 `/admin`）
+ */
+const rawAdminPrefix = (import.meta.env.VITE_ADMIN_API_PREFIX as string | undefined)?.trim() || '/admin';
+const adminPathNoTrail = rawAdminPrefix.replace(/\/$/, '') || '/admin';
+const adminPathPrefix = adminPathNoTrail.startsWith('/')
+  ? adminPathNoTrail
+  : `/${adminPathNoTrail}`;
+export const adminJsonBase = `${apiOrigin}${adminPathPrefix}`;
 
 /**
  * 模拟面试 AI（8000）。务必与后端实际监听地址一致，否则请求打到别的机器，对方会显示「没收到」。
@@ -108,11 +119,15 @@ function unwrapResponse<T = unknown>(response: { data: unknown }) {
   if (raw == null || typeof raw !== 'object') {
     return Promise.reject(new Error(formatApiErrorText(null)));
   }
-  const data = raw as { code?: unknown; message?: string; data: T };
-  if (!isSuccessCode(data.code)) {
+  const data = raw as { code?: unknown; message?: string; data?: T; result?: T };
+  // 仅当显式携带 code 且非成功码时失败；无 code 时视为成功（兼容仅靠 HTTP 200 的网关）
+  const hasCode = Object.prototype.hasOwnProperty.call(data, 'code');
+  if (hasCode && !isSuccessCode(data.code)) {
     return Promise.reject(new Error(formatApiErrorText(data)));
   }
-  return data.data;
+  // 兼容 data 或 result 作为业务载荷（如部分后端登录/业务接口用 result）
+  const inner = data.data !== undefined ? data.data : data.result;
+  return inner as T;
 }
 
 function formatAxiosError(error: unknown): Error {
@@ -176,6 +191,20 @@ apiAxios.interceptors.request.use((config) => {
 });
 apiAxios.interceptors.response.use(unwrapResponse, (err) => Promise.reject(formatAxiosError(err)));
 
+const adminAxios = axios.create({
+  baseURL: adminJsonBase,
+  timeout: 10000,
+});
+adminAxios.interceptors.request.use((config) => {
+  const userStore = useUserStore();
+  if (!config.headers) return config;
+  if (userStore.token) {
+    config.headers.Authorization = `Bearer ${userStore.token}`;
+  }
+  return config;
+});
+adminAxios.interceptors.response.use(unwrapResponse, (err) => Promise.reject(formatAxiosError(err)));
+
 const interviewAxios = axios.create({
   baseURL: interviewApiJsonBase,
   timeout: 120000,
@@ -208,8 +237,11 @@ function wrapClient(inst: AxiosInstance) {
 /** `/auth/*`，实际根地址为 `authBaseUrl`（见 `VITE_AUTH_API_PREFIX`） */
 export const authRequest = wrapClient(authAxios);
 
-/** 默认业务：`{apiOrigin}/api/...` */
+/** 默认业务：`{apiOrigin}/...` */
 export default wrapClient(apiAxios);
+
+/** 管理后台：`{apiOrigin}/admin/...`（见 `VITE_ADMIN_API_PREFIX`） */
+export const adminRequest = wrapClient(adminAxios);
 
 /** 仅模拟面试 AI：`{INTERVIEW_API_ORIGIN}/api/...` */
 export const interviewRequest = wrapClient(interviewAxios);

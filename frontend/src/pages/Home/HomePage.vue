@@ -45,7 +45,7 @@
               </div>
               <p class="job-desc">{{ (j.jobContent || '').slice(0, 60) }}...</p>
               <div class="job-salary">
-                {{ (j.salaryMin / 1000).toFixed(0) }}k - {{ (j.salaryMax / 1000).toFixed(0) }}k / 月
+                {{ formatSalaryRange(j.salaryMin, j.salaryMax) }}
               </div>
             </el-card>
           </el-col>
@@ -78,7 +78,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search } from '@element-plus/icons-vue';
-import { getHotJobsApi, type HotJobItem } from '@/api/jobs';
+import { getHotJobsApi, formatSalaryRange, type HotJobItem } from '@/api/jobs';
 import { getReportByRecordIdApi } from '@/api/report';
 import { getInterviewRecordListApi } from '@/api/interview';
 

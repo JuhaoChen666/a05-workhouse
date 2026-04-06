@@ -1,5 +1,5 @@
 <template>
-  <!-- 岗位详情页：展示 /positions/:id 返回的完整数据结构 -->
+  <!-- 岗位详情页：展示 admin /positions/:id 返回的完整数据结构 -->
   <div class="page">
     <el-card>
       <template #header>
@@ -65,7 +65,7 @@
         <!-- 原始 JSON 数据，方便对照接口结构 -->
         <el-card class="raw-card" shadow="never">
           <template #header>
-            <span>原始数据（/positions/:id 响应）</span>
+            <span>原始数据（/admin/positions/:id 响应）</span>
           </template>
           <pre class="json">{{ formattedJson }}</pre>
         </el-card>
@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import request from '@/api/request';
+import { getPositionDetailApi } from '@/api/admin';
 
 // 当前路由与路由实例
 const route = useRoute();
@@ -100,9 +100,8 @@ async function fetchDetail() {
   if (!id) return;
   loading.value = true;
   try {
-    // 直接调用主项目的 request 到 /positions/:id
-    const res = await request.get<Record<string, unknown>>(`/positions/${id}`);
-    detail.value = res;
+    const res = await getPositionDetailApi(id);
+    detail.value = res as Record<string, unknown>;
   } finally {
     loading.value = false;
   }

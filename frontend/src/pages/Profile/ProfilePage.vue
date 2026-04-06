@@ -26,76 +26,53 @@
       </div>
     </el-card>
 
-    <!-- 数据统计面板 -->
-    <el-row :gutter="16" class="stats-row">
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">{{ stats.totalCount }}</div>
-          <div class="stat-label">总面试次数</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">{{ stats.avgScore ?? '--' }}</div>
-          <div class="stat-label">平均得分</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">{{ stats.finishedCount }}</div>
-          <div class="stat-label">已完成</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">{{ stats.lastAt ? formatDate(stats.lastAt) : '--' }}</div>
-          <div class="stat-label">最近面试</div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 最近几次面试分数 - 折线图 -->
-    <el-card class="section-card" shadow="hover">
-      <template #header><span>最近面试得分趋势</span></template>
-      <div ref="lineChartRef" class="chart" style="height: 260px;"></div>
-    </el-card>
-
-    <!-- 能力分析：柱状图 + 雷达图 -->
     <el-row :gutter="16">
+      <!-- 用户评分趋势图 -->
       <el-col :span="12">
         <el-card class="section-card" shadow="hover">
-          <template #header><span>能力分析（柱状图）</span></template>
-          <div ref="barChartRef" class="chart" style="height: 280px;"></div>
+          <template #header><span>用户评分趋势</span></template>
+          <div ref="lineChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
       </el-col>
+
+      <!-- 能力雷达图 -->
       <el-col :span="12">
         <el-card class="section-card" shadow="hover">
-          <template #header><span>能力分析（六边形雷达图）</span></template>
-          <div ref="radarChartRef" class="chart" style="height: 280px;"></div>
+          <template #header><span>能力雷达图</span></template>
+          <div ref="radarChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- 最近几次面试记录 + 链接查看全部 -->
+    <!-- 最近面试记录 + 链接查看全部 -->
     <el-card class="section-card" shadow="hover">
       <template #header>
         <span>最近面试记录</span>
         <el-button type="primary" link style="float: right;" @click="goAllRecords">查看全部面试记录</el-button>
       </template>
       <el-table v-loading="listLoading" :data="recentRecords" stripe max-height="320">
-        <el-table-column prop="positionName" label="岗位" width="120" />
-        <el-table-column prop="startedAt" label="开始时间" width="170">
-          <template #default="{ row }">{{ formatDateTime(row.startedAt) }}</template>
+        <el-table-column prop="session_id" label="会话ID" min-width="240" show-overflow-tooltip />
+        <el-table-column label="岗位" min-width="140">
+          <template #default="{ row }">{{ row.position_name || row.position || '--' }}</template>
         </el-table-column>
-        <el-table-column prop="endedAt" label="结束时间" width="170">
-          <template #default="{ row }">{{ row.endedAt ? formatDateTime(row.endedAt) : '--' }}</template>
+        <el-table-column prop="created_at" label="开始时间" width="170">
+          <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="得分" width="80">
-          <template #default="{ row }">{{ row.totalScore ?? '--' }}</template>
+        <el-table-column prop="updated_at" label="更新时间" width="170">
+          <template #default="{ row }">{{ row.updated_at ? formatDateTime(row.updated_at) : '--' }}</template>
         </el-table-column>
-        <el-table-column label="报告" width="100">
+        <el-table-column prop="status" label="状态" width="110">
           <template #default="{ row }">
-            <el-button type="primary" link @click="goReport(row.id)">查看报告</el-button>
+            <el-tag :type="row.status === 'completed' ? 'success' : 'warning'" size="small">
+              {{ row.status === 'completed' ? '已完成' : '进行中' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="130" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="onRecordClick(row)">
+              {{ row.status === 'completed' ? '查看报告' : '继续面试' }}
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -107,11 +84,17 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import * as echarts from 'echarts';
 import { getProfileApi } from '@/api/auth';
-import { getInterviewRecordListApi, getInterviewStatsApi, getRecentScoresApi, type InterviewRecordItem } from '@/api/interview';
-import { getAbilityAnalysisApi, type AbilityRadarItem } from '@/api/user';
+import {
+  getUserEvaluationTrendApi,
+  getSessionEvaluationRadarApi,
+  getUserInterviewSessionsPageApi,
+  endInterviewSessionApi,
+  type SessionEvaluationRadarData,
+  type UserInterviewSessionItem,
+} from '@/api/interviewAi';
 import { apiOrigin } from '@/api/request';
 import type { UserInfo } from '@/types/auth';
 import { useUserStore } from '@/store/user';
@@ -121,10 +104,8 @@ const userStore = useUserStore();
 
 const profile = ref<UserInfo | null>(null);
 const listLoading = ref(false);
-const recentRecords = ref<InterviewRecordItem[]>([]);
-const statsData = ref({ totalCount: 0, finishedCount: 0, avgScore: null as number | null, lastAt: null as string | null });
+const recentRecords = ref<UserInterviewSessionItem[]>([]);
 const lineChartRef = ref<HTMLElement | null>(null);
-const barChartRef = ref<HTMLElement | null>(null);
 const radarChartRef = ref<HTMLElement | null>(null);
 
 const avatarFullUrl = computed(() => {
@@ -133,22 +114,15 @@ const avatarFullUrl = computed(() => {
   return url.startsWith('http') ? url : apiOrigin + url;
 });
 
-const stats = computed(() => ({
-  totalCount: statsData.value.totalCount,
-  avgScore: statsData.value.avgScore != null ? String(statsData.value.avgScore) : null,
-  finishedCount: statsData.value.finishedCount,
-  lastAt: statsData.value.lastAt,
-}));
-
-function formatDate(iso: string) {
-  if (!iso) return '--';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 function formatDateTime(iso: string) {
   if (!iso) return '--';
   const d = new Date(iso);
-  return `${formatDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
 async function loadProfile() {
@@ -161,32 +135,15 @@ async function loadProfile() {
   }
 }
 
-async function loadStats() {
-  try {
-    const res = await getInterviewStatsApi();
-    statsData.value = {
-      totalCount: res.totalCount ?? 0,
-      finishedCount: res.finishedCount ?? 0,
-      avgScore: res.avgScore ?? null,
-      lastAt: res.lastAt ?? null,
-    };
-  } catch {}
-}
-
 async function fetchRecentRecords() {
+  const userId = userStore.userInfo?.id;
+  if (!userId) return;
   listLoading.value = true;
   try {
-    const res = await getInterviewRecordListApi({ page: 1, pageSize: 5 });
+    const res = await getUserInterviewSessionsPageApi(userId, { page: 1, pageSize: 5 });
     recentRecords.value = res.list ?? [];
-    if (statsData.value.totalCount === 0 && (res.total ?? 0) > 0) {
-      statsData.value.totalCount = res.total ?? 0;
-      const withScore = (res.list ?? []).filter((r: InterviewRecordItem) => r.totalScore != null && r.endedAt);
-      const sum = withScore.reduce((s: number, r: InterviewRecordItem) => s + (r.totalScore ?? 0), 0);
-      statsData.value.avgScore = withScore.length ? sum / withScore.length : null;
-      statsData.value.lastAt = (res.list ?? [])[0]?.startedAt ?? null;
-    }
   } catch (e: any) {
-    ElMessage.error(e.message || '获取面试记录失败');
+    ElMessage.error(e.message || '获取面试报告记录失败');
   } finally {
     listLoading.value = false;
   }
@@ -199,70 +156,138 @@ function goAccountSettings() {
 function goAllRecords() {
   router.push({ name: 'InterviewRecordList' });
 }
-function goReport(recordId: number) {
-  router.push({ name: 'ReportDetail', params: { id: String(recordId) } });
+
+async function onRecordClick(row: UserInterviewSessionItem) {
+  const sid = String(row.session_id || '').trim();
+  if (!sid) return;
+  const job = (row.position_name || row.position || '').trim();
+  if (row.status === 'completed') {
+    router.push({
+      name: 'InterviewEvaluation',
+      params: { sessionId: sid },
+      query: { jobName: job || undefined },
+    });
+    return;
+  }
+  try {
+    await ElMessageBox.confirm('该面试尚未完成。你可以继续当前会话，或直接结束本次面试。', '面试未完成', {
+      confirmButtonText: '继续面试',
+      cancelButtonText: '结束面试',
+      distinguishCancelAndClose: true,
+      type: 'warning',
+    });
+    router.push({
+      name: 'InterviewSession',
+      params: { id: sid },
+      query: {
+        sessionId: sid,
+        jobName: job || undefined,
+        fromRecord: '1',
+      },
+    });
+  } catch (e) {
+    if (e !== 'cancel') return;
+    try {
+      await endInterviewSessionApi(sid);
+      ElMessage.success('已结束本次面试');
+      await fetchRecentRecords();
+    } catch (err: unknown) {
+      ElMessage.error((err as Error).message || '结束面试失败');
+    }
+  }
 }
 
-// 折线图：最近几次面试分数
 function initLineChart() {
   if (!lineChartRef.value) return;
   const chart = echarts.init(lineChartRef.value);
-  getRecentScoresApi({ limit: 10 }).then((list) => {
-    const data = (list ?? []).slice().reverse();
-    chart.setOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: {
-        type: 'category',
-        data: data.map((d: { startedAt?: string; totalScore?: number }) => (d.startedAt ? formatDateTime(d.startedAt).slice(0, 16) : '')),
-      },
-      yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
-      series: [{ name: '得分', type: 'line', data: data.map((d: { totalScore?: number }) => d.totalScore), smooth: true }],
-    });
-  }).catch(() => {
+  const userId = userStore.userInfo?.id;
+  if (!userId) {
     chart.setOption({ title: { text: '暂无数据', left: 'center' } });
-  });
-}
-
-function initBarChart() {
-  if (!barChartRef.value) return;
-  const chart = echarts.init(barChartRef.value);
-  getAbilityAnalysisApi().then((res) => {
-    const bar = res?.bar ?? [];
-    chart.setOption({
-      tooltip: {},
-      xAxis: { type: 'category', data: bar.map((b: { name: string; value: number }) => b.name) },
-      yAxis: { type: 'value', max: 100, name: '分数' },
-      series: [{ type: 'bar', data: bar.map((b: { name: string; value: number }) => b.value) }],
+    return;
+  }
+  getUserEvaluationTrendApi(userId)
+    .then((res) => {
+      const xData = res?.xAxis?.data ?? [];
+      const yData = res?.series?.[0]?.data ?? [];
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: xData },
+        yAxis: { type: 'value', name: '评分' },
+        series: [{ name: '评分', type: 'line', data: yData, smooth: true, showSymbol: true }],
+      });
+    })
+    .catch(() => {
+      chart.setOption({ title: { text: '暂无数据', left: 'center' } });
     });
-  }).catch(() => {
-    chart.setOption({ title: { text: '暂无数据', left: 'center' } });
-  });
 }
 
 function initRadarChart() {
   if (!radarChartRef.value) return;
   const chart = echarts.init(radarChartRef.value);
-  getAbilityAnalysisApi().then((res) => {
-    const radar = res?.radar ?? [];
-    const indicator = radar.map((r: AbilityRadarItem) => ({ name: r.name, max: r.max ?? 100 }));
-    const values = radar.map((r: AbilityRadarItem) => r.value);
+  const userId = userStore.userInfo?.id;
+  if (!userId) {
+    chart.setOption({ title: { text: '暂无可用会话', left: 'center' } });
+    return;
+  }
+  const applyRadar = (data: SessionEvaluationRadarData) => {
+    let indicator = (data.indicator || [])
+      .map((i) => ({ name: String(i.name || '').trim(), max: Number(i.max ?? 100) || 100 }))
+      .filter((i) => i.name);
+    let values = (data.value || []).map((v) => Number(v) || 0);
+
+    if ((!indicator.length || !values.length) && data.radar && !Array.isArray(data.radar)) {
+      indicator = (data.radar.indicator || [])
+        .map((i) => ({ name: String(i.name || '').trim(), max: Number(i.max ?? 100) || 100 }))
+        .filter((i) => i.name);
+    }
+    if ((!indicator.length || !values.length) && Array.isArray(data.radar) && data.radar.length) {
+      indicator = data.radar
+        .map((r) => ({ name: String(r.name || '').trim(), max: Number(r.max ?? 100) || 100 }))
+        .filter((i) => i.name);
+      values = data.radar.map((r) => Number(r.value ?? 0) || 0);
+    }
+    if (
+      !values.length &&
+      Array.isArray(data.series) &&
+      Array.isArray(data.series[0]?.data) &&
+      data.series[0]!.data![0]?.value?.length
+    ) {
+      values = data.series[0]!.data![0]!.value!.map((v) => Number(v) || 0);
+    }
+    if (!values.length && Array.isArray(data.series) && data.series[0]?.value?.length) {
+      values = data.series[0].value!.map((v) => Number(v) || 0);
+    }
+    if (!indicator.length || !values.length) {
+      chart.setOption({ title: { text: '暂无雷达图数据', left: 'center' } });
+      return;
+    }
     chart.setOption({
       tooltip: {},
       radar: { indicator },
-      series: [{ type: 'radar', data: [{ value: values, name: '能力' }] }],
+      series: [{ type: 'radar', data: [{ value: values, name: '能力评估' }] }],
     });
-  }).catch(() => {
-    chart.setOption({ title: { text: '暂无数据', left: 'center' } });
-  });
+  };
+
+  getUserInterviewSessionsPageApi(userId, { page: 1, pageSize: 20 })
+    .then(async (res) => {
+      const latestCompleted = (res.list || []).find((it) => it.status === 'completed');
+      if (!latestCompleted?.session_id) {
+        chart.setOption({ title: { text: '暂无已完成面试', left: 'center' } });
+        return;
+      }
+      const radarData = await getSessionEvaluationRadarApi(latestCompleted.session_id);
+      applyRadar(radarData);
+    })
+    .catch(() => {
+      chart.setOption({ title: { text: '雷达图加载失败', left: 'center' } });
+    });
 }
 
 onMounted(() => {
   loadProfile();
-  loadStats();
   fetchRecentRecords();
   setTimeout(() => {
     initLineChart();
-    initBarChart();
     initRadarChart();
   }, 100);
 });
@@ -275,10 +300,6 @@ onMounted(() => {
 .avatar-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .avatar-upload { margin-top: 4px; }
 .profile-form { flex: 1; }
-.stats-row { margin-bottom: 16px; }
-.stat-card { text-align: center; }
-.stat-value { font-size: 24px; font-weight: bold; color: #0d2137; }
-.stat-label { font-size: 12px; color: #909399; margin-top: 4px; }
 .section-card { margin-bottom: 16px; }
 .chart { width: 100%; }
 </style>

@@ -80,11 +80,11 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { loginApi } from '@/api/auth';
+import { loginApi, getProfileApi } from '@/api/auth';
 import { useUserStore } from '@/store/user';
 import { throttle } from '@/utils/throttle';
 import { 
@@ -119,9 +119,19 @@ const doSubmit = () => {
     try {
       const res = await loginApi(form);
       userStore.setToken(res.token);
-      userStore.setUserInfo(res.user);
+      if (res.user) {
+        userStore.setUserInfo(res.user);
+      } else {
+        try {
+          const profile = await getProfileApi();
+          userStore.setUserInfo(profile);
+        } catch {
+          /* 仅有 token 时也允许进入首页 */
+        }
+      }
       ElMessage.success('登录成功');
-      router.push({ name: 'Home' });
+      await nextTick();
+      await router.replace({ name: 'Home' }).catch(() => {});
     } catch (e: any) {
       ElMessage.error(e.message || '登录失败');
     } finally {

@@ -44,12 +44,46 @@ export interface InterviewSessionInfo {
   interview_mode?: 'text' | 'voice' | 'avatar';
 }
 
+/** GET /interview/session/:sessionId/evaluation（8000 等服务端） */
+export interface InterviewEvaluationData {
+  session_id: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  overall_score?: number;
+  recommendation?: string;
+  overall_comment?: string;
+  technical_evaluation?: string;
+  communication_evaluation?: string;
+}
+
 export interface UserInterviewSessionItem {
   session_id: string;
-  position: string;
-  status: 'questioning' | 'ended' | string;
+  position?: string;
+  position_name?: string;
+  status: 'questioning' | 'completed' | 'ended' | string;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserInterviewSessionPageRes {
+  list: UserInterviewSessionItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface UserEvaluationTrendData {
+  xAxis?: { type?: string; data?: string[] };
+  yAxis?: { type?: string };
+  series?: Array<{ data?: number[]; type?: string; smooth?: boolean }>;
+}
+
+export interface SessionEvaluationRadarData {
+  indicator?: Array<{ name?: string; max?: number }>;
+  value?: number[];
+  // 兼容旧结构 radar: [{name,max,value}] 与新结构 radar: { indicator: [...] }
+  radar?: Array<{ name?: string; max?: number; value?: number }> | { indicator?: Array<{ name?: string; max?: number }> };
+  series?: Array<{ value?: number[]; data?: Array<{ value?: number[]; name?: string }> }>;
 }
 
 export interface AvatarSessionStartRes {
@@ -93,6 +127,7 @@ export interface InterviewAnswerStreamEvent {
     | 'followup'
     | 'question_chunk'
     | 'question'
+    | 'interview_complete'
     | 'error';
   data: Record<string, unknown>;
   timestamp: string;
@@ -106,9 +141,61 @@ export function getInterviewSessionApi(sessionId: string) {
   return interviewRequest.get<InterviewSessionInfo>(`/interview/session/${sessionId}`);
 }
 
+/** 面试评估报告（与联调服务一致：`code` 常为 200） */
+export function getInterviewEvaluationApi(sessionId: string) {
+  return interviewRequest.get<InterviewEvaluationData>(`/interview/session/${sessionId}/evaluation`);
+}
+
 /** 获取某个用户的历史面试会话（按时间倒序） */
 export function getUserInterviewSessionsApi(userId: string | number) {
   return interviewRequest.get<UserInterviewSessionItem[]>(`/interview/user/${userId}/sessions`);
+}
+
+/** 分页获取用户会话列表：`/interview/user/:userId/sessions/page` */
+export async function getUserInterviewSessionsPageApi(
+  userId: string | number,
+  params?: { page?: number; pageSize?: number }
+) {
+  const page = Number(params?.page ?? 1) || 1;
+  const pageSize = Number(params?.pageSize ?? 10) || 10;
+  const raw = await interviewRequest.get<unknown>(`/interview/user/${userId}/sessions/page`, {
+    params: {
+      page,
+      pageSize,
+      page_size: pageSize,
+    },
+  });
+  // 兼容后端不同分页结构：data 可能是数组，或 { list, total, ... }
+  if (Array.isArray(raw)) {
+    return {
+      list: raw as UserInterviewSessionItem[],
+      total: raw.length,
+      page,
+      pageSize,
+    } satisfies UserInterviewSessionPageRes;
+  }
+  const obj = (raw ?? {}) as Record<string, unknown>;
+  const list = Array.isArray(obj.list)
+    ? (obj.list as UserInterviewSessionItem[])
+    : Array.isArray(obj.items)
+      ? (obj.items as UserInterviewSessionItem[])
+      : [];
+  return {
+    list,
+    total: Number(obj.total ?? obj.count ?? list.length) || list.length,
+    page: Number(obj.page ?? obj.page_num ?? page) || page,
+    pageSize: Number(obj.pageSize ?? obj.page_size ?? pageSize) || pageSize,
+  } satisfies UserInterviewSessionPageRes;
+}
+
+/** 用户评分趋势：`/interview/user/:userId/evaluation/trend` */
+export function getUserEvaluationTrendApi(userId: string | number) {
+  return interviewRequest.get<UserEvaluationTrendData>(`/interview/user/${userId}/evaluation/trend`);
+}
+
+/** 会话雷达图：`/interview/session/:sessionId/evaluation/radar` */
+export function getSessionEvaluationRadarApi(sessionId: string) {
+  return interviewRequest.get<SessionEvaluationRadarData>(`/interview/session/${sessionId}/evaluation/radar`);
 }
 
 export function endInterviewSessionApi(sessionId: string) {

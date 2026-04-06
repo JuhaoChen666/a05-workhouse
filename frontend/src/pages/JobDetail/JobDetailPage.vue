@@ -16,7 +16,7 @@
               <span class="company-name">{{ job.companyName }}</span>
             </div>
             <div class="salary">
-              薪资：{{ (job.salaryMin / 1000).toFixed(0) }}k - {{ (job.salaryMax / 1000).toFixed(0) }}k / 月
+              薪资：{{ formatSalaryRange(job.salaryMin, job.salaryMax) }}
             </div>
           </div>
           <div class="job-header-right">
@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getJobDetailApi, type HotJobItem } from '@/api/jobs';
+import { getJobDetailApi, formatSalaryRange, type HotJobItem } from '@/api/jobs';
 
 const route = useRoute();
 const router = useRouter();
