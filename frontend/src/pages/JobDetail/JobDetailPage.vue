@@ -1,7 +1,13 @@
 <template>
-  <div class="job-detail-page">
-    <el-button type="primary" link @click="goBack" class="back-btn">← 返回</el-button>
-    <el-card v-loading="loading" shadow="hover">
+  <div class="job-detail-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">岗位详情 <span>Job Detail</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
+    <div class="theme-top-actions fade-in-up">
+      <el-button @click="goBack" class="theme-back-btn">← 返回</el-button>
+    </div>
+    <el-card v-loading="loading" shadow="hover" class="theme-card fade-in-up delay-1">
       <template v-if="job">
         <div class="job-header">
           <div class="job-header-left">
@@ -20,7 +26,7 @@
             </div>
           </div>
           <div class="job-header-right">
-            <el-button type="primary" @click="startInterview">
+            <el-button type="primary" class="theme-primary-btn" @click="startInterview">
               开始模拟面试
             </el-button>
           </div>
@@ -72,8 +78,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.job-detail-page { max-width: 800px; }
-.back-btn { margin-bottom: 8px; }
+.job-detail-page { max-width: 1000px; }
 .job-header {
   margin-bottom: 16px;
   display: flex;

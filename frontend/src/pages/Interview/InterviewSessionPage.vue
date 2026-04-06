@@ -1,6 +1,6 @@
 <template>
-  <div class="interview-session-page">
-    <el-card class="session-card" shadow="hover">
+  <div class="interview-session-page theme-page-shell">
+    <el-card class="session-card theme-card" shadow="hover">
       <template #header>
         <div class="card-header">
           <el-button link class="leave-btn" @click="onLeavePage">← 离开</el-button>
@@ -951,6 +951,7 @@ async function onLeavePage() {
 
 <style scoped>
 .interview-session-page { width: 100%; height: 100%; margin: 0; }
+.interview-session-page.theme-page-shell { max-width: none; padding: 0; }
 .session-card { width: 100%; min-height: 72vh; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .card-title { font-weight: 600; }

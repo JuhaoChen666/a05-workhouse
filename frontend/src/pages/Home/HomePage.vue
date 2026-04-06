@@ -274,19 +274,26 @@ onMounted(async () => {
   border-radius: 8px;
   font-weight: 600;
   padding: 0 32px;
-  background: linear-gradient(180deg, #4877b8, #000000);
-  border: 1px solid #000000;
-  color: #ffffff;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, #4b7ec4, #0f172a) !important;
+  border: 1px solid #111827 !important;
+  color: #ffffff !important;
+  transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
 }
 
-.banner-search-btn:hover, .banner-search-btn:focus {
-  background: #333333;
-  border-color: #333333;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 15px rgba(0,0,0,0.15);
-  color: #ffffff;
+.banner-search-btn:hover,
+.banner-search-btn:focus {
+  background: linear-gradient(180deg, #5b8ad0, #1f2937) !important;
+  border-color: #374151 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+  color: #ffffff !important;
+}
+
+.banner-search-btn:active {
+  background: linear-gradient(180deg, #436ea8, #111827) !important;
+  border-color: #111827 !important;
+  transform: translateY(0);
 }
 
 /* Main Content Styles */

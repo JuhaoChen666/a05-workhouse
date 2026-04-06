@@ -1,8 +1,11 @@
 <template>
-  <div class="evaluation-page">
-    <div class="evaluation-header">
-      <el-button link type="primary" @click="goBack">← 返回</el-button>
-      <h1 class="evaluation-title">面试评估报告</h1>
+  <div class="evaluation-page theme-page-shell">
+    <div class="theme-top-actions fade-in-up">
+      <el-button @click="goBack" class="theme-back-btn">← 返回</el-button>
+    </div>
+    <div class="evaluation-header fade-in-up">
+      <h1 class="evaluation-title">面试评估报告 <span>Evaluation</span></h1>
+      <div class="theme-section-decoration"></div>
       <p v-if="jobName" class="evaluation-sub">岗位：{{ jobName }}</p>
       <p class="evaluation-meta">会话 ID：{{ sessionId }}</p>
     </div>
@@ -10,7 +13,7 @@
     <el-skeleton v-if="loading" :rows="10" animated />
     <el-alert v-else-if="errorText" :title="errorText" type="error" show-icon class="mb-16" />
     <template v-else-if="data">
-      <el-card class="score-card" shadow="never">
+      <el-card class="score-card theme-card fade-in-up delay-1" shadow="never">
         <div class="score-row">
           <span class="score-label">综合得分</span>
           <span class="score-value">{{ formatScore(data.overall_score) }}</span>
@@ -27,7 +30,7 @@
 
       <el-row :gutter="16">
         <el-col :span="12">
-          <el-card class="block-card" shadow="never">
+          <el-card class="block-card theme-card fade-in-up delay-1" shadow="never">
             <template #header>优势</template>
             <ul v-if="data.strengths?.length" class="bullet-list">
               <li v-for="(s, i) in data.strengths" :key="i">{{ s }}</li>
@@ -36,7 +39,7 @@
           </el-card>
         </el-col>
         <el-col :span="12">
-          <el-card class="block-card" shadow="never">
+          <el-card class="block-card theme-card fade-in-up delay-2" shadow="never">
             <template #header>待提升</template>
             <ul v-if="data.weaknesses?.length" class="bullet-list">
               <li v-for="(w, i) in data.weaknesses" :key="i">{{ w }}</li>
@@ -46,12 +49,12 @@
         </el-col>
       </el-row>
 
-      <el-card v-if="data.technical_evaluation" class="block-card" shadow="never">
+      <el-card v-if="data.technical_evaluation" class="block-card theme-card fade-in-up delay-1" shadow="never">
         <template #header>技术能力评价</template>
         <p class="paragraph">{{ data.technical_evaluation }}</p>
       </el-card>
 
-      <el-card v-if="data.communication_evaluation" class="block-card" shadow="never">
+      <el-card v-if="data.communication_evaluation" class="block-card theme-card fade-in-up delay-2" shadow="never">
         <template #header>沟通表达评价</template>
         <p class="paragraph">{{ data.communication_evaluation }}</p>
       </el-card>
@@ -109,11 +112,7 @@ onMounted(load);
 </script>
 
 <style scoped>
-.evaluation-page {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 8px 0 32px;
-}
+.evaluation-page { max-width: 1100px; margin: 0 auto; padding: 8px 0 32px; }
 
 .evaluation-header {
   margin-bottom: 20px;
@@ -125,6 +124,7 @@ onMounted(load);
   font-weight: 600;
   color: #303133;
 }
+.evaluation-title span { font-size: 14px; color: #6b7280; margin-left: 8px; text-transform: uppercase; }
 
 .evaluation-sub {
   margin: 0;

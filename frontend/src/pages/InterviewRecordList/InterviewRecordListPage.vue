@@ -1,7 +1,10 @@
 <template>
-  <div class="record-list-page">
-    <h2 class="page-title">全部面试记录</h2>
-    <el-card shadow="hover">
+  <div class="record-list-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">全部面试记录 <span>Records</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
+    <el-card shadow="hover" class="theme-card fade-in-up delay-1">
       <el-table v-loading="loading" :data="list" stripe>
         <el-table-column prop="session_id" label="会话ID" min-width="260" show-overflow-tooltip />
         <el-table-column label="岗位" min-width="160">
@@ -130,7 +133,6 @@ onMounted(() => fetchList());
 </script>
 
 <style scoped>
-.record-list-page { max-width: 900px; }
-.page-title { margin-top: 0; margin-bottom: 16px; }
+.record-list-page { max-width: 1200px; }
 .pagination { margin-top: 16px; justify-content: flex-end; }
 </style>

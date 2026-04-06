@@ -1,6 +1,10 @@
 <template>
-  <div class="interview-settings-page">
-    <el-card class="settings-card" shadow="hover" v-loading="loading">
+  <div class="interview-settings-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">面试设置 <span>Interview Setup</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
+    <el-card class="settings-card theme-card fade-in-up delay-1" shadow="hover" v-loading="loading">
       <template #header>
         <div class="card-header">
           <span>面试设置</span>
@@ -71,7 +75,7 @@
 
         <div class="actions">
           <el-button @click="backToJobDetail">取消</el-button>
-          <el-button type="primary" :loading="starting" @click="onStartInterview">开始面试</el-button>
+          <el-button type="primary" class="theme-primary-btn" :loading="starting" @click="onStartInterview">开始面试</el-button>
         </div>
       </template>
 
@@ -269,7 +273,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.interview-settings-page { max-width: 720px; margin: 0 auto; }
+.interview-settings-page { max-width: 1000px; margin: 0 auto; }
 .settings-card { width: 100%; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .intro { font-size: 13px; color: #606266; margin: 0 0 16px; line-height: 1.5; }

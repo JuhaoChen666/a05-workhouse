@@ -1,9 +1,12 @@
 <template>
-  <div class="profile-page">
-    <h2 class="page-title">个人中心</h2>
+  <div class="profile-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">个人中心 <span>Profile</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
 
     <!-- 用户资料卡片：头像 + 基本信息 -->
-    <el-card class="section-card profile-card" shadow="hover">
+    <el-card class="section-card profile-card theme-card fade-in-up delay-1" shadow="hover">
       <template #header>
         <span>用户资料</span>
         <el-button type="primary" link style="float: right;" @click="goAccountSettings">
@@ -29,7 +32,7 @@
     <el-row :gutter="16">
       <!-- 用户评分趋势图 -->
       <el-col :span="12">
-        <el-card class="section-card" shadow="hover">
+        <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
           <template #header><span>用户评分趋势</span></template>
           <div ref="lineChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
@@ -37,7 +40,7 @@
 
       <!-- 能力雷达图 -->
       <el-col :span="12">
-        <el-card class="section-card" shadow="hover">
+        <el-card class="section-card theme-card fade-in-up delay-2" shadow="hover">
           <template #header><span>能力雷达图</span></template>
           <div ref="radarChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
@@ -45,7 +48,7 @@
     </el-row>
 
     <!-- 最近面试记录 + 链接查看全部 -->
-    <el-card class="section-card" shadow="hover">
+    <el-card class="section-card theme-card fade-in-up delay-2" shadow="hover">
       <template #header>
         <span>最近面试记录</span>
         <el-button type="primary" link style="float: right;" @click="goAllRecords">查看全部面试记录</el-button>
