@@ -8,6 +8,7 @@ class InterviewStartRequest(BaseModel):
     position: str
     collection_name: str
     user_id: Optional[int] = None
+    difficulty: Optional[str] = "Normal"
 
 class InterviewAnswerRequest(BaseModel):
     """提交回答请求"""

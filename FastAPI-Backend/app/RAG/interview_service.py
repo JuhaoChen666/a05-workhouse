@@ -19,13 +19,13 @@ class InterviewService:
         """初始化数据库"""
         return self.rag_service.initialize_database(collection_name)
 
-    async def start_interview(self, resume: str, position: str, collection_name: str, user_id: int = None) -> dict:
+    async def start_interview(self, resume: str, position: str, collection_name: str, user_id: int = None, difficulty: str = "Normal") -> dict:
         """开始面试"""
         # 初始化数据库
         db_info = self.initialize_database(collection_name)
 
         # 创建会话
-        session_id = await self.session_service.create_session(resume, position, user_id)
+        session_id = await self.session_service.create_session(resume, position, user_id, difficulty)
 
         # 需要在异步环境中初始化，这里返回session_id，让路由层处理
         return {

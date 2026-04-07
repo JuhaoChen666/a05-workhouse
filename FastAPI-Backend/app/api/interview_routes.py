@@ -63,7 +63,8 @@ async def start_interview(
             request.resume,
             request.position,
             request.collection_name,
-            request.user_id
+            request.user_id,
+            request.difficulty
         )
 
         session_id = result["session_id"]

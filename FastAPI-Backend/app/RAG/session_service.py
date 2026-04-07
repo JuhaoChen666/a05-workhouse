@@ -15,7 +15,7 @@ class SessionService:
         # 不再使用本地内存存储：
         # self.sessions: Dict[str, 'InterviewSession'] = {}
 
-    async def create_session(self, resume: str, position: str, user_id: int = None) -> str:
+    async def create_session(self, resume: str, position: str, user_id: int = None, difficulty: str = "Normal") -> str:
         """创建新会话（写入数据库）"""
         session_id = str(uuid.uuid4())
         await SessionMapper.insert_session({
@@ -23,6 +23,7 @@ class SessionService:
             "user_id": user_id,
             "resume": resume,
             "position": position,
+            "difficulty": difficulty,
             "status": "initializing"
         })
         return session_id
@@ -34,7 +35,14 @@ class SessionService:
             return None
         
         # 将DB模型重组为InterviewSession业务对象
-        session = InterviewSession(session_id, session_model.resume, session_model.position, self.rag_service, user_id=session_model.user_id)
+        session = InterviewSession(
+            session_id, 
+            session_model.resume, 
+            session_model.position, 
+            self.rag_service, 
+            user_id=session_model.user_id,
+            difficulty=session_model.difficulty or "Normal"
+        )
         session.status = session_model.status
         session.current_topic = session_model.current_topic
         session.current_question = session_model.current_question
@@ -63,23 +71,37 @@ class SessionService:
 class InterviewSession:
     """面试会话类"""
 
-    def __init__(self, session_id: str, resume: str, position: str, rag_service: RAGService, user_id: Optional[int] = None):
+    def __init__(self, session_id: str, resume: str, position: str, rag_service: RAGService, user_id: Optional[int] = None, difficulty: str = "Normal"):
         self.session_id = session_id
         self.user_id = user_id
         self.resume = resume
         self.position = position
         self.rag_service = rag_service
+        self.difficulty = difficulty
         self.conversation_history: List[Dict] = []
         self.current_topic: Optional[str] = None
         self.current_question: Optional[str] = None
         self.status: str = "initializing"  # initializing, questioning, analyzing, completed
-        self.max_depth_per_topic: int = 3
+        
+        # 行为矩阵配置 (V3.0)
+        difficulty_configs = {
+            "Easy": {"max_depth": 2, "threshold": 7.5},
+            "Normal": {"max_depth": 3, "threshold": 8.5},
+            "Hard": {"max_depth": 5, "threshold": 9.0}
+        }
+        config = difficulty_configs.get(self.difficulty, difficulty_configs["Normal"])
+        self.max_depth_per_topic: int = config["max_depth"]
+        self.threshold: float = config["threshold"]
+        
+        # 淘汰计数
+        self.consecutive_failed_rounds: int = 0  # 单话题连续失败轮次 (< 7.0)
+        self.failed_topics_streak: int = 0         # 累计失败话题数
 
     async def initialize(self) -> str:
         """初始化面试，生成第一个问题"""
         # 生成初始问题
         self.current_question = await self.rag_service.generate_initial_question(
-            self.resume, self.position
+            self.resume, self.position, self.difficulty
         )
         self.current_topic = await self.rag_service.extract_topic(self.current_question)
         self.status = "questioning"
@@ -127,24 +149,38 @@ class InterviewSession:
         # 分析回答深度
         yield StreamEvent(
             type="analyzing",
-            data={"message": "正在分析回答深度" + (" (结合情感分析)" if emotion_data else "") + "..."},
+            data={"message": f"正在进行{self.difficulty}模式深度分析" + (" (结合情感分析)" if emotion_data else "") + "..."},
             timestamp=datetime.now().isoformat()
         )
 
         analysis = await self.rag_service.analyze_answer_depth(
-            self.current_question, answer, emotion_data=emotion_data
+            self.current_question, answer, difficulty=self.difficulty, emotion_data=emotion_data
         )
+        
+        depth_score = analysis.get("depth_score", 5)
+        # 精准阈值修正：如果分数未达到当前难度的阈值，则强制标记为需要追问（除非已达最大深度）
+        need_followup_by_score = depth_score < self.threshold
+        
+        # Hard 模式特殊计数
+        is_hard_fail = self.difficulty == "Hard" and depth_score < 7.0
+        if is_hard_fail:
+            self.consecutive_failed_rounds += 1
+        else:
+            self.consecutive_failed_rounds = 0
 
         yield StreamEvent(
             type="analysis_result",
             data={
-                "depth_score": analysis.get("depth_score", 5),
+                "depth_score": depth_score,
                 "is_vague": analysis.get("is_vague", False),
-                "need_followup": analysis.get("need_followup", False),
+                "need_followup": need_followup_by_score,
                 "feedback": analysis.get("feedback_to_candidate", "")
             },
             timestamp=datetime.now().isoformat()
         )
+        
+        # Hard 模式断路控制：如果单话题连续 2 轮不达标 (< 7.0)，强制结束本话题
+        force_stop_topic = self.difficulty == "Hard" and self.consecutive_failed_rounds >= 2
 
         # 获取当前主题的 QA 历史
         topic_qa_history = [q for q in self.conversation_history
@@ -154,10 +190,10 @@ class InterviewSession:
         is_max_depth_reached = len(topic_qa_history) >= self.max_depth_per_topic
         
         # 判断是否需要追问（但不超过最大深度）
-        if analysis.get("need_followup", False) and not is_max_depth_reached:
+        if not force_stop_topic and need_followup_by_score and not is_max_depth_reached:
             yield StreamEvent(
                 type="followup",
-                data={"message": "回答不够深入，准备追问..."},
+                data={"message": "表现未达标，继续深入考察..." if self.difficulty == "Hard" else "回答不够深入，准备追问..."},
                 timestamp=datetime.now().isoformat()
             )
 
@@ -208,24 +244,38 @@ class InterviewSession:
         )
 
         # 决定下一步
-        if completeness.get("is_sufficient", False) or is_max_depth_reached:
+        if completeness.get("is_sufficient", False) or is_max_depth_reached or force_stop_topic:
+            # Hard 模式记录失败话题数
+            if force_stop_topic:
+                self.failed_topics_streak += 1
+                self.consecutive_failed_rounds = 0 # 重置单轮计数
+
             # 当前主题结束
             yield StreamEvent(
                 type="topic_completed",
-                data={"topic": self.current_topic},
+                data={
+                    "topic": self.current_topic,
+                    "reason": "考核通过" if not force_stop_topic else "由于表现不佳强制切题"
+                },
                 timestamp=datetime.now().isoformat()
             )
 
             completed_topics = list(set([q['topic'] for q in self.conversation_history]))
 
-            # 检查是否已经覆盖足够主题
-            if len(completed_topics) >= 5:
+            # 检查是否已经覆盖足够主题 或 硬淘汰逻辑
+            is_eliminated = self.difficulty == "Hard" and self.failed_topics_streak >= 2
+            is_finished = len(completed_topics) >= 5 or is_eliminated
+
+            if is_finished:
+                bye_message = "由于您多次未能清晰回答核心技术点，本次面试提前结束。建议针对简历中的技术栈进行更深入的学习。" if is_eliminated else "面试考察完成"
+                
                 yield StreamEvent(
                     type="interview_complete",
                     data={
-                        "message": "面试考察完成",
+                        "message": bye_message,
                         "total_rounds": len(self.conversation_history),
-                        "covered_topics": completed_topics
+                        "covered_topics": completed_topics,
+                        "is_eliminated": is_eliminated
                     },
                     timestamp=datetime.now().isoformat()
                 )
@@ -260,7 +310,8 @@ class InterviewSession:
                 self.resume,
                 self.position,
                 completed_topics,
-                history_summary
+                history_summary,
+                self.difficulty
             )
 
             self.current_question = next_question
