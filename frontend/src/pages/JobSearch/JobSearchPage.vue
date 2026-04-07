@@ -83,8 +83,7 @@
                   <p class="job-desc" v-html="highlightText((job.jobContent || '').slice(0, 80) + '...')" />
                   <div class="job-footer">
                     <span class="job-salary">
-                      {{ (job.salaryMin / 1000).toFixed(0) }}k -
-                      {{ (job.salaryMax / 1000).toFixed(0) }}k / 月
+                      {{ formatSalaryRange(job.salaryMin, job.salaryMax) }}
                     </span>
                     <el-button type="primary" link @click.stop="goJobDetail(job.id)">
                       查看详情
@@ -118,6 +117,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { Search } from '@element-plus/icons-vue';
 import {
   searchJobsApi,
+  formatSalaryRange,
   type HotJobItem,
   type SearchJobsParams,
 } from '@/api/jobs';

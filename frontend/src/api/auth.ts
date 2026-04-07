@@ -1,9 +1,59 @@
 import { authRequest } from './request';
-import type { LoginRequest, RegisterRequest, LoginResponse, UserInfo } from '../types/auth';
+import type { LoginRequest, RegisterRequest, UserInfo } from '../types/auth';
+
+/** 登录接口解析结果（兼容多种后端字段命名与嵌套） */
+export interface LoginApiResult {
+  token: string;
+  user: UserInfo | null;
+}
+
+/**
+ * 将 unwrap 后的登录载荷规范为 token + user。
+ * 兼容：accessToken / access_token、userInfo / user_info、以及 user 字段与根级扁平共存。
+ */
+function normalizeLoginResult(raw: unknown): LoginApiResult {
+  if (raw == null || typeof raw !== 'object') {
+    throw new Error('登录响应格式异常');
+  }
+  const o = raw as Record<string, unknown>;
+  const token =
+    (typeof o.token === 'string' && o.token) ||
+    (typeof o.accessToken === 'string' && o.accessToken) ||
+    (typeof o.access_token === 'string' && o.access_token) ||
+    '';
+  if (!token) {
+    throw new Error('登录响应缺少 token');
+  }
+
+  const nested = o.user ?? o.userInfo ?? o.user_info;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return { token, user: nested as UserInfo };
+  }
+
+  if (o.id != null || o.username != null) {
+    return {
+      token,
+      user: {
+        id: o.id,
+        username: o.username,
+        email: o.email,
+        roleId: o.roleId,
+        role_id: o.role_id,
+        roleID: o.roleID,
+        roleName: o.roleName,
+        role_name: o.role_name,
+        avatarUrl: o.avatarUrl ?? o.avatar_url,
+      } as UserInfo,
+    };
+  }
+
+  return { token, user: null };
+}
 
 // 用户登录
-export function loginApi(payload: LoginRequest) {
-  return authRequest.post<LoginResponse>('/auth/login', payload);
+export async function loginApi(payload: LoginRequest): Promise<LoginApiResult> {
+  const raw = await authRequest.post<unknown>('/auth/login', payload);
+  return normalizeLoginResult(raw);
 }
 
 // 用户注册

@@ -264,19 +264,19 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 5. 角色列表
 
-**GET** `/roles`
+**GET** `/roles`（或 **`GET /admin/roles`**，视网关而定）
 
-需要认证。返回所有角色，用于下拉等。
-
-响应：`data: [{ id, name }]`
+需要认证。返回所有角色。说明：当前主站 **管理后台用户管理页** 已在前端写死角色（1 普通用户、2 管理员），**不调用**本接口；其它客户端仍可按需使用。
 
 ---
 
 ### 岗位（Position）
 
+管理后台「岗位管理」等页面使用的接口挂在 **`/admin`** 下（与 `adminRequest` 一致），例如 **`/admin/positions`**。本地模拟后端将 `/api/admin/positions` 转发到 `/api/positions`。
+
 #### 6. 岗位列表
 
-**GET** `/positions`
+**GET** `/admin/positions`
 
 需要认证。按 `sort_order`、`id` 排序。
 
@@ -286,7 +286,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 7. 岗位详情
 
-**GET** `/positions/:id`
+**GET** `/admin/positions/:id`
 
 需要认证。404 表示岗位不存在。
 
@@ -318,7 +318,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 在本地开发环境中，可以通过查询参数覆盖其中部分字段，例如：
 
-`GET /positions/1?city=上海&salaryMin=30000&salaryMax=50000`
+`GET /admin/positions/1?city=上海&salaryMin=30000&salaryMax=50000`
 
 上述请求会返回相同结构的数据，只是 `city` 与薪资范围会按查询参数进行替换，
 方便在不改动数据库的前提下模拟不同岗位详情。
@@ -327,7 +327,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 8. 新增岗位（管理员）
 
-**POST** `/positions`
+**POST** `/admin/positions`
 
 需要认证 + 管理员。
 
@@ -342,7 +342,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 9. 更新岗位（管理员）
 
-**PUT** `/positions/:id`
+**PUT** `/admin/positions/:id`
 
 需要认证 + 管理员。请求体字段均为可选，用于局部更新：
 
@@ -367,7 +367,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 10. 删除岗位（管理员）
 
-**DELETE** `/positions/:id`
+**DELETE** `/admin/positions/:id`
 
 需要认证 + 管理员。
 
@@ -788,7 +788,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 ### 热门岗位（招聘信息）
 
-以下为首页「热门岗位」卡片及岗位详情页所用接口，与面试用岗位（`/positions`）可独立。
+以下为首页「热门岗位」卡片及岗位详情页所用接口，与管理后台「岗位」接口（`/admin/positions`）可独立。
 
 #### 24. 热门岗位列表
 
@@ -877,16 +877,18 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 以下接口均需 **认证** 且 **`roleId === 2`（管理员）**。
 
-管理后台「用户管理」页（`/admin/users`）联调说明：
+管理后台「用户管理」页（前端路由 `/admin/users`）联调说明：
 
-- 角色下拉：复用 **「角色列表」** `GET /roles`（见上文 #### 5）。
-- 用户 CRUD：使用本节 `GET/POST/PUT/DELETE /users...`。
+- **用户接口**挂在 **`/admin` 前缀下**（不是 `/api`）：例如 `GET /admin/users`。与真实后端文档一致。
+- 管理后台「用户管理」中 **角色下拉已在前端写死**：`1` 普通用户、`2` 管理员，**不再请求** `/admin/roles`。
+- 前端通过 `adminRequest` 请求用户 CRUD（`VITE_API_ORIGIN` + `VITE_ADMIN_API_PREFIX`，默认 `/admin`）。
+- 题库、学习资源等其它后台页仍走 **`/api`**（见下文各节）。
 
-> **路径前缀**：本文档统一以 `Base URL = http://localhost:3000/api` 为准，即完整地址形如 `http://localhost:3000/api/users`。若生产环境网关去掉 `/api` 前缀（例如根路径直接挂到 `8080`），则等价路径为 `http://localhost:8080/users`，请求体与响应结构不变。
+> **路径前缀（用户）**：`{API_ORIGIN}/admin`，例如 `http://10.105.2.13:8080/admin/users`。本地模拟后端将 `/api/admin/users` 转发到 `/api/users`，便于与 Vite 代理同源联调。
 
 #### 27. 用户列表（分页）
 
-**GET** `/users?page=1&pageSize=10`
+**GET** `/admin/users?page=1&pageSize=10`（相对 `{API_ORIGIN}`；下文简写仍用 `/users` 表示 **admin 下的路径**，即 `/admin/users`）
 
 | 查询参数 | 类型 | 必填 | 说明 |
 |----------|------|------|------|
@@ -922,7 +924,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 28. 用户详情
 
-**GET** `/users/:id`
+**GET** `/admin/users/:id`（简写：`/users/:id`，指 admin 前缀下）
 
 | 路径参数 | 类型 | 必填 | 说明 |
 |----------|------|------|------|
@@ -936,7 +938,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 29. 创建用户
 
-**POST** `/users`
+**POST** `/admin/users`
 
 `Content-Type: application/json`
 
@@ -963,7 +965,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 30. 更新用户
 
-**PUT** `/users/:id`
+**PUT** `/admin/users/:id`
 
 `Content-Type: application/json`
 
@@ -998,7 +1000,7 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 
 #### 31. 删除用户
 
-**DELETE** `/users/:id`
+**DELETE** `/admin/users/:id`
 
 成功示例：
 
@@ -1021,28 +1023,28 @@ JWT payload 含：`id`、`username`、`roleId`。管理员为 `roleId === 2`。
 管理员先登录拿到 `token` 后：
 
 ```bash
-# 用户列表
-curl -X GET "http://localhost:3000/api/users?page=1&pageSize=10" \
+# 用户列表（将 HOST 换为你的 API 域名，如 http://10.105.2.13:8080）
+curl -X GET "http://HOST/admin/users?page=1&pageSize=10" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 
 # 用户详情
-curl -X GET "http://localhost:3000/api/users/1" \
+curl -X GET "http://HOST/admin/users/1" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 
 # 创建用户
-curl -X POST "http://localhost:3000/api/users" \
+curl -X POST "http://HOST/admin/users" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"username":"testuser","password":"123456","email":"test@example.com","roleId":1}'
 
 # 更新用户
-curl -X PUT "http://localhost:3000/api/users/2" \
+curl -X PUT "http://HOST/admin/users/2" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"username":"newname","roleId":2}'
 
 # 删除用户
-curl -X DELETE "http://localhost:3000/api/users/2" \
+curl -X DELETE "http://HOST/admin/users/2" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 
@@ -1074,10 +1076,11 @@ curl -X DELETE "http://localhost:3000/api/users/2" \
 
 ## 六、前端请求封装说明
 
-- `baseURL`: `http://localhost:3000/api`（可通过环境变量 `VITE_API_ORIGIN` 等调整，见前端 `request.ts`）
+- `baseURL`（默认业务）：`{VITE_API_ORIGIN}/api`
+- **管理后台用户/岗位**：`{VITE_API_ORIGIN}{VITE_ADMIN_API_PREFIX}`，默认 **`/admin`**（见 `request.ts` 中 `adminRequest`）
 - 请求拦截器：自动注入 `Authorization: Bearer <token>`
-- 响应拦截器：`code !== 0` 时抛出 `Error(data.message)`，成功时返回 `data.data`
-- 管理后台用户管理：`src/pages/Admin/UserManagePage.vue` 使用 `src/api/admin.ts` 中的 `getUserListApi`、`getUserDetailApi`、`createUserApi`、`updateUserApi`、`deleteUserApi` 及 `getRolesApi`
+- 响应拦截器：`code !== 0` 时抛出 `Error(data.message)`，成功时返回 `data.data`（或 `result`）
+- 管理后台用户管理：`UserManagePage.vue` 角色下拉写死（1/2）；用户 CRUD 走 **`adminRequest`**
 
 ---
 

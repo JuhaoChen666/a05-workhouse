@@ -1,31 +1,6 @@
 <template>
   <div class="home-layout">
     <el-container>
-      <!-- 左侧深蓝菜单 -->
-      <el-aside v-if="!isInterviewSessionPage" width="200px" class="aside">
-        <div class="logo">AI 面试平台</div>
-        <el-menu
-          :default-active="activeMenu"
-          class="aside-menu"
-          background-color="#0d2137"
-          text-color="#b0c4de"
-          active-text-color="#fff"
-          router
-        >
-          <el-menu-item index="/home">
-            <el-icon><HomeFilled /></el-icon>
-            <span>首页</span>
-          </el-menu-item>
-          <el-menu-item index="/interview">
-            <el-icon><Microphone /></el-icon>
-            <span>模拟面试</span>
-          </el-menu-item>
-          <el-menu-item index="/question-bank">
-            <el-icon><Collection /></el-icon>
-            <span>题库</span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
       <el-container direction="vertical" class="main-wrapper" :class="{ 'main-wrapper-full': isInterviewSessionPage }">
         <el-header v-if="!isInterviewSessionPage" class="header">
           <div class="header-right">
@@ -58,7 +33,7 @@
           <el-scrollbar class="main-scrollbar" always :class="{ 'main-scrollbar-full': isInterviewSessionPage }">
             <div class="main-inner" :class="{ 'main-inner-full': isInterviewSessionPage }">
               <router-view v-slot="{ Component }">
-                <transition name="fade" mode="out-in">
+                <transition :name="transitionName" mode="out-in">
                   <component :is="Component" />
                 </transition>
               </router-view>
@@ -71,13 +46,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
-  HomeFilled,
-  Microphone,
-  Collection,
   User,
   SwitchButton,
   ArrowDown,
@@ -87,8 +59,10 @@ import { useUserStore } from '@/store/user';
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const transitionName = ref('fade');
 
-const activeMenu = computed(() => route.path);
+const FLOW_ROUTES = new Set(['InterviewSettings', 'InterviewSession']);
+
 const isInterviewSessionPage = computed(() => route.name === 'InterviewSession');
 
 const avatarSrc = computed(() => userStore.userInfo?.avatarUrl || undefined);
@@ -98,6 +72,36 @@ const avatarText = computed(() => {
   if (!name) return '?';
   return name.length >= 2 ? name.slice(0, 2) : name;
 });
+
+watch(
+  () => route.name,
+  (to, from) => {
+    const toName = String(to || '');
+    const fromName = String(from || '');
+    const toInFlow = FLOW_ROUTES.has(toName);
+    const fromInFlow = FLOW_ROUTES.has(fromName);
+
+    // 面试流程页进入：从右往左淡入；返回离开：反向
+    if (toInFlow && !fromInFlow) {
+      transitionName.value = 'slide-left-fade';
+      return;
+    }
+    if (!toInFlow && fromInFlow) {
+      transitionName.value = 'slide-right-fade';
+      return;
+    }
+    if (fromName === 'InterviewSettings' && toName === 'InterviewSession') {
+      transitionName.value = 'slide-left-fade';
+      return;
+    }
+    if (fromName === 'InterviewSession' && toName === 'InterviewSettings') {
+      transitionName.value = 'slide-right-fade';
+      return;
+    }
+    transitionName.value = 'fade';
+  },
+  { immediate: true }
+);
 
 function handleUserCommand(command: string) {
   if (command === 'profile') {
@@ -118,6 +122,8 @@ function handleUserCommand(command: string) {
 .home-layout {
   height: 100vh;
   overflow: hidden;
+  background-color: #fafafa;
+  position: relative;
 }
 .home-layout > .el-container {
   height: 100%;
@@ -129,37 +135,14 @@ function handleUserCommand(command: string) {
   overflow: hidden;
 }
 .main-wrapper-full { width: 100%; }
-.aside {
-  background-color: #0d2137;
-  height: 100vh;
-}
-.logo {
-  height: 56px;
-  line-height: 56px;
-  text-align: center;
-  color: #fff;
-  font-weight: bold;
-  font-size: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.aside-menu {
-  border-right: none;
-}
-.aside-menu .el-menu-item {
-  height: 52px;
-  line-height: 52px;
-}
-.aside-menu .el-menu-item:hover,
-.aside-menu .el-menu-item.is-active {
-  background-color: #1a3a5c !important;
-}
 .header {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 20px;
-  background: #fff;
+  background: #ffffff;
   border-bottom: 1px solid #ebeef5;
+  backdrop-filter: saturate(120%) blur(3px);
 }
 .avatar-wrap {
   display: inline-flex;
@@ -176,7 +159,7 @@ function handleUserCommand(command: string) {
   color: #303133;
 }
 .main {
-  background: #f5f7fa;
+  background: transparent;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -211,5 +194,32 @@ function handleUserCommand(command: string) {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.slide-left-fade-enter-active,
+.slide-left-fade-leave-active,
+.slide-right-fade-enter-active,
+.slide-right-fade-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.slide-left-fade-enter-from {
+  opacity: 0;
+  transform: translateX(28px);
+}
+
+.slide-left-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-28px);
+}
+
+.slide-right-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-28px);
+}
+
+.slide-right-fade-leave-to {
+  opacity: 0;
+  transform: translateX(28px);
 }
 </style>

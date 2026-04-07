@@ -1,9 +1,12 @@
 <template>
-  <div class="profile-edit-page">
-    <h2 class="page-title">账号与安全设置</h2>
+  <div class="profile-edit-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">账号与安全设置 <span>Account</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
 
     <!-- 头像与基本信息 -->
-    <el-card class="section-card" shadow="hover">
+    <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
       <template #header><span>头像与基本信息</span></template>
       <div class="profile-header" v-if="profile">
         <div class="avatar-area">
@@ -33,7 +36,7 @@
     </el-card>
 
     <!-- 修改密码（需要邮箱验证码） -->
-    <el-card class="section-card" shadow="hover">
+    <el-card class="section-card theme-card fade-in-up delay-2" shadow="hover">
       <template #header><span>修改密码</span></template>
       <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="110px">
         <el-form-item label="原密码" prop="oldPassword">
@@ -203,13 +206,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.profile-edit-page {
-  max-width: 800px;
-}
-.page-title {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
+.profile-edit-page { max-width: 1000px; }
 .section-card {
   margin-bottom: 16px;
 }

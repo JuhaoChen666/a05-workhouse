@@ -51,6 +51,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/Interview/InterviewSessionPage.vue'),
       },
       {
+        path: 'interview/evaluation/:sessionId',
+        name: 'InterviewEvaluation',
+        meta: { title: '面试评估报告' },
+        component: () => import('../pages/Interview/InterviewEvaluationPage.vue'),
+      },
+      {
         path: 'question-bank',
         name: 'QuestionBank',
         component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
@@ -137,14 +143,20 @@ export function setupRouterGuard(pinia: Pinia) {
     const requiresAuth = to.matched.some((r) => r.meta.requiresAuth);
     const requiresAdmin = to.matched.some((r) => r.meta.requiresAdmin);
 
+    // 已登录仍访问登录/注册页时，直接进入主站首页（避免「有 token 却停在登录页」）
+    if (userStore.isLoggedIn && (to.name === 'Login' || to.name === 'Register')) {
+      next({ name: 'Home' });
+      return;
+    }
+
     // 需要登录但当前未登录，跳转到登录页并带上重定向地址
     if (requiresAuth && !userStore.isLoggedIn) {
       next({ name: 'Login' });
       return;
     }
 
-    // 仅管理员可访问的路由：如果已登录但不是管理员，则提示并回到首页
-    if (requiresAdmin && userStore.userInfo && userStore.userInfo.roleId !== 2) {
+    // 仅管理员可访问：用 isAdmin（内部 Number(roleId)===2），避免后端返回字符串 "2" 时误判
+    if (requiresAdmin && userStore.isLoggedIn && !userStore.isAdmin) {
       ElMessage.error('仅管理员可访问后台管理系统');
       next({ name: 'Home' });
       return;

@@ -1,8 +1,13 @@
 <template>
-  <div class="report-page">
-    <el-button type="primary" link @click="goBack" class="back-btn">← 返回</el-button>
-    <h2 class="page-title">AI 面试报告</h2>
-    <el-card v-loading="loading" shadow="hover">
+  <div class="report-page theme-page-shell">
+    <div class="theme-section-header fade-in-up">
+      <h2 class="theme-section-title">AI 面试报告 <span>Report</span></h2>
+      <div class="theme-section-decoration"></div>
+    </div>
+    <div class="theme-top-actions fade-in-up">
+      <el-button @click="goBack" class="theme-back-btn">← 返回</el-button>
+    </div>
+    <el-card v-loading="loading" shadow="hover" class="theme-card fade-in-up delay-1">
       <template v-if="report">
         <div class="report-summary">
           <el-statistic title="综合得分" :value="content.totalScore ?? 0" suffix="分" />
@@ -62,9 +67,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.report-page { max-width: 800px; }
-.back-btn { margin-bottom: 8px; }
-.page-title { margin-top: 0; margin-bottom: 16px; }
+.report-page { max-width: 1000px; }
 .report-summary { margin-bottom: 16px; }
 h3 { margin: 16px 0 8px; }
 .summary-text { color: #606266; line-height: 1.6; }

@@ -91,6 +91,8 @@ const interviewSessionsV2 = new Map();
 // session_id -> { userId, avatar_session_id, avatar_id, token, expire_at, stream_url, ws_url, status }
 const avatarInterviewSessions = new Map();
 const AI_INTERVIEW_MAX_QUESTIONS = Number(process.env.AI_INTERVIEW_MAX_QUESTIONS || 10);
+/** 模拟新版面试：超过该轮次后结束会话并下发 interview_complete，便于联调「面试报告」 */
+const INTERVIEW_MOCK_MAX_ROUNDS = Number(process.env.INTERVIEW_MOCK_MAX_ROUNDS || 8);
 const AI_INTERVIEW_SCORE_MIN = Number(process.env.AI_INTERVIEW_SCORE_MIN || 0);
 const AI_INTERVIEW_SCORE_MAX = Number(process.env.AI_INTERVIEW_SCORE_MAX || 10);
 
@@ -436,6 +438,17 @@ app.use((req, _res, next) => {
   if (req.url === '/api' || req.url.startsWith('/api/')) return next();
   if (req.url === '/avatar-file' || req.url.startsWith('/avatar-file/')) return next();
   req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
+  next();
+});
+// 管理后台文档前缀 `/admin/*`：与真实后端一致，转发到现有 `/api/users`、`/api/roles`、`/api/positions` 处理器
+app.use((req, _res, next) => {
+  if (req.url.startsWith('/api/admin/users')) {
+    req.url = req.url.replace(/^\/api\/admin\/users/, '/api/users');
+  } else if (req.url.startsWith('/api/admin/roles')) {
+    req.url = req.url.replace(/^\/api\/admin\/roles/, '/api/roles');
+  } else if (req.url.startsWith('/api/admin/positions')) {
+    req.url = req.url.replace(/^\/api\/admin\/positions/, '/api/positions');
+  }
   next();
 });
 // 对外暴露头像静态文件
@@ -2401,6 +2414,17 @@ app.post('/api/interview/answer', authMiddleware, async (req, res) => {
       await new Promise((r) => setTimeout(r, 120));
     }
 
+    if (nextRound > INTERVIEW_MOCK_MAX_ROUNDS) {
+      session.status = 'ended';
+      session.total_rounds = round;
+      writeEvt('interview_complete', {
+        session_id: String(session_id),
+        message: '面试已结束，可查看评估报告',
+      });
+      res.end();
+      return;
+    }
+
     session.total_rounds = nextRound;
     session.current_topic = nextTopic;
     session.current_question = followupQuestion;
@@ -2532,6 +2556,19 @@ app.post('/api/interview/answer-voice', authMiddleware, uploadInterviewVoice.sin
       await new Promise((r) => setTimeout(r, 120));
     }
 
+    if (nextRound > INTERVIEW_MOCK_MAX_ROUNDS) {
+      session.status = 'ended';
+      session.total_rounds = round;
+      writeEvt('interview_complete', {
+        session_id: String(session_id),
+        message: '面试已结束，可查看评估报告',
+      });
+      res.write('      \n\n');
+      await new Promise((r) => setTimeout(r, 300));
+      res.end();
+      return;
+    }
+
     session.total_rounds = nextRound;
     session.current_topic = nextTopic;
     session.current_question = followupQuestion;
@@ -2554,6 +2591,26 @@ app.post('/api/interview/answer-voice', authMiddleware, uploadInterviewVoice.sin
     writeEvt('error', { message: e.message || '服务器错误' });
     res.end();
   }
+});
+
+app.get('/api/interview/session/:session_id/evaluation', authMiddleware, (req, res) => {
+  const userId = String(req.user.id);
+  const { session_id } = req.params;
+  const session = interviewSessionsV2.get(String(session_id));
+  if (!session || session.userId !== userId) {
+    return res.status(404).json({ code: 404, message: '会话不存在或无权访问', data: null });
+  }
+  const data = {
+    strengths: ['能够完成多轮技术问答，表达基本清晰。'],
+    weaknesses: ['部分回答可结合更多项目细节与量化指标。'],
+    session_id: String(session_id),
+    overall_score: 7.5,
+    recommendation: '推荐进入下一轮',
+    overall_comment: '综合表现良好，建议结合业务场景继续深挖。',
+    technical_evaluation: '技术栈与问题理解到位，可加强系统设计表述。',
+    communication_evaluation: '沟通顺畅，逻辑结构可再条理一些。',
+  };
+  return res.json(ok200(data, 'success'));
 });
 
 app.get('/api/interview/session/:session_id', authMiddleware, (req, res) => {

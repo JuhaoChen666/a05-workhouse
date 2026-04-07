@@ -1,6 +1,6 @@
 <template>
-  <div class="interview-session-page">
-    <el-card class="session-card" shadow="hover">
+  <div class="interview-session-page theme-page-shell">
+    <el-card class="session-card theme-card" shadow="hover">
       <template #header>
         <div class="card-header">
           <el-button link class="leave-btn" @click="onLeavePage">← 离开</el-button>
@@ -81,6 +81,24 @@
                   </div>
                 </div>
               </div>
+              <div
+                v-if="showReportInvite && effectiveSessionId"
+                class="report-share-card"
+                role="button"
+                tabindex="0"
+                @click="goEvaluationReport"
+                @keydown.enter.prevent="goEvaluationReport"
+              >
+                <div class="report-share-thumb" aria-hidden="true">
+                  <span class="report-share-icon">📋</span>
+                </div>
+                <div class="report-share-body">
+                  <div class="report-share-title">面试评估报告</div>
+                  <div class="report-share-desc">点击查看 AI 综合评分与录用建议</div>
+                </div>
+                <el-icon class="report-share-arrow"><ArrowRight /></el-icon>
+              </div>
+
               <div v-if="streaming" class="msg msg-ai">
                 <div class="msg-row">
                   <el-avatar class="msg-avatar" :size="30" :src="aiAvatarSrc">AI</el-avatar>
@@ -114,7 +132,7 @@
                   :placeholder="
                     isRecording ? '录音中…' : '输入回答，Enter 发送 · Shift+Enter 换行'
                   "
-                  :disabled="streaming || isRecording"
+                  :disabled="streaming || isRecording || interviewEnded"
                   class="composer-field"
                   @keydown.enter.exact.prevent="sendMessage"
                 />
@@ -122,7 +140,7 @@
                   <el-button
                     circle
                     :type="isRecording ? 'danger' : 'default'"
-                    :disabled="streaming"
+                    :disabled="streaming || interviewEnded"
                     class="composer-tool-btn"
                     :title="isRecording ? '停止并发送' : '语音回答'"
                     @click="toggleVoiceRecord"
@@ -132,7 +150,7 @@
                   <el-button
                     circle
                     type="primary"
-                    :disabled="streaming || isRecording || !userInput.trim()"
+                    :disabled="streaming || isRecording || interviewEnded || !userInput.trim()"
                     class="composer-tool-btn composer-send-btn"
                     title="发送"
                     @click="sendMessage"
@@ -153,7 +171,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Microphone, Right } from '@element-plus/icons-vue';
+import { Microphone, Right, ArrowRight } from '@element-plus/icons-vue';
 import {
   startInterviewApi,
   streamInterviewAnswer,
@@ -217,6 +235,9 @@ const streaming = ref(false);
 const streamingText = ref('');
 const chatPanelRef = ref<HTMLElement | null>(null);
 const showThinkingHint = computed(() => streaming.value && !streamingText.value);
+/** 面试已结束：展示报告分享卡片并禁用作答 */
+const interviewEnded = ref(false);
+const showReportInvite = ref(false);
 const canRenderInterview = computed(
   () => Boolean(effectiveSessionId.value || hasPendingStart.value)
 );
@@ -285,7 +306,7 @@ function startAudioMeter(stream: MediaStream) {
       let sum = 0;
       const start = b * step;
       const end = Math.min(start + step, bufferLength);
-      for (let i = start; i < end; i++) sum += dataArray[i];
+      for (let i = start; i < end; i++) sum += dataArray[i] ?? 0;
       next.push(sum / (end - start) / 255);
     }
     waveformBars.value = next;
@@ -347,9 +368,37 @@ watch(
 );
 
 function backToSettings() {
+  if (String(route.query.fromRecord || '') === '1') {
+    router.push({ name: 'Home' });
+    return;
+  }
   const id = route.params.id;
   if (id) router.push({ name: 'InterviewSettings', params: { id: String(id) } });
   else router.push({ name: 'Home' });
+}
+
+function goEvaluationReport() {
+  const sid = effectiveSessionId.value;
+  if (!sid) return;
+  router.push({
+    name: 'InterviewEvaluation',
+    params: { sessionId: sid },
+    query: { jobName: jobName.value || undefined },
+  });
+}
+
+async function refreshSessionEndedState() {
+  const sid = effectiveSessionId.value;
+  if (!sid) return;
+  try {
+    const info = await getInterviewSessionApi(sid);
+    if (info.status === 'ended') {
+      interviewEnded.value = true;
+      showReportInvite.value = true;
+    }
+  } catch {
+    /* 会话已删或网络错误时忽略 */
+  }
 }
 
 function clearAvatarRefreshTimer() {
@@ -669,6 +718,7 @@ onMounted(async () => {
   } finally {
     streaming.value = false;
   }
+  await refreshSessionEndedState();
 });
 
 function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
@@ -716,6 +766,13 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
           scrollToBottom();
         });
       }
+    } else if (evt.type === 'interview_complete') {
+      interviewEnded.value = true;
+      showReportInvite.value = true;
+      streamingText.value = '';
+      const hint = String(evt.data.message || '').trim() || '面试已结束，可查看评估报告。';
+      messages.value.push({ role: 'assistant', content: hint, kind: 'text' });
+      scrollToBottom();
     } else if (evt.type === 'error') {
       const msg = String(evt.data.message || '').trim() || '处理失败';
       streamingText.value = '';
@@ -734,6 +791,7 @@ async function sendMessage() {
     ElMessage.warning('会话尚未就绪，请稍候再试');
     return;
   }
+  if (interviewEnded.value) return;
   const text = userInput.value.trim();
   if (!text || streaming.value) return;
 
@@ -751,6 +809,7 @@ async function sendMessage() {
   } finally {
     streaming.value = false;
     streamingText.value = '';
+    await refreshSessionEndedState();
     scrollToBottom();
   }
 }
@@ -761,6 +820,7 @@ async function sendVoiceFile(file: File, voiceDurationSec?: number) {
     ElMessage.warning('会话尚未就绪，无法发送语音');
     return;
   }
+  if (interviewEnded.value) return;
   if (streaming.value) return;
 
   messages.value.push(createVoicePlaceholderMessage(voiceDurationSec));
@@ -777,6 +837,7 @@ async function sendVoiceFile(file: File, voiceDurationSec?: number) {
   } finally {
     streaming.value = false;
     streamingText.value = '';
+    await refreshSessionEndedState();
     scrollToBottom();
   }
 }
@@ -786,6 +847,7 @@ async function startVoiceRecord() {
     ElMessage.warning('会话尚未就绪，无法开始录音');
     return;
   }
+  if (interviewEnded.value) return;
   if (streaming.value) return;
   try {
     recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -889,6 +951,7 @@ async function onLeavePage() {
 
 <style scoped>
 .interview-session-page { width: 100%; height: 100%; margin: 0; }
+.interview-session-page.theme-page-shell { max-width: none; padding: 0; }
 .session-card { width: 100%; min-height: 72vh; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .card-title { font-weight: 600; }
@@ -989,6 +1052,65 @@ async function onLeavePage() {
 .avatar-tip { margin-top: 6px; color: #909399; font-size: 12px; }
 .chat-panel { min-height: 360px; max-height: 520px; overflow-y: auto; padding: 12px; background: #f5f7fa; border-radius: 8px; margin-bottom: 16px; }
 .conference-right .chat-panel { margin-bottom: 0; max-height: none; }
+
+/* 类微信分享卡片：引导跳转评估报告页 */
+.report-share-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  max-width: 100%;
+}
+.report-share-card:hover {
+  border-color: #c8e6c9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.report-share-card:focus {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 2px;
+}
+.report-share-thumb {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #e8f5e9, #c8e6c9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.report-share-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.report-share-body {
+  flex: 1;
+  min-width: 0;
+}
+.report-share-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+.report-share-desc {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+.report-share-arrow {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: #c0c4cc;
+}
+
 .msg { margin-bottom: 14px; }
 .msg-row { display: inline-flex; align-items: flex-start; gap: 8px; }
 .msg-user { text-align: right; }

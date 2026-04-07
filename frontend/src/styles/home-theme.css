@@ -1,0 +1,125 @@
+.theme-page-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
+}
+
+.theme-section-header {
+  margin-bottom: 14px;
+}
+
+.theme-section-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.theme-section-title span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.theme-section-decoration {
+  width: 44px;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #a855f7, #3b82f6);
+}
+
+.theme-card {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+}
+
+.theme-card:hover {
+  border-color: rgba(59, 130, 246, 0.28) !important;
+  box-shadow: 0 16px 30px -12px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+}
+
+.theme-primary-btn {
+  background: linear-gradient(180deg, #1f2937, #000000) !important;
+  border: 1px solid #000000 !important;
+  color: #ffffff !important;
+  transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease !important;
+}
+
+.theme-primary-btn:hover,
+.theme-primary-btn:focus {
+  background: linear-gradient(180deg, #374151, #111827) !important;
+  border-color: #111827 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-1px);
+}
+
+.el-button {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.el-button:not(.is-link):not(.is-text):hover {
+  border-color: #8b5cf6;
+  color: inherit;
+}
+
+.el-button.is-link:hover,
+.el-button.is-text:hover {
+  color: #7c3aed;
+}
+
+.theme-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.theme-back-btn {
+  border-radius: 999px !important;
+  border: 1px solid #d8dbe3 !important;
+  background: #ffffff !important;
+  color: #374151 !important;
+  padding: 8px 14px !important;
+  font-weight: 600;
+}
+
+.theme-back-btn:hover,
+.theme-back-btn:focus {
+  border-color: #c4b5fd !important;
+  background: #f5f3ff !important;
+  color: #6d28d9 !important;
+  transform: translateY(-1px);
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.delay-1 { animation-delay: 0.15s; }
+.delay-2 { animation-delay: 0.3s; }
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
