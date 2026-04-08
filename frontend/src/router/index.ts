@@ -32,8 +32,40 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        name: 'Home',
         component: () => import('../pages/Home/HomePage.vue'),
+        children: [
+          {
+            path: '',
+            name: 'Home',
+            meta: { title: '首页' },
+            component: () => import('../pages/Home/HomeDashboardPage.vue'),
+          },
+          {
+            path: 'question',
+            name: 'HomeQuestion',
+            meta: { title: '题库' },
+            component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
+          },
+          {
+            path: 'resume',
+            name: 'HomeResume',
+            meta: { title: '简历' },
+            component: () => import('../pages/Resume/ResumeManagePage.vue'),
+          },
+          {
+            path: 'job',
+            name: 'HomeJob',
+            meta: { title: '岗位' },
+            component: () => import('../pages/JobSearch/JobSearchPage.vue'),
+          },
+          {
+            path: 'doc',
+            name: 'HomeDoc',
+            meta: { title: '文档' },
+            component: () => import('../pages/Common/PlaceholderPage.vue'),
+            props: { title: '文档', desc: '文档模块正在建设中，后续会提供使用说明与常见问题。' },
+          },
+        ],
       },
       {
         path: 'job-search',
@@ -86,6 +118,12 @@ const routes: RouteRecordRaw[] = [
         name: 'JobDetail',
         component: () => import('../pages/JobDetail/JobDetailPage.vue'),
       },
+      {
+        path: 'demo',
+        name: 'HomeDemo',
+        meta: { title: '首页Demo' },
+        component: () => import('../pages/Demo/HomeDemoPage.vue'),
+      },
     ],
   },
   {
@@ -136,6 +174,18 @@ const router = createRouter({
   routes,
 });
 
+const APP_TITLE = 'AI 模拟面试平台';
+
+function pickRouteTitle(to: { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown }): string {
+  const matchedTitle = [...to.matched]
+    .reverse()
+    .map((r) => r.meta?.title)
+    .find((t) => typeof t === 'string' && t.trim()) as string | undefined;
+  if (matchedTitle) return matchedTitle.trim();
+  if (typeof to.name === 'string' && to.name.trim()) return to.name.trim();
+  return APP_TITLE;
+}
+
 // 在 app 挂载前守卫里用 store 时，必须传入 pinia，否则 getActivePinia() 未就绪
 export function setupRouterGuard(pinia: Pinia) {
   router.beforeEach((to, _from, next) => {
@@ -163,6 +213,11 @@ export function setupRouterGuard(pinia: Pinia) {
     }
 
     next();
+  });
+
+  router.afterEach((to) => {
+    const pageTitle = pickRouteTitle(to as { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown });
+    document.title = pageTitle === APP_TITLE ? APP_TITLE : `${pageTitle} - ${APP_TITLE}`;
   });
 }
 
