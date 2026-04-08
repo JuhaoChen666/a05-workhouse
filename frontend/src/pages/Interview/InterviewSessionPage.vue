@@ -368,13 +368,7 @@ watch(
 );
 
 function backToSettings() {
-  if (String(route.query.fromRecord || '') === '1') {
-    router.push({ name: 'Home' });
-    return;
-  }
-  const id = route.params.id;
-  if (id) router.push({ name: 'InterviewSettings', params: { id: String(id) } });
-  else router.push({ name: 'Home' });
+  router.push({ name: 'Home' });
 }
 
 function goEvaluationReport() {

@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { uploadResumeApi } from '@/api/resume';
 import { useUserStore } from '@/store/user';
@@ -42,6 +42,7 @@ import { useUserStore } from '@/store/user';
 type ResumeItem = { id: number; name: string; content: string; updatedAt: string };
 const resumeList = ref<ResumeItem[]>([]);
 const userStore = useUserStore();
+const LOCAL_KEY = 'user_resume_list_v1';
 
 function nowText() {
   const d = new Date();
@@ -86,6 +87,25 @@ function removeResume(id: number) {
   resumeList.value = resumeList.value.filter((r) => r.id !== id);
   ElMessage.success('简历已删除');
 }
+
+onMounted(() => {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw) as ResumeItem[];
+    if (Array.isArray(list)) resumeList.value = list;
+  } catch {
+    // ignore parse error
+  }
+});
+
+watch(
+  resumeList,
+  (list) => {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(list));
+  },
+  { deep: true }
+);
 </script>
 
 <style scoped>
