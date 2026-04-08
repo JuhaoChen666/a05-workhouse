@@ -111,57 +111,70 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.hero { display: grid; grid-template-columns: 1.1fr 1.3fr; gap: 16px; margin-bottom: 16px; }
-.hero-left, .hero-right, .panel, .card { padding: 16px; }
-.hero-left h1 { margin: 0 0 10px; font-size: 28px; }
-.hero-left p { margin: 0 0 14px; color: #4b5563; }
-.kpi-title { font-size: 13px; color: #6b7280; margin-bottom: 10px; }
+.hero { display: grid; grid-template-columns: 1.1fr 1.3fr; gap: clamp(12px, 1.2vw, 18px); margin-bottom: clamp(12px, 1.2vw, 18px); }
+.hero-left, .hero-right, .panel, .card { padding: clamp(12px, 1.1vw, 18px); }
+.hero-left h1 { margin: 0 0 10px; font-size: clamp(22px, 2vw, 30px); }
+.hero-left p { margin: 0 0 14px; color: #4b5563; font-size: clamp(13px, 1vw, 15px); }
+.kpi-title { font-size: clamp(12px, 0.9vw, 13px); color: #6b7280; margin-bottom: 10px; }
 .kpi-variants { display: grid; gap: 10px; }
-.kpi-card { padding: 12px; }
-.kpi-card h4 { margin: 0 0 4px; font-size: 14px; }
-.kpi-card p { margin: 0 0 8px; color: #6b7280; font-size: 12px; }
-.mini-chart { height: 62px; }
-.section { margin-bottom: 16px; }
+.kpi-card { padding: clamp(10px, 0.9vw, 14px); }
+.kpi-card h4 { margin: 0 0 4px; font-size: clamp(13px, 1vw, 15px); }
+.kpi-card p { margin: 0 0 8px; color: #6b7280; font-size: clamp(12px, 0.9vw, 13px); }
+.mini-chart { height: clamp(58px, 5vw, 72px); }
+.section { margin-bottom: clamp(12px, 1.2vw, 18px); }
 .section h3, .panel h3 { margin-top: 0; }
-.mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1vw, 14px); }
 .card h4 { margin: 0 0 8px; }
-.card p { margin: 0 0 12px; color: #6b7280; font-size: 13px; }
-.main-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
-.calendar-placeholder { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 10px; padding: 12px; }
+.card p { margin: 0 0 12px; color: #6b7280; font-size: clamp(12px, 0.9vw, 14px); }
+.main-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(12px, 1.2vw, 18px); }
+.calendar-placeholder { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 10px; padding: clamp(10px, 1vw, 14px); }
 .calendar-placeholder ul { margin: 8px 0 0; padding-left: 0; list-style: none; }
-.calendar-placeholder li { margin: 6px 0; font-size: 13px; color: #4b5563; }
+.calendar-placeholder li { margin: 6px 0; font-size: clamp(12px, 0.9vw, 13px); color: #4b5563; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .done { background: #10b981; }
 .plan { background: #3b82f6; }
 .miss { background: #f59e0b; }
 .today-plan h4 { margin: 14px 0 8px; }
-.today-plan p { margin: 0 0 6px; color: #4b5563; font-size: 14px; }
-.job-tip { margin: 0 0 10px; color: #6b7280; font-size: 13px; }
-.job-tags { display: flex; flex-wrap: wrap; gap: 10px; }
+.today-plan p { margin: 0 0 6px; color: #4b5563; font-size: clamp(13px, 1vw, 14px); }
+.job-tip { margin: 0 0 10px; color: #6b7280; font-size: clamp(12px, 0.9vw, 13px); }
+.job-tags { display: flex; flex-wrap: wrap; gap: clamp(8px, 0.8vw, 12px); }
 .job-tag {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   border: 1px solid #ddd6fe;
   border-radius: 10px;
-  padding: 7px 12px;
+  padding: clamp(6px, 0.7vw, 8px) clamp(10px, 1vw, 14px);
   background: #f5f3ff;
   color: #5b21b6;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .job-tag:hover { background: #ede9fe; border-color: #c4b5fd; transform: translateY(-1px); }
-.job-tag-name { font-size: 13px; font-weight: 600; }
+.job-tag-name { font-size: clamp(12px, 0.9vw, 13px); font-weight: 600; }
 .job-tag-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
+  min-width: clamp(18px, 1.4vw, 22px);
+  height: clamp(18px, 1.4vw, 22px);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: clamp(11px, 0.8vw, 12px);
   background: #7c3aed;
   color: #fff;
   padding: 0 6px;
+}
+
+@media (max-width: 1200px) {
+  .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .hero,
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

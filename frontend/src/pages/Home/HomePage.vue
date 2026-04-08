@@ -67,7 +67,8 @@ const greetingText = computed(() => {
   const hour = new Date().getHours();
   const username = userStore.userInfo?.username || userStore.userInfo?.name || '同学';
   if (hour < 11) return `早上好，${username}`;
-  if (hour < 18) return `中午好，${username}`;
+  if (hour < 14) return `中午好，${username}`;
+  if (hour < 19) return `下午好，${username}`;
   return `还不睡觉吗，${username}`;
 });
 const pageHeaderText = computed(() => (activeRouteName.value === 'Home' ? greetingText.value : currentPageTitle.value));
@@ -87,27 +88,27 @@ watch(
   min-height: calc(100vh - 120px);
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 18px;
+  gap: clamp(12px, 1.2vw, 20px);
 }
 .home-sidebar {
-  width: 64px;
+  width: clamp(56px, 4.2vw, 72px);
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  padding: 14px 8px;
+  padding: clamp(10px, 1vw, 14px) clamp(6px, 0.8vw, 10px);
   transition: width 0.22s ease;
   overflow: hidden;
 }
-.home-sidebar.collapsed { width: 64px; }
-.home-sidebar:not(.collapsed) { width: 104px; }
+.home-sidebar.collapsed { width: clamp(56px, 4.2vw, 72px); }
+.home-sidebar:not(.collapsed) { width: clamp(90px, 7vw, 116px); }
 .sidebar-top {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 14px;
+  margin-bottom: clamp(8px, 1vw, 14px);
 }
 .collapse-icon {
-  font-size: 16px;
+  font-size: clamp(14px, 1vw, 16px);
   color: #6b7280;
 }
 .menu-list { display: grid; gap: 8px; }
@@ -117,19 +118,19 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: clamp(4px, 0.5vw, 6px);
   width: 100%;
-  min-height: 52px;
+  min-height: clamp(46px, 4vw, 56px);
   border: none;
   border-radius: 10px;
   background: transparent;
   color: #4b5563;
-  font-size: 12px;
+  font-size: clamp(12px, 0.8vw, 13px);
   transition: all 0.2s ease;
 }
 
-.home-sidebar:not(.collapsed) .menu-item { min-height: 60px; }
-.menu-item .el-icon { font-size: 17px; }
+.home-sidebar:not(.collapsed) .menu-item { min-height: clamp(50px, 4.4vw, 62px); }
+.menu-item .el-icon { font-size: clamp(15px, 1.1vw, 18px); }
 .menu-item:hover { background: #f3f4f6; }
 .menu-item.active {
   background: linear-gradient(135deg, #8b5cf6, #6366f1);

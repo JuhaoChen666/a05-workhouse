@@ -89,29 +89,31 @@ function removeResume(id: number) {
 </script>
 
 <style scoped>
-.resume-page { display: grid; gap: 14px; }
+.resume-page { display: grid; gap: clamp(10px, 1vw, 16px); }
 .resume-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px;
+  padding: clamp(14px, 1.2vw, 20px);
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .resume-toolbar p {
   margin: 0;
   color: #6b7280;
-  font-size: 13px;
+  font-size: clamp(12px, 0.9vw, 14px);
 }
 .resume-upload-area {
   position: relative;
   display: inline-flex;
   align-items: center;
   flex-direction: column;
-  gap: 0px;
+  gap: 0;
 }
 .resume-upload-tip {
-  width: 110%;
+  width: max-content;
   position: absolute;
-  font-size: 10px;
+  font-size: clamp(10px, 0.8vw, 12px);
   color: #909399;
   top: 110%;
 }
