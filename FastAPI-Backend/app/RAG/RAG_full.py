@@ -26,6 +26,8 @@ class RAGService:
         # 答案深度评估器
         self.answer_depth_analyzer_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，需要评估候选人对技术问题的回答深度。
+        当前面试难度：{difficulty}
+        评分标准：{scoring_standard}
 
         问题: {question}
         候选人的回答: {answer}
@@ -33,10 +35,11 @@ class RAGService:
 
         请分析候选人的回答，判断：
         1. 回答是否过于概括/模糊？（是/否）
-        2. 回答的深度评分（1-10分，1=完全模糊，10=非常详细）
-        3. 是否需要追问？（是/否）
-        4. 如果需要追问，应该追问哪个具体的技术点？（从回答中缺失或不够深入的点中选择）
+        2. 回答的深度评分（1-10分，请严格遵守难度对应的评分标准）
+        3. 是否需要追问？（根据评分标准判断，达标则否，不达标则是）
+        4. 如果需要追问，应该追问哪个具体的技术点？
         5. 追问的方向是什么？
+        6. 给候选人的反馈（如果是 Hard 模式且评分 < 7.0，请生成一段刻意刁难、严苛的反馈内容）
 
         输出JSON格式：
         {{
@@ -44,7 +47,8 @@ class RAGService:
             "depth_score": 1-10,
             "need_followup": true/false,
             "followup_point": "具体技术点",
-            "followup_direction": "详细的追问问题"
+            "followup_direction": "详细的追问问题",
+            "feedback_to_candidate": "反馈内容"
         }}
         """)
 
@@ -52,6 +56,8 @@ class RAGService:
         self.voice_answer_depth_analyzer_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，正在通过语音与候选人进行技术面试。
         你需要评估候选人对技术问题的回答深度及其情感表现。
+        当前面试难度：{difficulty}
+        评分标准：{scoring_standard}
 
         问题: {question}
         候选人的回答（ASR自动转写）: {answer}
@@ -114,6 +120,7 @@ class RAGService:
         # 初始问题生成器
         self.initial_question_prompt = ChatPromptTemplate.from_template("""
         根据候选人的简历和岗位，生成第一个面试问题。
+        当前难度系数：{difficulty_factor} (1.0为标准)
 
         简历: {resume}
         岗位: {position}
@@ -130,6 +137,7 @@ class RAGService:
         # 下一个主题生成器
         self.next_topic_prompt = ChatPromptTemplate.from_template("""
         根据以下信息，生成下一个面试问题：
+        当前难度系数：{difficulty_factor} (1.0为标准)
 
         候选人简历: {resume}
         岗位: {position}
@@ -236,16 +244,19 @@ class RAGService:
         docs = self.db_kb.similarity_search(query, k=k)
         return "\n".join([doc.page_content for doc in docs])
 
-    async def generate_initial_question(self, resume: str, position: str) -> str:
+    async def generate_initial_question(self, resume: str, position: str, difficulty: str = "Normal") -> str:
         """生成初始问题"""
-        retrieval_query = f"{resume} {position} 基础问题 难度0.2"
+        factors = {"Easy": 0.5, "Normal": 1.0, "Hard": 1.5}
+        factor = factors.get(difficulty, 1.0)
+        retrieval_query = f"{resume} {position} 基础问题 难度{factor}"
         questions_text = self.retrieve_questions(retrieval_query, k=5)
 
         chain = self.initial_question_prompt | DeepSeek_LLM | StrOutputParser()
         question = await chain.ainvoke({
             "resume": resume,
             "position": position,
-            "questions": questions_text
+            "questions": questions_text,
+            "difficulty_factor": factor
         })
 
         return question.strip()
@@ -263,9 +274,16 @@ class RAGService:
         topic = await chain.ainvoke({"question": question})
         return topic.strip()
 
-    async def analyze_answer_depth(self, question: str, answer: str, emotion_data: Optional[Dict] = None) -> dict:
+    async def analyze_answer_depth(self, question: str, answer: str, difficulty: str = "Normal", emotion_data: Optional[Dict] = None) -> dict:
         """分析回答深度 (支持语音情感数据)"""
         knowledge = self.retrieve_knowledge(f"{question} {answer}", k=3)
+        
+        standards = {
+            "Easy": "要求较低，只要答对核心概念即可给高分（7.5分及以上视为达标）",
+            "Normal": "要求标准，需要有一定逻辑和细节（8.5分及以上视为达标）",
+            "Hard": "要求严苛，必须深入底层原理，且逻辑完美（9.0分及以上视为达标）"
+        }
+        scoring_standard = standards.get(difficulty, standards["Normal"])
 
         if emotion_data:
             # 使用语音专用的评估提示词
@@ -274,6 +292,8 @@ class RAGService:
                 "question": question,
                 "answer": answer,
                 "knowledge_base": knowledge,
+                "difficulty": difficulty,
+                "scoring_standard": scoring_standard,
                 "emotion_data": json.dumps(emotion_data, ensure_ascii=False)
             }
         else:
@@ -282,7 +302,9 @@ class RAGService:
             input_data = {
                 "question": question,
                 "answer": answer,
-                "knowledge_base": knowledge
+                "knowledge_base": knowledge,
+                "difficulty": difficulty,
+                "scoring_standard": scoring_standard
             }
 
         result = await chain.ainvoke(input_data)
@@ -360,14 +382,17 @@ class RAGService:
 
     async def generate_next_question(self, resume: str, position: str,
                                      completed_topics: List[str],
-                                     history: str) -> str:
+                                     history: str, difficulty: str = "Normal") -> str:
         """生成下一个问题"""
+        factors = {"Easy": 0.5, "Normal": 1.0, "Hard": 1.5}
+        factor = factors.get(difficulty, 1.0)
         chain = self.next_topic_prompt | DeepSeek_LLM | StrOutputParser()
         question = await chain.ainvoke({
             "resume": resume,
             "position": position,
             "completed_topics": ", ".join(completed_topics),
-            "history": history
+            "history": history,
+            "difficulty_factor": factor
         })
         return question.strip()
 

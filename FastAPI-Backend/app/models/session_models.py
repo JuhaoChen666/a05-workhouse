@@ -14,6 +14,7 @@ class SessionModel(Base):
     user_id = Column(Integer, nullable=True)
     current_topic = Column(String(255), nullable=True)
     current_question = Column(Text, nullable=True)
+    difficulty = Column(String(50), default='Normal')
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

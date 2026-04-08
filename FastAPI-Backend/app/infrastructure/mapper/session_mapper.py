@@ -18,6 +18,7 @@ class SessionMapper:
                 resume=session_data.get("resume", ""),
                 position=session_data.get("position", ""),
                 status=session_data.get("status", "initializing"),
+                difficulty=session_data.get("difficulty", "Normal"),
                 current_topic=session_data.get("current_topic"),
                 current_question=session_data.get("current_question"),
                 created_at=datetime.now(),
