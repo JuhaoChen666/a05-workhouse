@@ -53,6 +53,16 @@ const routes: RouteRecordRaw[] = [
             component: () => import('../pages/Resume/ResumeManagePage.vue'),
           },
           {
+            path: 'resume/optimize',
+            name: 'HomeResumeOptimize',
+            meta: { title: '简历优化' },
+            component: () => import('../pages/Common/PlaceholderPage.vue'),
+            props: {
+              title: '简历优化',
+              desc: '简历优化功能正在建设中，后续会提供智能分析与优化建议。',
+            },
+          },
+          {
             path: 'job',
             name: 'HomeJob',
             meta: { title: '岗位' },

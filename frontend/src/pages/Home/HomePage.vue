@@ -55,6 +55,7 @@ import {
   Suitcase,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/store/user";
+import { loadInterviewSetupDraft } from "@/pages/Interview/setupState";
 
 const route = useRoute();
 const userStore = useUserStore();
@@ -92,7 +93,15 @@ const setupStepMap: Record<string, number> = {
 };
 const prevSetupStep = ref<number | null>(setupStepMap[activeRouteName.value] ?? null);
 const currentPageTitle = computed(
-  () => titleMap[activeRouteName.value] || "页面"
+  () => {
+    if (activeRouteName.value.startsWith("HomeInterview")) {
+      const mode = loadInterviewSetupDraft().mode;
+      if (mode === "avatar") return "虚拟人面试设置";
+      if (mode === "text") return "AI面试设置";
+      return "面试设置";
+    }
+    return titleMap[activeRouteName.value] || "页面";
+  }
 );
 const greetingText = computed(() => {
   const hour = new Date().getHours();

@@ -45,10 +45,55 @@ onMounted(() => {
 <style scoped>
 .setup-page { display: block; }
 .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.type-card { padding: 22px; min-height: 240px; cursor: pointer; transition: transform .2s ease; display: flex; flex-direction: column; justify-content: flex-start; }
-.type-card:hover { transform: translateY(-2px); }
-.type-card h3 { margin: 0 0 12px; }
-.type-card p { margin: 0; color: #6b7280; line-height: 1.7; min-height: 58px; }
-.is-disabled { opacity: .7; cursor: not-allowed; }
+.type-card {
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  min-height: 240px;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  border: 1px solid #d1d5db !important;
+  background: linear-gradient(160deg, #ffffff 0%, #f7f8ff 100%) !important;
+  box-shadow: 0 10px 24px -16px rgba(31, 41, 55, 0.35) !important;
+}
+.type-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+  opacity: 0.75;
+}
+.type-card:hover {
+  transform: translateY(-2px);
+  border-color: #b9a8fd !important;
+  box-shadow: 0 16px 30px -16px rgba(76, 29, 149, 0.28) !important;
+}
+.type-card h3 {
+  margin: 0 0 12px;
+  color: #111827;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.type-card p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.7;
+  min-height: 58px;
+}
+.is-disabled {
+  opacity: .78;
+  cursor: not-allowed;
+  border-color: #e5e7eb !important;
+}
+.is-disabled::before {
+  background: linear-gradient(90deg, #9ca3af, #d1d5db);
+  opacity: 0.6;
+}
 @media (max-width: 1100px) { .card-grid { grid-template-columns: 1fr; } }
 </style>

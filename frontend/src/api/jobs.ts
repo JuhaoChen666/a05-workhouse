@@ -1,3 +1,4 @@
+import axios from 'axios';
 import request from './request';
 import { apiOrigin } from './request';
 
@@ -25,6 +26,28 @@ export interface SearchJobsResult {
   total: number;
 }
 
+export interface SimplePositionItem {
+  id: number;
+  name: string;
+}
+
+export interface SimplePositionPageRes {
+  total: number;
+  pageSize: number;
+  page: number;
+  list: SimplePositionItem[];
+}
+
+export interface PositionDetailRes {
+  id: number;
+  name?: string;
+  type?: string;
+  content?: string;
+  jobContent?: string;
+  description?: string;
+  companyName?: string;
+}
+
 /** GET {apiOrigin}/jobs（无 /api 前缀） */
 export async function getHotJobsApi(params?: { limit?: number }) {
   const data = await request.get<HotJobItem[]>(`${apiOrigin}/jobs`);
@@ -41,6 +64,35 @@ export async function getJobDetailApi(id: number) {
 /** GET /jobs/search */
 export async function searchJobsApi(params: SearchJobsParams) {
   return request.get<SearchJobsResult>('/jobs/search', { params });
+}
+
+/** GET /positions/simple/page */
+export async function getSimplePositionPageApi(params: {
+  page: number;
+  pageSize: number;
+  name?: string;
+}) {
+  const { data } = await axios.get<unknown>(`${apiOrigin}/positions/simple/page`, {
+    params,
+    timeout: 10000,
+  });
+  const raw = data as
+    | SimplePositionPageRes
+    | { data?: SimplePositionPageRes; result?: SimplePositionPageRes };
+  return (raw as { data?: SimplePositionPageRes }).data ??
+    (raw as { result?: SimplePositionPageRes }).result ??
+    (raw as SimplePositionPageRes);
+}
+
+/** GET /positions/:id */
+export async function getPositionDetailApi(id: number | string) {
+  const { data } = await axios.get<unknown>(`${apiOrigin}/positions/${id}`, {
+    timeout: 10000,
+  });
+  const raw = data as PositionDetailRes | { data?: PositionDetailRes; result?: PositionDetailRes };
+  return (raw as { data?: PositionDetailRes }).data ??
+    (raw as { result?: PositionDetailRes }).result ??
+    (raw as PositionDetailRes);
 }
 
 function formatSalaryOne(value: number | string): string {

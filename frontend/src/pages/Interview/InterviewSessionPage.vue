@@ -1,17 +1,14 @@
 <template>
-  <div class="interview-session-page theme-page-shell">
+  <div class="interview-session-page theme-page-shell" :class="{ 'text-desktop-theme': !isAvatarInterview }">
+  
     <el-card class="session-card theme-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <el-button link class="leave-btn" @click="onLeavePage">← 离开</el-button>
-          <span class="card-title">模拟面试</span>
-          <span class="header-placeholder"></span>
+          <span class="card-title">{{ pageInterviewTopic }}</span>
+          <el-button circle class="close-btn" @click="onLeavePage">×</el-button>
         </div>
       </template>
-
-      <div v-if="jobName" class="job-info">当前面试岗位：<span class="job-name">{{ jobName }}</span></div>
       <div class="toolbar">
-        <el-tag size="small" type="primary">新面试协议</el-tag>
         <el-tag v-if="isAvatarInterview" size="small" type="success">虚拟人面试</el-tag>
       </div>
 
@@ -25,7 +22,11 @@
       />
 
       <template v-else-if="canRenderInterview">
-        <div class="session-workspace" :class="{ 'conference-layout': isAvatarInterview }">
+        <div
+          class="session-workspace"
+          :class="{ 'conference-layout': isAvatarInterview}"
+        >
+
           <div v-if="isAvatarInterview" class="conference-left">
             <div class="participant-card">
               <div class="participant-title">我</div>
@@ -191,6 +192,7 @@ const router = useRouter();
 const userStore = useUserStore();
 
 const jobName = computed(() => (route.query.jobName as string) || '');
+const pageInterviewTopic = computed(() => `${jobName.value || '未设置岗位'}`);
 /** 会话 ID：路由 query 与「pending 创建后立即回填」合并，避免仅有 pending 时 query 仍为空导致发语音/文字静默 return、网络里看不到请求 */
 const effectiveSessionId = ref(String(route.query.sessionId || ''));
 watch(
@@ -944,18 +946,48 @@ async function onLeavePage() {
 </script>
 
 <style scoped>
-.interview-session-page { width: 100%; height: 100%; margin: 0; }
-.interview-session-page.theme-page-shell { max-width: none; padding: 0; }
-.session-card { width: 100%; min-height: 72vh; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.card-title { font-weight: 600; }
-.leave-btn { color: #606266; }
-.header-placeholder { width: 48px; }
-.job-info { margin-bottom: 8px; }
-.job-name { font-weight: 600; }
+.interview-session-page { width: 100%; height: 100%; margin: 0 auto;display: flex;align-content: center; }
+.interview-session-page.theme-page-shell { max-width: 980px; padding: 0 0 12px; }
+.session-top-header { margin-bottom: 10px; }
+.session-card { width: 100%; height: 86vh; align-self: center; }
+.card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.card-title { font-weight: 600; color: #374151; font-size: 14px; text-align: left; }
+.close-btn {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  font-size: 16px;
+  line-height: 1;
+  border-color: #e5e7eb;
+  color: #6b7280;
+}
+.close-btn:hover {
+  color: #fff;
+  border-color: #ef4444;
+  background: #ef4444;
+}
 .toolbar { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 .mb-16 { margin-bottom: 16px; }
 .session-workspace { display: block; }
+.desktop-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.desktop-left-pane {
+  min-height: 440px;
+  padding: 14px;
+}
+.desktop-left-pane h4 {
+  margin: 0 0 10px;
+  color: #111827;
+}
+.desktop-left-pane p {
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.7;
+}
 .conference-layout {
   display: grid;
   grid-template-columns: 400px minmax(0, 1fr);
@@ -1224,5 +1256,34 @@ async function onLeavePage() {
 }
 .composer-send-btn.el-button--primary {
   --el-button-hover-bg-color: var(--el-color-primary-light-3);
+}
+.text-desktop-theme {
+  padding: 12px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 38%),
+    radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.18), transparent 42%),
+    linear-gradient(180deg, #eaf2ff 0%, #dfe9f7 52%, #d6e0ee 100%);
+}
+.text-desktop-theme :deep(.el-card__header) {
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+  border-bottom-color: #e5e7eb;
+}
+@media (max-width: 1200px) {
+  .interview-session-page.theme-page-shell {
+    max-width: 900px;
+  }
+}
+@media (max-width: 992px) {
+  .interview-session-page.theme-page-shell {
+    max-width: none;
+    padding: 0 0 8px;
+  }
+  .desktop-layout {
+    grid-template-columns: 1fr;
+  }
+  .desktop-left-pane {
+    min-height: 120px;
+  }
 }
 </style>
