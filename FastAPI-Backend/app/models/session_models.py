@@ -57,3 +57,13 @@ class InterviewEvaluationModel(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     session = relationship("SessionModel", back_populates="evaluation")
+
+class ResumeModel(Base):
+    __tablename__ = 'resumes'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    filename = Column(String(255), nullable=False)
+    local_path = Column(String(511), nullable=False)
+    content_text = Column(Text, nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.now)

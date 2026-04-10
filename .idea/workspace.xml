@@ -4,16 +4,19 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:后台岗位管理接口,评分雷达图接口,评分趋势接口">
+    <list default="true" id="e5dc2b90-a500-4502-bd68-3f6a9e8da07a" name="更改" comment="feat:面试难度选择器(轻松/一般/困难)">
       <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/bae40462-2769-46a2-93eb-6112af7b73a8.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/RAG_full.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/interview_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/RAG/session_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/api/interview_routes.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/mapper/session_mapper.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/mapper/session_mapper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/interview_models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/FastAPI-Backend/app/models/session_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/app/models/session_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/FastAPI-Backend/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/FastAPI-Backend/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/PositionsController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/Controller/PositionsController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/PositionsMapper.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/mapper/PositionsMapper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/PositionsService.java" beforeDir="false" afterPath="$PROJECT_DIR$/Springboot-backend/src/main/java/com/example/springbootbackend/service/PositionsService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -264,6 +267,9 @@
       <workItem from="1775373832848" duration="8844000" />
       <workItem from="1775464624307" duration="4398000" />
       <workItem from="1775545723265" duration="435000" />
+      <workItem from="1775643808382" duration="4731000" />
+      <workItem from="1775732356265" duration="1295000" />
+      <workItem from="1775785682208" duration="1238000" />
     </task>
     <task id="LOCAL-00001" summary="fix:后端FastAPI和Springboot分离目录">
       <option name="closed" value="true" />
@@ -461,6 +467,6 @@
     <SUITE FILE_PATH="coverage/a05_workhouse$deepseek.coverage" NAME="deepseek 覆盖结果" MODIFIED="1774007365293" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/llm" />
     <SUITE FILE_PATH="coverage/a05_workhouse$test_import.coverage" NAME="test_import 覆盖结果" MODIFIED="1774081571252" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend" />
     <SUITE FILE_PATH="coverage/a05_workhouse$chroma_client.coverage" NAME="chroma_client 覆盖结果" MODIFIED="1774007768774" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/infrastructure/vector_store" />
-    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1775572601610" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
+    <SUITE FILE_PATH="coverage/a05_workhouse$main.coverage" NAME="main 覆盖结果" MODIFIED="1775786195934" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/FastAPI-Backend/app/RAG" />
   </component>
 </project>

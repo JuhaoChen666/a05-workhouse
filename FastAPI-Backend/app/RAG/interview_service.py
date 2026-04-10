@@ -3,6 +3,7 @@ from app.RAG.RAG_full import RAGService
 from app.RAG.session_service import SessionService
 from app.RAG.voice_service import VoiceRAGService
 from app.utils.audio_utils import generate_audio_path, save_wav_file
+from app.infrastructure.mapper.session_mapper import SessionMapper
 from datetime import datetime
 from app.models.interview_models import StreamEvent
 
@@ -19,13 +20,22 @@ class InterviewService:
         """初始化数据库"""
         return self.rag_service.initialize_database(collection_name)
 
-    async def start_interview(self, resume: str, position: str, collection_name: str, user_id: int = None, difficulty: str = "Normal") -> dict:
+    async def start_interview(self, resume_id: int, position: str, collection_name: str, user_id: int = None, difficulty: str = "Normal") -> dict:
         """开始面试"""
-        # 初始化数据库
+        # 0. 查找简历内容
+        resume_record = await SessionMapper.get_resume_by_id(resume_id)
+        if not resume_record:
+            raise ValueError(f"简历 ID {resume_id} 不存在")
+        
+        resume_text = resume_record.content_text
+        if not resume_text:
+             raise ValueError(f"简历 ID {resume_id} 内容为空，请重新上传")
+
+        # 1. 初始化数据库
         db_info = self.initialize_database(collection_name)
 
-        # 创建会话
-        session_id = await self.session_service.create_session(resume, position, user_id, difficulty)
+        # 2. 创建会话
+        session_id = await self.session_service.create_session(resume_text, position, user_id, difficulty)
 
         # 需要在异步环境中初始化，这里返回session_id，让路由层处理
         return {
@@ -99,7 +109,6 @@ class InterviewService:
 
     async def generate_session_evaluation(self, session_id: str) -> dict:
         """生成并保存会话的综合评价"""
-        from app.infrastructure.mapper.session_mapper import SessionMapper
         
         # 1. 尝试从数据库获取已有的评价
         existing_eval = await SessionMapper.get_evaluation_by_session_id(session_id)

@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import interview_routes
+from fastapi.staticfiles import StaticFiles
+import os
+from app.api import interview_routes, resume_routes
 from app.RAG.interview_service import InterviewService
 
 @asynccontextmanager
@@ -30,6 +32,13 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(interview_routes.router)
+app.include_router(resume_routes.router)
+
+# 挂载静态文件目录，允许访问简历 PDF
+UPLOAD_DIR = "data/resumes"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+app.mount("/data/resumes", StaticFiles(directory=UPLOAD_DIR), name="resumes")
 
 
 @app.get("/")

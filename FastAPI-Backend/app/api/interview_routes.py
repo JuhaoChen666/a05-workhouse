@@ -60,7 +60,7 @@ async def start_interview(
     try:
         # 开始面试
         result = await interview_service.start_interview(
-            request.resume,
+            request.resume_id,
             request.position,
             request.collection_name,
             request.user_id,
