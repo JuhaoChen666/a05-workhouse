@@ -32,5 +32,21 @@ public class PositionsController {
         }
         return Result.success(positionInfo);
     }
+    
+    // 简单分页查询(只返回id和name,按sort_order排序)
+    @GetMapping("/simple/page")
+    public Result getSimplePositionsByPage(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String name) {
+        // 如果有name参数,使用模糊查询
+        if (name != null && !name.trim().isEmpty()) {
+            Map<String, Object> result = positionsService.getSimplePositionsByPageWithName(name.trim(), page, pageSize);
+            return Result.success(result);
+        }
+        // 否则使用普通分页查询
+        Map<String, Object> result = positionsService.getSimplePositionsByPage(page, pageSize);
+        return Result.success(result);
+    }
 }
 

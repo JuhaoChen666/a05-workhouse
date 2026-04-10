@@ -4,7 +4,7 @@ from datetime import datetime
 
 class InterviewStartRequest(BaseModel):
     """开始面试请求"""
-    resume: str
+    resume_id: int
     position: str
     collection_name: str
     user_id: Optional[int] = None
@@ -52,3 +52,23 @@ class ConversationRecord(BaseModel):
     answer: str
     topic: str
     timestamp: datetime
+
+class ResumeDeleteRequest(BaseModel):
+    """简历删除请求"""
+    id: int
+    user_id: int
+    filename: str
+
+class ResumeListItem(BaseModel):
+    """简历列表项"""
+    id: int
+    filename: str
+    uploaded_at: datetime
+
+class ResumeListResponse(BaseModel):
+    """简历列表响应"""
+    total: int
+    items: List[ResumeListItem]
+    page: int
+    page_size: int
+

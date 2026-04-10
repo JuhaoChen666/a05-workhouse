@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.infrastructure.database import AsyncSessionLocal
-from app.models.session_models import SessionModel, ChatHistoryModel, InterviewEvaluationModel
+from app.models.session_models import SessionModel, ChatHistoryModel, InterviewEvaluationModel, ResumeModel
 from datetime import datetime
 
 class SessionMapper:
@@ -149,3 +149,9 @@ class SessionMapper:
                 .limit(page_size)
             )
             return result.scalars().all()
+    @staticmethod
+    async def get_resume_by_id(resume_id: int) -> Optional[ResumeModel]:
+        """按 ID 查询简历"""
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(ResumeModel).filter(ResumeModel.id == resume_id))
+            return result.scalar_one_or_none()

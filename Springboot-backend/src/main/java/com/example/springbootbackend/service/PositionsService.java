@@ -4,6 +4,7 @@ import com.example.springbootbackend.entity.Positions;
 import com.example.springbootbackend.entity.Positions_Info;
 import com.example.springbootbackend.mapper.PositionsMapper;
 import com.example.springbootbackend.mapper.Positions_infoMapper;
+import com.example.springbootbackend.vo.PositionSimpleVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -63,5 +64,33 @@ public class PositionsService {
         positions_infoMapper.deletePositionInfo(id);
         // 再删除岗位
         return positionsMapper.deletePosition(id);
+    }
+    
+    // 简单分页查询(只返回id和name)
+    public Map<String, Object> getSimplePositionsByPage(int page, int pageSize) {
+        int offset = (page - 1) * pageSize;
+        List<PositionSimpleVO> positions = positionsMapper.getSimplePositionsByPage(offset, pageSize);
+        int total = positionsMapper.countAllPositions();
+            
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", positions);
+        result.put("total", total);
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+        return result;
+    }
+        
+    // 简单分页查询+模糊查询(只返回id和name)
+    public Map<String, Object> getSimplePositionsByPageWithName(String name, int page, int pageSize) {
+        int offset = (page - 1) * pageSize;
+        List<PositionSimpleVO> positions = positionsMapper.getSimplePositionsByPageWithName(name, offset, pageSize);
+        int total = positionsMapper.countPositionsByName(name);
+            
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", positions);
+        result.put("total", total);
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+        return result;
     }
 }
