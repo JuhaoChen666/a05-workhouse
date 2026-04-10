@@ -1,652 +1,257 @@
+
 <template>
-  <div class="home-page">
-    <div class="bg-pattern"></div>
-    <div class="bg-layer"></div>
-
-    <!-- Banner -->
-    <div class="banner">
-      <div class="banner-content">
-        <h1 class="fade-in-up title">
-          AI 模拟面试平台<br />
-          <span class="highlight">开启你的高薪之路</span>
-        </h1>
-        <p class="fade-in-up delay-1 subtitle">智能面试练习，助力求职进阶，掌控真实面试节奏！</p>
-        <div class="banner-actions fade-in-up delay-2">
-          <div class="banner-search-wrap">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索心仪岗位，例如：前端开发、Java、算法工程师"
-              class="banner-search-input"
-              clearable
-              size="large"
-              @keyup.enter="goJobSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button type="primary" size="large" class="banner-search-btn" @click="goJobSearch">
-              搜索岗位
-            </el-button>
-          </div>
+  <div class="home-shell">
+    <div class="home-sidebar-shell">
+      <aside
+        class="home-sidebar"
+        :class="{ collapsed: !sidebarExpanded }"
+        @mouseenter="sidebarExpanded = true"
+        @mouseleave="sidebarExpanded = false"
+      >
+        <div class="sidebar-top">
+          <el-icon class="collapse-icon"><Fold /></el-icon>
         </div>
-      </div>
+        <nav class="menu-list">
+          <RouterLink
+            v-for="item in menuItems"
+            :key="item.name"
+            class="menu-item"
+            :class="{ active: activeRouteName === item.name }"
+            :to="{ name: item.name }"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span v-if="sidebarExpanded">{{ item.label }}</span>
+          </RouterLink>
+        </nav>
+      </aside>
     </div>
 
-    <!-- 下方两栏：左侧热门岗位 | 右侧最近报告 -->
-    <div class="main-content">
-      <el-row :gutter="24" class="main-row">
-        <el-col :span="16">
-          <div class="section-header">
-            <h2 class="section-title">热门岗位 <span>Hot Jobs</span></h2>
-            <div class="section-decoration"></div>
-          </div>
-          <el-row :gutter="20" class="job-cards">
-            <el-col v-for="j in hotJobs" :key="j.id" :span="12">
-              <el-card shadow="hover" class="job-card fade-in-up" @click="goJobDetail(j.id)">
-                <div class="job-card-header">
-                  <span class="job-name">{{ j.name }}</span>
-                  <span class="job-salary">
-                    {{ formatSalaryRange(j.salaryMin, j.salaryMax) }}
-                  </span>
-                </div>
-                <div class="company-name">
-                  <img
-                    v-if="j.companyLogo"
-                    :src="`/img/${j.companyLogo}.ico`"
-                    class="company-logo"
-                    alt="company logo"
-                  />
-                  <span>{{ j.companyName }}</span>
-                </div>
-                <p class="job-desc">{{ (j.jobContent || '').slice(0, 65) }}...</p>
-                <div class="job-card-footer">
-                  <span class="detail-link">查看详情 <el-icon class="el-icon--right"><ArrowRight /></el-icon></span>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </el-col>
-        <el-col :span="8">
-          <div class="section-header">
-            <h2 class="section-title">最近报告 <span>Latest Report</span></h2>
-            <div class="section-decoration"></div>
-          </div>
-          <el-card v-loading="reportLoading" shadow="hover" class="report-card fade-in-up delay-1">
-            <template v-if="latestReport">
-              <div class="report-score-wrap">
-                <div class="score-circle">
-                  <span class="score-num">{{ latestReport.totalScore ?? '--' }}</span>
-                  <span class="score-unit">分</span>
-                </div>
-                <div class="score-label">综合得分</div>
-              </div>
-              <p class="report-summary">{{ latestReport.summary || '暂无总结' }}</p>
-              <div class="report-action">
-                <button class="full-btn" @click="goReport">查看完整报告</button>
-              </div>
-            </template>
-            <el-empty v-else description="暂无面试报告" :image-size="80" />
-          </el-card>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 页尾 -->
-    <div class="home-footer">
-      <div class="home-footer-inner">
-        <div class="logo">
-          <el-icon class="logo-icon" style="margin-right: 4px;"><Platform /></el-icon>
-          <span class="logo-text">AI 面试官</span>
-        </div>
-        <p class="home-footer-desc">本项目用于学习与演示，不代表真实招聘信息。</p>
-        <div class="footer-copyright">© 2026 AI Interview Platform. All rights reserved.</div>
+    <main class="home-main theme-page-shell">
+      <div class="theme-section-header fade-in-up">
+        <h2 class="theme-section-title">
+          {{ pageHeaderText }} <span v-if="pageSubtitle">{{ pageSubtitle }}</span>
+        </h2>
+        <div class="theme-section-decoration"></div>
       </div>
-    </div>
+      <RouterView v-slot="{ Component }">
+        <transition :name="transitionName" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </RouterView>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { Search, ArrowRight, Platform } from '@element-plus/icons-vue';
-import { getHotJobsApi, formatSalaryRange, type HotJobItem } from '@/api/jobs';
-import { getReportByRecordIdApi } from '@/api/report';
-import { getInterviewRecordListApi } from '@/api/interview';
+import { computed, ref, watch } from "vue";
+import { useRoute, RouterLink, RouterView } from "vue-router";
+import {
+  ChatDotRound,
+  Collection,
+  Document,
+  Fold,
+  HomeFilled,
+  Notebook,
+  Suitcase,
+} from "@element-plus/icons-vue";
+import { useUserStore } from "@/store/user";
+import { loadInterviewSetupDraft } from "@/pages/Interview/setupState";
 
-const router = useRouter();
-const hotJobs = ref<HotJobItem[]>([]);
-const reportLoading = ref(false);
-const latestReport = ref<{ totalScore?: number; summary?: string } | null>(null);
-const latestRecordId = ref<number | null>(null);
-const searchKeyword = ref('');
+const route = useRoute();
+const userStore = useUserStore();
 
-function goJobDetail(id: number) {
-  router.push({ name: 'JobDetail', params: { id: String(id) } });
-}
-function goReport() {
-  if (latestRecordId.value) router.push({ name: 'ReportDetail', params: { id: String(latestRecordId.value) } });
-}
+const sidebarExpanded = ref(false);
+const menuItems = [
+  { name: "Home", label: "首页", icon: HomeFilled },
+  { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
+  { name: "HomeQuestion", label: "题库", icon: Collection },
+  { name: "HomeResume", label: "简历", icon: Document },
+  { name: "HomeJob", label: "岗位", icon: Suitcase },
+  { name: "HomeDoc", label: "帮助文档", icon: Notebook },
+];
 
-// 从首页 banner 进入岗位搜索页
-function goJobSearch() {
-  router.push({
-    name: 'JobSearch',
-    query: {
-      keyword: searchKeyword.value || undefined,
-    },
-  });
-}
+const titleMap: Record<string, string> = {
+  Home: "首页",
+  HomeInterviewType: "面试设置",
+  HomeInterviewPosition: "面试设置",
+  HomeInterviewConfig: "面试设置",
+  HomeInterview: "面试设置",
+  HomeQuestion: "题库",
+  HomeResume: "简历",
+  HomeJob: "岗位",
+  HomeDoc: "帮助文档",
+  Profile: "个人信息",
+  ProfileEdit: "个人信息",
+};
 
-onMounted(async () => {
-  try {
-    const list = await getHotJobsApi({ limit: 6 });
-    hotJobs.value = list ?? [];
-  } catch {}
-
-  reportLoading.value = true;
-  try {
-    const listRes = await getInterviewRecordListApi({ page: 1, pageSize: 1 });
-    const first = (listRes.list ?? [])[0];
-    if (first?.id) {
-      latestRecordId.value = first.id;
-      const rep = await getReportByRecordIdApi(first.id);
-      if (rep?.content) {
-        latestReport.value = {
-          totalScore: rep.content.totalScore,
-          summary: rep.content.summary,
-        };
-      }
+const activeRouteName = computed(() => String(route.name || "Home"));
+const transitionName = ref("fade-slide");
+const setupStepMap: Record<string, number> = {
+  HomeInterviewType: 0,
+  HomeInterviewPosition: 1,
+  HomeInterviewConfig: 2,
+};
+const prevSetupStep = ref<number | null>(setupStepMap[activeRouteName.value] ?? null);
+const currentPageTitle = computed(
+  () => {
+    if (activeRouteName.value.startsWith("HomeInterview")) {
+      const mode = loadInterviewSetupDraft().mode;
+      if (mode === "avatar") return "虚拟人面试设置";
+      if (mode === "text") return "AI面试设置";
+      return "面试设置";
     }
-  } catch {
-    latestReport.value = null;
-  } finally {
-    reportLoading.value = false;
+    return titleMap[activeRouteName.value] || "页面";
   }
+);
+const greetingText = computed(() => {
+  const hour = new Date().getHours();
+  const username =
+    userStore.userInfo?.username || userStore.userInfo?.name || "同学";
+  if (hour < 11) return `早上好，${username}`;
+  if (hour < 14) return `中午好，${username}`;
+  if (hour < 19) return `下午好，${username}`;
+  return `还不睡觉吗，${username}`;
 });
+const pageHeaderText = computed(() =>
+  activeRouteName.value === "Home" ? greetingText.value : currentPageTitle.value
+);
+const pageSubtitle = computed(() =>
+  activeRouteName.value === "Home"
+    ? "今天也要比昨天更强一点"
+    : activeRouteName.value === "Profile" || activeRouteName.value === "ProfileEdit"
+      ? ""
+    : activeRouteName.value.startsWith("HomeInterview")
+      ? ""
+      : "保持节奏，稳步提升面试竞争力"
+);
+
+watch(
+  currentPageTitle,
+  (title) => {
+    document.title = title;
+  },
+  { immediate: true }
+);
+
+watch(
+  activeRouteName,
+  (name) => {
+    const nextStep = setupStepMap[name];
+    const prevStep = prevSetupStep.value;
+    if (typeof nextStep === "number" && typeof prevStep === "number") {
+      transitionName.value = nextStep >= prevStep ? "setup-slide-left" : "setup-slide-right";
+    } else if (typeof nextStep === "number") {
+      transitionName.value = "setup-slide-left";
+    } else {
+      transitionName.value = "fade-slide";
+    }
+    prevSetupStep.value = typeof nextStep === "number" ? nextStep : null;
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
-.home-page {
-  padding-bottom: 0;
-  background-color: #fafafa;
-  min-height: 100vh;
-  color: #1a1a1a;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  overflow-x: hidden;
+.home-shell {
   position: relative;
+  min-height: calc(100vh - 120px);
+  padding-left: 64px;
 }
-
-/* --- Textured Background --- */
-.bg-pattern {
-  position: absolute;
-  top: 0;
+.home-sidebar-shell {
+  width: 64px;
+}
+.home-sidebar {
+  position: fixed;
   left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  background-image: radial-gradient(#d1d5db 1px, transparent 1px);
-  background-size: 24px 24px;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.bg-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 80% -10%, rgba(147, 51, 234, 0.15) 0%, transparent 50%),
-              radial-gradient(circle at 20% 110%, rgba(59, 130, 246, 0.1) 0%, transparent 40%);
-}
-
-/* Banner Styles */
-.banner {
-  position: relative;
-  z-index: 10;
-  padding: 80px 24px 60px;
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.banner-content {
-  position: relative;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.title {
-  font-size: 48px;
-  line-height: 1.15;
-  font-weight: 800;
-  margin-bottom: 20px;
-  letter-spacing: -1.5px;
-  color: #111827;
-}
-
-.highlight {
-  background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: inline-block;
-  font-size: 36px;
-  margin-top: 8px;
-}
-
-.subtitle {
-  font-size: 18px;
-  line-height: 1.6;
-  color: #4b5563;
-  margin-bottom: 40px;
-  font-weight: 400;
-}
-
-.banner-actions {
-  display: flex;
-  justify-content: center;
-}
-
-.banner-search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  max-width: 640px;
-  background: #ffffff;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-}
-
-.banner-search-input :deep(.el-input__wrapper) {
-  border-radius: 8px;
-  box-shadow: none;
-  height: 48px;
-}
-
-.banner-search-btn {
-  white-space: nowrap;
-  height: 48px;
-  border-radius: 8px;
-  font-weight: 600;
-  padding: 0 32px;
-  background: linear-gradient(180deg, #4b7ec4, #0f172a) !important;
-  border: 1px solid #111827 !important;
-  color: #ffffff !important;
-  transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
-}
-
-.banner-search-btn:hover,
-.banner-search-btn:focus {
-  background: linear-gradient(180deg, #5b8ad0, #1f2937) !important;
-  border-color: #374151 !important;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
-  color: #ffffff !important;
-}
-
-.banner-search-btn:active {
-  background: linear-gradient(180deg, #436ea8, #111827) !important;
-  border-color: #111827 !important;
-  transform: translateY(0);
-}
-
-/* Main Content Styles */
-.main-content {
-  position: relative;
-  z-index: 10;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.section-header {
-  margin-bottom: 30px;
-  position: relative;
-}
-
-.section-title {
-  font-size: 24px;
-  font-weight: 800;
-  color: #111827;
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  letter-spacing: -0.5px;
-}
-
-.section-title span {
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.section-decoration {
-  width: 48px;
-  height: 4px;
-  background: linear-gradient(90deg, #a855f7, #3b82f6);
-  border-radius: 2px;
-  margin-top: 12px;
-}
-
-/* Job Cards Styles */
-.job-cards {
-  margin-bottom: 40px;
-}
-
-.job-card {
-  cursor: pointer;
-  margin-bottom: 24px;
-  position: relative;
-  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
-  border: 1px solid #e5e7eb;
+  top: 10%;
+  bottom: 10%;
+  z-index: 20;
+  width: 80px;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 1);
+  color: #475569;
+  padding: 10px 8px;
+  transition: width 0.22s ease, box-shadow 0.22s ease;
   overflow: hidden;
-  height: 270px;
 }
-
-.job-card :deep(.el-card__body) {
-  padding: 24px;
-  height: 100%;
-  box-sizing: border-box;
+.home-sidebar:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+.home-sidebar.collapsed {
+  width: 52px;
+}
+.home-sidebar:not(.collapsed) {
+  width: 80px;
+}
+.sidebar-top {
   display: flex;
-  flex-direction: column;
-}
-
-.job-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #a855f7, #3b82f6);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.job-card:hover {
-  border-color: rgba(168, 85, 247, 0.3);
-  box-shadow: 0 20px 40px -10px rgba(147, 51, 234, 0.1), inset 0 1px 0 rgba(255, 255, 255, 1);
-  transform: translateY(-6px);
-}
-.job-card:hover::after {
-  opacity: 1;
-}
-
-.job-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.job-name {
-  font-size: 19px;
-  font-weight: 800;
-  color: #111827;
-  transition: color 0.3s;
-}
-
-.job-card:hover .job-name {
-  color: #9333ea;
-}
-
-.company-name {
-  font-size: 13px;
-  color: #4b5563;
-  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.collapse-icon {
+  color: #94a3b8;
+}
+.menu-list {
+  display: grid;
   gap: 8px;
-  margin-bottom: 16px;
-  background: #f3f4f6;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-weight: 500;
 }
-
-.company-logo {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-}
-
-.job-desc {
-  font-size: 14px;
-  color: #4b5563;
-  margin: 0 0 20px;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.job-salary {
-  color: #9333ea;
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.job-card-footer {
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
-  margin-top: auto;
-}
-
-.detail-link {
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 600;
-  display: flex;
+.menu-item {
+  text-decoration: none;
+  flex-direction: column;
   align-items: center;
-  transition: color 0.3s;
-}
-.job-card:hover .detail-link {
-  color: #3b82f6;
-}
-
-/* Report Card Styles */
-.report-card {
-  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  min-height: 340px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 1);
-  transition: all 0.4s ease;
-}
-
-.report-card:hover {
-  box-shadow: 0 20px 40px -10px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 1);
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.report-card :deep(.el-card__body) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 32px 24px;
-}
-
-.report-score-wrap {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.score-circle {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 20px;
-  border-radius: 50%;
-  background: conic-gradient(from 180deg at 50% 50%, #3b82f6 -7.5deg, #a855f7 165deg, #3b82f6 352.5deg);
-  display: flex;
-  flex-direction: column;
   justify-content: center;
-  align-items: center;
-  color: #111827;
-  box-shadow: 0 8px 16px rgba(147, 51, 234, 0.15);
-  position: relative;
-}
-
-.score-circle::after {
-  content: '';
-  position: absolute;
-  inset: 5px;
-  background: #ffffff;
-  border-radius: 50%;
-  z-index: 1;
-}
-
-.score-num {
-  font-size: 38px;
-  font-weight: 800;
-  color: #111827;
-  z-index: 2;
-  line-height: 1;
-  letter-spacing: -1px;
-}
-
-.score-unit {
-  font-size: 14px;
-  color: #9333ea;
-  z-index: 2;
-  margin-top: 4px;
-  font-weight: 600;
-}
-
-.score-label {
-  font-size: 15px;
-  font-weight: 700;
-  color: #4b5563;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.report-summary {
-  font-size: 14px;
-  color: #4b5563;
-  margin: 0 0 24px;
-  line-height: 1.6;
-  flex: 1;
-  background: #f9fafb;
-  padding: 16px 20px;
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  position: relative;
-}
-
-.report-summary::before {
-  content: '“';
-  font-size: 44px;
-  color: #e5e7eb;
-  position: absolute;
-  top: -12px;
-  left: 12px;
-  font-family: serif;
-  line-height: 1;
-}
-
-.report-action {
-  margin-top: auto;
-}
-
-.full-btn {
-  width: 100%;
-  height: 44px;
-  font-weight: 600;
-  font-size: 15px;
-  background: linear-gradient(180deg, #1f2937, #000000);
-  border: 1px solid #000000;
-  color: #ffffff;
-  border-radius: 8px;
-  cursor: pointer;
+  background: transparent;
+  color: #475569;
+  min-height: 56px;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1);
+  display:flex;
 }
 
-.full-btn:hover {
-  background: #333333;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+.menu-item span { font-size: 12px; line-height: 1.1; }
+.home-sidebar.collapsed .menu-item { min-height: 44px; padding: 8px 4px; }
+.menu-item .el-icon {
+  font-size: 17px;
+}
+.menu-item:hover {
+  background: #eef2ff;
+  color: #4338ca;
+}
+.menu-item.active {
+  background: linear-gradient(90deg, #ede9fe, #dbeafe);
+  border-color: #c4b5fd;
+  color: #4338ca;
+}
+.home-main {
+  color: #1f2937;
+  flex: 1;
+  min-width: 0;
 }
 
-/* Footer Styles */
-.home-footer {
-  position: relative;
-  z-index: 10;
-  margin-top: 80px;
-  padding: 50px 0;
-  background: #ffffff;
-  text-align: center;
-  border-top: 1px solid #e5e7eb;
+.setup-slide-left-enter-active,
+.setup-slide-left-leave-active,
+.setup-slide-right-enter-active,
+.setup-slide-right-leave-active {
+  transition: all .26s ease;
 }
-
-.home-footer-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 20px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: -0.5px;
-}
-.logo-icon {
-  color: #111827;
-  font-size: 22px;
-}
-
-.home-footer-desc {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.footer-copyright {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-top: 8px;
-}
-
-/* Animations */
-.fade-in-up {
-  animation: fadeInUp 0.8s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+.setup-slide-left-enter-from {
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateX(18px);
 }
-
-.delay-1 {
-  animation-delay: 0.15s;
+.setup-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
 }
-
-.delay-2 {
-  animation-delay: 0.3s;
+.setup-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-18px);
 }
-@keyframes fadeInUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.setup-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
 }
 </style>

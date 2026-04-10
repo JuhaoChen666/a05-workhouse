@@ -1,3 +1,4 @@
+import axios from 'axios';
 import request from './request';
 import { apiOrigin } from './request';
 
@@ -13,34 +14,6 @@ export interface HotJobItem {
   type?: string;
 }
 
-/**
- * 远程未提供 /jobs 接口（如 404）时的本地示例数据，保证首页卡片与搜索/详情可演示。
- */
-export const FALLBACK_HOT_JOBS: HotJobItem[] = [
-  {
-    id: 1,
-    name: '移动端开发工程师(Android)',
-    companyName: '示例公司',
-    companyLogo: 'ByteDance',
-    salaryMin: 18000,
-    salaryMax: 30000,
-    jobContent:
-      '负责 Android 客户端开发与性能优化，熟悉 Kotlin/Java、组件化、网络请求、数据存储与稳定性治理。',
-    type: 'frontend',
-  },
-  {
-    id: 2,
-    name: '后端开发工程师',
-    companyName: '示例公司',
-    companyLogo: 'Alibaba',
-    salaryMin: 20000,
-    salaryMax: 35000,
-    jobContent:
-      '负责后端接口设计与实现，熟悉 Java/Spring、MySQL、缓存与消息队列，关注高并发与可用性。',
-    type: 'backend',
-  },
-];
-
 export interface SearchJobsParams {
   keyword?: string;
   type?: string;
@@ -53,56 +26,73 @@ export interface SearchJobsResult {
   total: number;
 }
 
-function searchFallbackLocal(params: SearchJobsParams): SearchJobsResult {
-  const keyword = String(params.keyword || '')
-    .trim()
-    .toLowerCase();
-  const type = String(params.type || '').trim();
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
-  let list = [...FALLBACK_HOT_JOBS];
-  if (type) list = list.filter((j) => j.type === type);
-  if (keyword) {
-    list = list.filter((j) =>
-      [j.name, j.companyName, j.jobContent].some((v) => String(v || '').toLowerCase().includes(keyword))
-    );
-  }
-  const total = list.length;
-  const start = (page - 1) * pageSize;
-  return { list: list.slice(start, start + pageSize), total };
+export interface SimplePositionItem {
+  id: number;
+  name: string;
 }
 
-/** GET {apiOrigin}/jobs（无 /api 前缀）；失败时使用 FALLBACK_HOT_JOBS */
+export interface SimplePositionPageRes {
+  total: number;
+  pageSize: number;
+  page: number;
+  list: SimplePositionItem[];
+}
+
+export interface PositionDetailRes {
+  id: number;
+  name?: string;
+  type?: string;
+  content?: string;
+  jobContent?: string;
+  description?: string;
+  companyName?: string;
+}
+
+/** GET {apiOrigin}/jobs（无 /api 前缀） */
 export async function getHotJobsApi(params?: { limit?: number }) {
-  try {
-    const data = await request.get<HotJobItem[]>(`${apiOrigin}/jobs`);
-    const list = Array.isArray(data) ? data : [];
-    const limit = Math.max(1, Number(params?.limit ?? list.length ?? 6));
-    return list.slice(0, limit);
-  } catch {
-    const limit = Math.max(1, Number(params?.limit ?? FALLBACK_HOT_JOBS.length));
-    return FALLBACK_HOT_JOBS.slice(0, limit);
-  }
+  const data = await request.get<HotJobItem[]>(`${apiOrigin}/jobs`);
+  const list = Array.isArray(data) ? data : [];
+  const limit = Math.max(1, Number(params?.limit ?? list.length ?? 6));
+  return list.slice(0, limit);
 }
 
-/** GET /jobs/:id；失败时在 FALLBACK_HOT_JOBS 中按 id 查找 */
+/** GET /jobs/:id */
 export async function getJobDetailApi(id: number) {
-  try {
-    return await request.get<HotJobItem>(`/jobs/${id}`);
-  } catch {
-    const item = FALLBACK_HOT_JOBS.find((j) => j.id === Number(id));
-    if (item) return item;
-    throw new Error('岗位不存在');
-  }
+  return request.get<HotJobItem>(`/jobs/${id}`);
 }
 
-/** GET /jobs/search；失败时在本地示例数据中筛选分页 */
+/** GET /jobs/search */
 export async function searchJobsApi(params: SearchJobsParams) {
-  try {
-    return await request.get<SearchJobsResult>('/jobs/search', { params });
-  } catch {
-    return searchFallbackLocal(params);
-  }
+  return request.get<SearchJobsResult>('/jobs/search', { params });
+}
+
+/** GET /positions/simple/page */
+export async function getSimplePositionPageApi(params: {
+  page: number;
+  pageSize: number;
+  name?: string;
+}) {
+  const { data } = await axios.get<unknown>(`${apiOrigin}/positions/simple/page`, {
+    params,
+    timeout: 10000,
+  });
+  const raw = data as
+    | SimplePositionPageRes
+    | { data?: SimplePositionPageRes; result?: SimplePositionPageRes };
+  return (raw as { data?: SimplePositionPageRes }).data ??
+    (raw as { result?: SimplePositionPageRes }).result ??
+    (raw as SimplePositionPageRes);
+}
+
+/** GET /positions/:id */
+export async function getPositionDetailApi(id: number | string) {
+  const { data } = await axios.get<unknown>(`${apiOrigin}/positions/${id}`, {
+    timeout: 10000,
+  });
+  const raw = data as PositionDetailRes | { data?: PositionDetailRes; result?: PositionDetailRes };
+  return (raw as { data?: PositionDetailRes }).data ??
+    (raw as { result?: PositionDetailRes }).result ??
+    (raw as PositionDetailRes);
 }
 
 function formatSalaryOne(value: number | string): string {

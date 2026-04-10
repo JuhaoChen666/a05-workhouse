@@ -32,8 +32,85 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        name: 'Home',
         component: () => import('../pages/Home/HomePage.vue'),
+        children: [
+          {
+            path: '',
+            name: 'Home',
+            meta: { title: '首页' },
+            component: () => import('../pages/Home/HomeDashboardPage.vue'),
+          },
+          {
+            path: 'question',
+            name: 'HomeQuestion',
+            meta: { title: '题库' },
+            component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
+          },
+          {
+            path: 'resume',
+            name: 'HomeResume',
+            meta: { title: '简历' },
+            component: () => import('../pages/Resume/ResumeManagePage.vue'),
+          },
+          {
+            path: 'resume/optimize',
+            name: 'HomeResumeOptimize',
+            meta: { title: '简历优化' },
+            component: () => import('../pages/Common/PlaceholderPage.vue'),
+            props: {
+              title: '简历优化',
+              desc: '简历优化功能正在建设中，后续会提供智能分析与优化建议。',
+            },
+          },
+          {
+            path: 'job',
+            name: 'HomeJob',
+            meta: { title: '岗位' },
+            component: () => import('../pages/JobSearch/JobSearchPage.vue'),
+          },
+          {
+            path: 'interview',
+            name: 'HomeInterview',
+            redirect: { name: 'HomeInterviewType' },
+          },
+          {
+            path: 'interview/type',
+            name: 'HomeInterviewType',
+            meta: { title: '面试设置' },
+            component: () => import('../pages/Interview/InterviewTypeSelectPage.vue'),
+          },
+          {
+            path: 'interview/position',
+            name: 'HomeInterviewPosition',
+            meta: { title: '面试设置' },
+            component: () => import('../pages/Interview/InterviewPositionSelectPage.vue'),
+          },
+          {
+            path: 'interview/config',
+            name: 'HomeInterviewConfig',
+            meta: { title: '面试设置' },
+            component: () => import('../pages/Interview/InterviewConfigPage.vue'),
+          },
+          {
+            path: 'doc',
+            name: 'HomeDoc',
+            meta: { title: '文档' },
+            component: () => import('../pages/Common/PlaceholderPage.vue'),
+            props: { title: '文档', desc: '文档模块正在建设中，后续会提供使用说明与常见问题。' },
+          },
+          {
+            path: 'profile',
+            name: 'Profile',
+            meta: { title: '个人中心' },
+            component: () => import('../pages/Profile/ProfilePage.vue'),
+          },
+          {
+            path: 'profile/edit',
+            name: 'ProfileEdit',
+            meta: { title: '编辑资料' },
+            component: () => import('../pages/Profile/ProfileEditPage.vue'),
+          },
+        ],
       },
       {
         path: 'job-search',
@@ -41,7 +118,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/JobSearch/JobSearchPage.vue'),
       },
       {
-        path: 'interview/settings/:id',
+        path: 'interview/settings/:id(\\d+)',
         name: 'InterviewSettings',
         component: () => import('../pages/Interview/InterviewSettingsPage.vue'),
       },
@@ -62,16 +139,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
       },
       {
-        path: 'profile',
-        name: 'Profile',
-        component: () => import('../pages/Profile/ProfilePage.vue'),
-      },
-      {
-        path: 'profile/edit',
-        name: 'ProfileEdit',
-        component: () => import('../pages/Profile/ProfileEditPage.vue'),
-      },
-      {
         path: 'records',
         name: 'InterviewRecordList',
         component: () => import('../pages/InterviewRecordList/InterviewRecordListPage.vue'),
@@ -82,9 +149,15 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/ReportDetail/ReportDetailPage.vue'),
       },
       {
-        path: 'job/:id',
+        path: 'job/:id(\\d+)',
         name: 'JobDetail',
         component: () => import('../pages/JobDetail/JobDetailPage.vue'),
+      },
+      {
+        path: 'demo',
+        name: 'HomeDemo',
+        meta: { title: '首页Demo' },
+        component: () => import('../pages/Demo/HomeDemoPage.vue'),
       },
     ],
   },
@@ -136,33 +209,46 @@ const router = createRouter({
   routes,
 });
 
+const APP_TITLE = 'AI 模拟面试平台';
+
+function pickRouteTitle(to: { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown }): string {
+  const matchedTitle = [...to.matched]
+    .reverse()
+    .map((r) => r.meta?.title)
+    .find((t) => typeof t === 'string' && t.trim()) as string | undefined;
+  if (matchedTitle) return matchedTitle.trim();
+  if (typeof to.name === 'string' && to.name.trim()) return to.name.trim();
+  return APP_TITLE;
+}
+
 // 在 app 挂载前守卫里用 store 时，必须传入 pinia，否则 getActivePinia() 未就绪
 export function setupRouterGuard(pinia: Pinia) {
-  router.beforeEach((to, _from, next) => {
+  router.beforeEach((to) => {
     const userStore = useUserStore(pinia);
     const requiresAuth = to.matched.some((r) => r.meta.requiresAuth);
     const requiresAdmin = to.matched.some((r) => r.meta.requiresAdmin);
 
     // 已登录仍访问登录/注册页时，直接进入主站首页（避免「有 token 却停在登录页」）
     if (userStore.isLoggedIn && (to.name === 'Login' || to.name === 'Register')) {
-      next({ name: 'Home' });
-      return;
+      return { name: 'Home' };
     }
 
     // 需要登录但当前未登录，跳转到登录页并带上重定向地址
     if (requiresAuth && !userStore.isLoggedIn) {
-      next({ name: 'Login' });
-      return;
+      return { name: 'Login' };
     }
 
     // 仅管理员可访问：用 isAdmin（内部 Number(roleId)===2），避免后端返回字符串 "2" 时误判
     if (requiresAdmin && userStore.isLoggedIn && !userStore.isAdmin) {
       ElMessage.error('仅管理员可访问后台管理系统');
-      next({ name: 'Home' });
-      return;
+      return { name: 'Home' };
     }
+    return true;
+  });
 
-    next();
+  router.afterEach((to) => {
+    const pageTitle = pickRouteTitle(to as { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown });
+    document.title = pageTitle;
   });
 }
 

@@ -127,6 +127,8 @@ function unwrapResponse<T = unknown>(response: { data: unknown }) {
   }
   // 兼容 data 或 result 作为业务载荷（如部分后端登录/业务接口用 result）
   const inner = data.data !== undefined ? data.data : data.result;
+  // 若后端直接返回业务对象（如 { total, items, page, page_size }），则直接返回 raw
+  if (inner === undefined) return raw as T;
   return inner as T;
 }
 

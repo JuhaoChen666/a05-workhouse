@@ -1,18 +1,10 @@
 <template>
   <div class="interview-settings-page theme-page-shell">
-    <div class="theme-section-header fade-in-up">
-      <h2 class="theme-section-title">面试设置 <span>Interview Setup</span></h2>
-      <div class="theme-section-decoration"></div>
-    </div>
     <el-card class="settings-card theme-card fade-in-up delay-1" shadow="hover" v-loading="loading">
       <template #header>
-        <div class="card-header">
-          <span>面试设置</span>
-          <el-button type="primary" link @click="backToJobDetail">返回岗位详情</el-button>
-        </div>
       </template>
 
-      <template v-if="job">
+      <template v-if="job || !hasJobId">
         <p class="intro">请确认岗位并提供简历信息（文字输入或上传 PDF/Word），系统会自动匹配题库集合并开始面试。</p>
 
         <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px" class="settings-form">
@@ -85,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import type { FormInstance, FormRules, UploadFile, UploadFiles } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
@@ -111,6 +103,10 @@ const resumeInputMode = ref<'text' | 'file'>('text');
 const fileList = ref<UploadFiles>([]);
 const interviewMode = ref<'text' | 'avatar'>('text');
 const avatarId = ref<'110592024' | '110117005' | '110017006'>('110592024');
+const hasJobId = computed(() => {
+  const id = Number(route.params.id);
+  return Number.isFinite(id) && id > 0;
+});
 
 const formRef = ref<FormInstance>();
 const form = reactive({
@@ -212,11 +208,7 @@ async function onStartInterview() {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
 
-  const idParam = route.params.id;
-  if (!idParam) {
-    ElMessage.error('缺少岗位 ID');
-    return;
-  }
+  const idParam = String(route.params.id || 'new');
 
   starting.value = true;
   try {
@@ -239,7 +231,7 @@ async function onStartInterview() {
 
     router.push({
       name: 'InterviewSession',
-      params: { id: String(idParam) },
+      params: { id: idParam },
       query: {
         jobName: position,
         interviewMode: interviewMode.value,
@@ -256,8 +248,8 @@ async function onStartInterview() {
 onMounted(async () => {
   const id = Number(route.params.id);
   if (!id) {
+    form.positionName = form.positionName || '通用岗位';
     loading.value = false;
-    ElMessage.error('缺少岗位 ID');
     return;
   }
   try {

@@ -1,7 +1,7 @@
 <template>
   <div class="profile-page theme-page-shell">
     <div class="theme-section-header fade-in-up">
-      <h2 class="theme-section-title">个人中心 <span>Profile</span></h2>
+      <h2 class="theme-section-title">个人信息</h2>
       <div class="theme-section-decoration"></div>
     </div>
 
