@@ -5,13 +5,13 @@
       <div class="theme-section-decoration"></div>
     </div>
 
-    <!-- 头像与基本信息 -->
+    <!-- 头像设置（独立于 profile 请求，可直接上传） -->
     <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
-      <template #header><span>头像与基本信息</span></template>
-      <div class="profile-header" v-if="profile">
+      <template #header><span>头像设置</span></template>
+      <div class="profile-header">
         <div class="avatar-area">
           <el-avatar :size="80" :src="avatarFullUrl" class="avatar">
-            {{ profile.username.slice(0, 2) || '?' }}
+            {{ displayUsername.slice(0, 2) || '?' }}
           </el-avatar>
           <el-upload
             class="avatar-upload"
@@ -21,18 +21,25 @@
           >
             <el-button size="small" type="primary">修改头像</el-button>
           </el-upload>
-        </div>
-        <div class="profile-form">
-          <el-form label-width="80px">
-            <el-form-item label="用户名">{{ profile.username }}</el-form-item>
-            <el-form-item label="邮箱">
-              <el-input v-model="profile.email" placeholder="找回密码时将使用该邮箱" disabled />
-            </el-form-item>
-          </el-form>
-          <div class="tip">如需绑定或修改邮箱，请通过找回密码流程补充/更新邮箱。</div>
+          <div class="tip">头像大小不超过 10MB</div>
         </div>
       </div>
-      <el-empty v-else description="加载中..." :image-size="60" />
+    </el-card>
+
+    <!-- 基本信息（单独加载状态，不影响头像上传） -->
+    <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
+      <template #header><span>基本信息</span></template>
+      <div v-if="profileLoading" class="info-loading">基本信息加载中...</div>
+      <div v-else-if="displayProfile" class="profile-form">
+        <el-form label-width="80px">
+          <el-form-item label="用户名">{{ displayProfile.username }}</el-form-item>
+          <el-form-item label="邮箱">
+            <el-input :model-value="displayProfile.email || ''" placeholder="找回密码时将使用该邮箱" disabled />
+          </el-form-item>
+        </el-form>
+        <div class="tip">如需绑定或修改邮箱，请通过找回密码流程补充/更新邮箱。</div>
+      </div>
+      <el-empty v-else description="未获取到基本信息，请稍后重试" :image-size="60" />
     </el-card>
 
     <!-- 修改密码（需要邮箱验证码） -->
@@ -53,7 +60,7 @@
             <el-input v-model="pwdForm.code" placeholder="请输入验证码" class="code-input" />
             <el-button
               class="code-btn"
-              :disabled="sendCodeLoading || !!codeTimer || !profile"
+              :disabled="sendCodeLoading || !!codeTimer || !profileInfo"
               @click="onSendCode"
             >
               {{ sendCodeText }}
@@ -73,25 +80,52 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, computed } from 'vue';
+import { onMounted, reactive, ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { getProfileApi, uploadAvatarApi, changePasswordApi, sendCodeApi, type ChangePasswordRequest } from '@/api/auth';
+import {
+  getProfileAvatarApi,
+  getProfileInfoApi,
+  uploadAvatarApi,
+  changePasswordApi,
+  sendCodeApi,
+  type ChangePasswordRequest,
+} from '@/api/auth';
 import type { UserInfo } from '@/types/auth';
 import { useUserStore } from '@/store/user';
+import { apiOrigin } from '@/api/request';
 
 const router = useRouter();
 const userStore = useUserStore();
 
-const profile = ref<UserInfo | null>(null);
+const profileInfo = ref<Pick<UserInfo, 'id' | 'username' | 'email'> | null>(null);
+const avatarProfile = ref<Pick<UserInfo, 'id' | 'username' | 'avatarUrl'> | null>(null);
+const avatarLoading = ref(false);
+const profileLoading = ref(false);
 const pwdFormRef = ref<FormInstance>();
 const pwdLoading = ref(false);
 const sendCodeLoading = ref(false);
 const sendCodeText = ref('发送验证码');
 let codeTimer: number | null = null;
+const avatarBust = ref(0);
 
-const avatarFullUrl = computed(() => profile.value?.avatarUrl || userStore.userInfo?.avatarUrl || '');
+const displayProfile = computed(() => profileInfo.value || userStore.userInfo || null);
+const displayUsername = computed(
+  () => avatarProfile.value?.username || profileInfo.value?.username || userStore.userInfo?.username || '用户'
+);
+const avatarUrlRaw = computed(() =>
+  String(avatarProfile.value?.avatarUrl || userStore.userInfo?.avatarUrl || '').trim()
+);
+const avatarFullUrl = computed(() => {
+  if (!avatarUrlRaw.value) return '';
+  const full =
+    avatarUrlRaw.value.startsWith('http') || avatarUrlRaw.value.startsWith('/img/')
+      ? avatarUrlRaw.value
+      : `${apiOrigin}${avatarUrlRaw.value}`;
+  const sep = full.includes('?') ? '&' : '?';
+  return `${full}${sep}v=${avatarBust.value}`;
+});
 
 const pwdForm = reactive({
   oldPassword: '',
@@ -116,26 +150,57 @@ const pwdRules: FormRules = {
   code: [{ required: true, message: '请输入邮箱验证码', trigger: 'blur' }],
 };
 
-async function loadProfile() {
+async function loadProfileInfo() {
+  profileLoading.value = true;
   try {
-    const res = await getProfileApi();
-    profile.value = res;
-    if (res?.avatarUrl) {
-      userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
+    const res = await getProfileInfoApi();
+    profileInfo.value = res;
+  } catch (e: any) {
+    ElMessage.error(e.message || '获取基本信息失败');
+  } finally {
+    profileLoading.value = false;
+  }
+}
+
+async function loadAvatarProfile() {
+  avatarLoading.value = true;
+  try {
+    const res = await getProfileAvatarApi();
+    avatarProfile.value = res;
+    if (res?.avatarUrl && userStore.userInfo) {
+      userStore.setUserInfo({ ...userStore.userInfo, avatarUrl: res.avatarUrl });
     }
   } catch (e: any) {
-    ElMessage.error(e.message || '获取用户信息失败');
+    ElMessage.error(e.message || '获取头像信息失败');
+  } finally {
+    avatarLoading.value = false;
   }
 }
 
 async function handleAvatarUpload({ file }: { file: File }) {
+  const MAX_AVATAR_SIZE = 10 * 1024 * 1024;
+  if (file.size > MAX_AVATAR_SIZE) {
+    ElMessage.warning('头像大小不能超过 10MB');
+    return;
+  }
   const form = new FormData();
   form.append('file', file);
+  const userId = avatarProfile.value?.id || profileInfo.value?.id || userStore.userInfo?.id;
+  if (!userId) {
+    ElMessage.error('未获取到用户ID，无法上传头像');
+    return;
+  }
   try {
-    const res = await uploadAvatarApi(form);
+    const res = await uploadAvatarApi(userId, form);
     if (res?.avatarUrl) {
-      profile.value = { ...profile.value!, avatarUrl: res.avatarUrl };
-      userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
+      avatarProfile.value = {
+        id: String(userId),
+        username: displayUsername.value,
+        avatarUrl: res.avatarUrl,
+      };
+      if (userStore.userInfo) {
+        userStore.setUserInfo({ ...userStore.userInfo, avatarUrl: res.avatarUrl });
+      }
       ElMessage.success('头像已更新');
     }
   } catch (e: any) {
@@ -144,8 +209,8 @@ async function handleAvatarUpload({ file }: { file: File }) {
 }
 
 const onSendCode = async () => {
-  if (!profile.value || sendCodeLoading.value || codeTimer) return;
-  if (!profile.value.email) {
+  if (!profileInfo.value || sendCodeLoading.value || codeTimer) return;
+  if (!profileInfo.value.email) {
     ElMessage.warning('请先绑定邮箱后再获取验证码，可通过找回密码流程绑定邮箱。');
     return;
   }
@@ -153,8 +218,8 @@ const onSendCode = async () => {
   try {
     await sendCodeApi({
       scene: 'reset',
-      username: profile.value.username,
-      email: profile.value.email || undefined,
+      username: profileInfo.value.username,
+      email: profileInfo.value.email || undefined,
     });
     ElMessage.success('验证码已发送，请查收（示例中在后端日志中查看）');
     let left = 60;
@@ -201,8 +266,17 @@ function goBack() {
 }
 
 onMounted(() => {
-  loadProfile();
+  void loadAvatarProfile();
+  void loadProfileInfo();
 });
+
+watch(
+  () => avatarUrlRaw.value,
+  () => {
+    avatarBust.value = Date.now();
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
@@ -226,6 +300,11 @@ onMounted(() => {
 }
 .profile-form {
   flex: 1;
+}
+.info-loading {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 4px 0;
 }
 .tip {
   font-size: 12px;

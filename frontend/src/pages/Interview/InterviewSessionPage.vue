@@ -186,6 +186,7 @@ import {
   type InterviewAnswerStreamEvent,
 } from '@/api/interviewAi';
 import { useUserStore } from '@/store/user';
+import { apiOrigin } from '@/api/request';
 
 const route = useRoute();
 const router = useRouter();
@@ -201,7 +202,12 @@ watch(
     if (q != null && String(q).trim()) effectiveSessionId.value = String(q).trim();
   }
 );
-const userAvatar = computed(() => userStore.userInfo?.avatarUrl || '');
+const userAvatar = computed(() => {
+  const raw = String(userStore.userInfo?.avatarUrl || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http') || raw.startsWith('/img/')) return raw;
+  return `${apiOrigin}${raw}`;
+});
 const aiAvatarSrc = computed(() => '/img/mentor-a.png');
 const hasPendingStart = ref(false);
 const isAvatarInterview = computed(() => String(route.query.interviewMode || '') === 'avatar');
@@ -673,12 +679,6 @@ onMounted(async () => {
     try {
       streaming.value = true;
       const payload = JSON.parse(pending) as StartInterviewBody;
-      if (!payload.interview_mode && route.query.interviewMode) {
-        payload.interview_mode = String(route.query.interviewMode) as 'text' | 'voice' | 'avatar';
-      }
-      if (!payload.avatar_id && route.query.avatarId) {
-        payload.avatar_id = String(route.query.avatarId);
-      }
       const started = await startInterviewApi(payload);
       sid = started.session_id;
       effectiveSessionId.value = sid;

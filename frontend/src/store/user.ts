@@ -6,6 +6,8 @@ interface UserState {
   userInfo: UserInfo | null;
 }
 
+const DEFAULT_AVATAR_URL = '/img/avatar1.png';
+
 /**
  * 登录/资料接口可能返回 number、字符串 "2"，或蛇形字段 role_id；
  * 部分后端返回驼峰但为 **roleID**（末尾大写 ID），与前端类型里的 roleId 不一致，需一并兼容。
@@ -34,10 +36,11 @@ export function normalizeUserInfo(raw: unknown): UserInfo | null {
     email: o.email != null ? String(o.email) : undefined,
     roleId,
     roleName: roleNameStr || undefined,
-    avatarUrl:
+    avatarUrl: String(
       (o.avatarUrl as string | null | undefined) ??
-      (o.avatar_url as string | null | undefined) ??
-      null,
+        (o.avatar_url as string | null | undefined) ??
+        DEFAULT_AVATAR_URL
+    ).trim() || DEFAULT_AVATAR_URL,
   };
 }
 

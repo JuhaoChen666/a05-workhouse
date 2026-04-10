@@ -1,4 +1,4 @@
-import { authRequest } from './request';
+import { authRequest, adminRequest } from './request';
 import type { LoginRequest, RegisterRequest, UserInfo } from '../types/auth';
 
 /** 登录接口解析结果（兼容多种后端字段命名与嵌套） */
@@ -66,6 +66,16 @@ export function getProfileApi() {
   return authRequest.get<UserInfo>('/auth/profile');
 }
 
+// 分离请求：仅用于头像区域（独立加载）
+export function getProfileAvatarApi() {
+  return authRequest.get<Pick<UserInfo, 'id' | 'username' | 'avatarUrl'>>('/auth/profile');
+}
+
+// 分离请求：仅用于基本信息区域（独立加载）
+export function getProfileInfoApi() {
+  return authRequest.get<Pick<UserInfo, 'id' | 'username' | 'email'>>('/auth/profile');
+}
+
 // 发送验证码（注册绑定邮箱 / 找回密码）；注册场景远程常要求同时带 username + email
 export function sendCodeApi(payload: {
   scene: 'register' | 'reset';
@@ -84,7 +94,13 @@ export interface VerifyCodeResetRequest {
 }
 
 export function verifyCodeResetApi(payload: VerifyCodeResetRequest) {
-  return authRequest.post<null>('/auth/verify-code', payload);
+  // 后端字段大小写约定：newpassword（小写 p）+ confirmPassword（大写 P）
+  return authRequest.post<null>('/auth/verify-code', {
+    username: payload.username,
+    code: payload.code,
+    newpassword: payload.newPassword,
+    confirmPassword: payload.confirmPassword,
+  });
 }
 
 // 修改密码（已登录场景）
@@ -99,12 +115,17 @@ export function changePasswordApi(payload: ChangePasswordRequest) {
   return authRequest.post<null>('/auth/password', payload);
 }
 
-// 上传头像（FormData 或 { avatar: base64 }）
-export function uploadAvatarApi(form: FormData | { avatar: string }) {
-  if (form instanceof FormData) {
-    return authRequest.post<{ avatarUrl: string }>('/auth/avatar', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  }
-  return authRequest.post<{ avatarUrl: string }>('/auth/avatar', form);
+// 上传头像：POST /admin/users/{id}/avatar（form-data: file）
+export function uploadAvatarApi(userId: string | number, form: FormData) {
+  return adminRequest.post<{ avatarUrl: string }>(`/users/${userId}/avatar`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+// 根据用户 ID 获取头像信息：GET /admin/users/{id}/avatar
+export async function getUserAvatarByIdApi(userId: string | number) {
+  const raw = await adminRequest.get<unknown>(`/users/${userId}/avatar`);
+  const obj = (raw ?? {}) as Record<string, unknown>;
+  const avatarUrl = String(obj.avatarUrl ?? obj.avatar_url ?? obj.url ?? '').trim();
+  return { avatarUrl };
 }
