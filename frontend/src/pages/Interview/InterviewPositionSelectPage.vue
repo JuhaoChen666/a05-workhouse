@@ -4,11 +4,7 @@
     <div class="layout">
       <el-card class="theme-card left-card" shadow="hover">
         <el-form label-width="120px">
-          <el-form-item label="是否使用简历">
-            <el-switch v-model="useResume" />
-          </el-form-item>
-
-          <el-form-item v-if="useResume" label="个人简历：">
+          <el-form-item label="个人简历：">
             <el-select
               v-model="selectedResumeId"
               placeholder="请选择个人简历"
@@ -31,16 +27,15 @@
             <div class="search-row">
               <el-input
                 v-model="jobKeyword"
-                placeholder="搜索工作岗位"
+                placeholder="请输入关键词"
                 clearable
-                @keyup.enter="onSearch"
+                @keyup.enter.prevent
               />
-              <el-button type="primary" :loading="jobLoading" @click="onSearch">搜索</el-button>
             </div>
           </el-form-item>
 
-          <div class="job-result-wrap">
-            <div class="job-cards">
+          <div class="job-result-wrap" v-loading="jobLoading" element-loading-text="岗位搜索中...">
+            <div v-if="filteredJobs.length > 0" class="job-cards">
               <article
                 v-for="job in filteredJobs"
                 :key="job.id"
@@ -55,11 +50,13 @@
                 <p class="desc">{{ shorten(job.jobContent) }}</p>
               </article>
             </div>
-            <el-empty
-              v-if="filteredJobs.length === 0"
-              description="暂无匹配工作"
-              :image-size="54"
-            />
+            <div v-else-if="showNoJobResult" class="job-empty-wrap">
+              <el-empty
+                description="未搜索到匹配岗位"
+                :image-size="54"
+              />
+            </div>
+            <div v-else-if="showSearchHint" class="job-search-hint">请输入关键词</div>
           </div>
         </el-form>
       </el-card>
@@ -122,7 +119,7 @@ const router = useRouter();
 const userStore = useUserStore();
 const draft = loadInterviewSetupDraft();
 
-const useResume = ref(Boolean(draft.useResume));
+const useResume = ref(true);
 const resumeName = ref(draft.resumeName || '');
 const resumeType = ref(draft.resumeType || '');
 const positionName = ref(draft.positionName || '');
@@ -137,6 +134,8 @@ const selectedJobId = ref<number | undefined>(undefined);
 const jobKeyword = ref('');
 const allJobs = ref<HotJobItem[]>([]);
 const jobLoading = ref(false);
+const hasSearched = ref(false);
+let jobSearchTimer: number | null = null;
 const selectedJob = computed(() => allJobs.value.find((j) => j.id === selectedJobId.value));
 const selectedJobDetail = ref<{
   name: string;
@@ -167,13 +166,12 @@ watch(selectedResumeId, (id) => {
 });
 
 const filteredJobs = computed(() => allJobs.value);
-
-function onSearch() {
-  void fetchSimplePositions();
-}
+const showNoJobResult = computed(() => hasSearched.value && !jobLoading.value && filteredJobs.value.length === 0);
+const showSearchHint = computed(() => !hasSearched.value && !jobLoading.value);
 
 async function fetchSimplePositions() {
   const keyword = String(jobKeyword.value || '').trim();
+  hasSearched.value = true;
   jobLoading.value = true;
   try {
     const res = await getSimplePositionPageApi({
@@ -286,7 +284,23 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   detachResumeScrollListener();
+  if (jobSearchTimer != null) {
+    window.clearTimeout(jobSearchTimer);
+    jobSearchTimer = null;
+  }
 });
+
+watch(
+  () => jobKeyword.value,
+  () => {
+    if (jobSearchTimer != null) {
+      window.clearTimeout(jobSearchTimer);
+    }
+    jobSearchTimer = window.setTimeout(() => {
+      void fetchSimplePositions();
+    }, 350);
+  }
+);
 
 async function fetchResumeOptions(reset = false) {
   const userId = userStore.userInfo?.id;
@@ -354,6 +368,10 @@ function goPrev() {
 }
 
 function goNext() {
+  if (!selectedResumeId.value) {
+    ElMessage.warning('请先选择个人简历');
+    return;
+  }
   if (!selectedJobId.value) {
     ElMessage.warning('请先选择工作岗位');
     return;
@@ -398,16 +416,17 @@ function goNext() {
   overflow: hidden;
 }
 .job-result-wrap {
+  position: relative;
   margin-top: 6px;
   flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
-  max-height: 210px;
+  height: 210px;
 }
 .search-row {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 .job-cards {
@@ -445,6 +464,17 @@ function goNext() {
   flex-shrink: 0;
 }
 .job-card .desc { margin: 0; color: #4b5563; font-size: 12px; line-height: 1.5; }
+.job-empty-wrap,
+.job-search-hint {
+  height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.job-search-hint {
+  color: #9ca3af;
+  font-size: 13px;
+}
 .detail-title { margin: 0 0 8px; }
 .selected-job-card {
   border: 1px solid #e5e7eb;

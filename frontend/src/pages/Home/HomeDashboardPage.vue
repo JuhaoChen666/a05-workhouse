@@ -7,11 +7,9 @@
         <el-button type="primary" class="theme-primary-btn" @click="goInterviewSettings">立即开始面试</el-button>
       </div>
       <div class="hero-right">
-        <div class="kpi-title">右上角数据卡片</div>
         <div class="kpi-variants">
-          <article class="kpi-card theme-card">
-            <h4>本周进度概览</h4>
-            <p>本周完成 2 / 5</p>
+          <article class="kpi-card theme-card ">
+            <p>{{ scoreTrendDesc }}</p>
             <div ref="chartARef" class="mini-chart"></div>
           </article>
         </div>
@@ -62,13 +60,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
+import { useUserStore } from '@/store/user';
+import { getUserEvaluationTrendApi } from '@/api/interviewAi';
 
 const chartARef = ref<HTMLElement | null>(null);
 let chartA: echarts.ECharts | null = null;
 const router = useRouter();
+const userStore = useUserStore();
+const scoreList = ref<number[]>([]);
+const scoreTrendDesc = computed(() => {
+  if (!scoreList.value.length) return '';
+  const latest = scoreList.value[scoreList.value.length - 1] ?? 0;
+  return `最近一次得分：${Number(latest).toFixed(1)}`;
+});
 
 const hotCategories = [
   { name: '后端开发', count: 128 },
@@ -92,11 +99,43 @@ function initCharts() {
   if (!chartARef.value) return;
   chartA = echarts.init(chartARef.value);
   chartA.setOption({
-    grid: { left: 6, right: 6, top: 6, bottom: 6 },
-    xAxis: { type: 'category', show: false, data: ['一', '二', '三', '四', '五'] },
+    grid: { left: 8, right: 8, top: 10, bottom: 8 },
+    xAxis: { type: 'category', show: false, data: ['1', '2', '3', '4', '5'] },
     yAxis: { type: 'value', show: false },
-    series: [{ type: 'line', smooth: true, symbol: 'none', data: [2, 3, 1, 4, 2], areaStyle: {} }],
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 2, color: '#6366f1' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(99, 102, 241, 0.25)' },
+            { offset: 1, color: 'rgba(99, 102, 241, 0.02)' },
+          ]),
+        },
+        data: [0, 0, 0, 0, 0],
+      },
+    ],
   });
+}
+
+async function loadScoreTrend() {
+  const userId = userStore.userInfo?.id;
+  if (!userId) return;
+  try {
+    const trend = await getUserEvaluationTrendApi(userId);
+    const yData = Array.isArray(trend?.series?.[0]?.data) ? trend.series![0]!.data! : [];
+    const scores = yData.map((n) => Number(n) || 0).slice(-8);
+    scoreList.value = scores;
+    const xData = scores.map((_v, i) => String(i + 1));
+    chartA?.setOption({
+      xAxis: { data: xData.length ? xData : ['1', '2', '3', '4', '5'] },
+      series: [{ data: scores.length ? scores : [0, 0, 0, 0, 0] }],
+    });
+  } catch {
+    scoreList.value = [];
+  }
 }
 
 function resizeCharts() {
@@ -120,6 +159,7 @@ function handleQuickEntry(key: string) {
 
 onMounted(() => {
   initCharts();
+  void loadScoreTrend();
   window.addEventListener('resize', resizeCharts);
 });
 
@@ -130,18 +170,62 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.hero { display: grid; grid-template-columns: 1.1fr 1.3fr; gap: clamp(12px, 1.2vw, 18px); margin-bottom: clamp(12px, 1.2vw, 18px); }
-.hero-left, .hero-right, .panel, .card { padding: clamp(12px, 1.1vw, 18px); }
+.hero {
+  display: grid;
+  grid-template-columns: 1.1fr 1.3fr;
+  gap: clamp(10px, 1vw, 14px);
+  margin-bottom: clamp(12px, 1.1vw, 16px);
+  align-items: stretch;
+  min-height: clamp(200px, 22vw, 220px);
+}
+.hero-left, .panel, .card { padding: clamp(10px, 0.9vw, 14px); }
+.hero-left {
+  height: 100%;
+  margin: 0 !important;
+  box-sizing: border-box;
+  overflow: auto;
+}
+.hero-right {
+  height: 100%;
+  margin: 0 !important;
+  box-sizing: border-box;
+  display: grid;
+  min-height: 0;
+}
 .hero-left h1 { margin: 0 0 10px; font-size: clamp(22px, 2vw, 30px); }
 .hero-left p { margin: 0 0 14px; color: #4b5563; font-size: clamp(13px, 1vw, 15px); }
 .kpi-title { font-size: clamp(12px, 0.9vw, 13px); color: #6b7280; margin-bottom: 10px; }
-.kpi-variants { display: grid; gap: 10px; }
-.kpi-card { padding: clamp(10px, 0.9vw, 14px); }
+.kpi-variants {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+}
+.kpi-card {
+  padding: clamp(8px, 0.8vw, 10px);
+  height: 100%;
+  margin: 0 !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: visible;
+}
 .kpi-card h4 { margin: 0 0 4px; font-size: clamp(13px, 1vw, 15px); }
 .kpi-card p { margin: 0 0 8px; color: #6b7280; font-size: clamp(12px, 0.9vw, 13px); }
-.mini-chart { height: clamp(58px, 5vw, 72px); }
-.section { margin-bottom: clamp(12px, 1.2vw, 18px); }
-.section h3, .panel h3 { margin-top: 0; }
+.mini-chart { flex: 1; min-height: clamp(40px, 3.6vw, 56px); }
+.section {
+  margin-bottom: clamp(12px, 1.2vw, 18px);
+  padding-top: clamp(4px, 0.5vw, 8px);
+}
+.section h3,
+.panel h3 {
+  margin: 0;
+}
+.section h3 {
+  margin-bottom: clamp(10px, 0.9vw, 14px);
+  line-height: 1.25;
+}
 .mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1vw, 14px); }
 .card h4 { margin: 0 0 8px; }
 .card p { margin: 0 0 12px; color: #6b7280; font-size: clamp(12px, 0.9vw, 14px); }
@@ -194,6 +278,15 @@ onBeforeUnmount(() => {
   .hero,
   .main-grid {
     grid-template-columns: 1fr;
+  }
+  .hero {
+    max-height: none;
+    overflow: visible;
+  }
+  .hero-left,
+  .hero-right,
+  .kpi-card {
+    overflow: visible;
   }
 }
 </style>

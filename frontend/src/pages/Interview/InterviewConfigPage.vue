@@ -186,21 +186,22 @@ function startInterview() {
     router.push({ name: 'HomeInterviewPosition' });
     return;
   }
+  if (!latest.resumeId) {
+    ElMessage.warning('请先选择个人简历后再开始面试');
+    router.push({ name: 'HomeInterviewPosition' });
+    return;
+  }
   saveInterviewSetupDraft({
     difficulty: difficulty.value,
     maxRounds: maxRounds.value,
   });
 
   const payload = {
-    resume: latest.positionDetail,
+    resume_id: Number(latest.resumeId),
     position: latest.positionName,
     collection_name: 'general_engineer',
     user_id: userStore.userInfo?.id,
-    interview_mode: latest.mode,
-    avatar_id: latest.avatarId || '110592024',
     difficulty: difficulty.value,
-    enable_followup: latest.enableFollowup,
-    max_rounds: maxRounds.value,
   };
   sessionStorage.setItem('pendingInterviewStart', JSON.stringify(payload));
   router.push({

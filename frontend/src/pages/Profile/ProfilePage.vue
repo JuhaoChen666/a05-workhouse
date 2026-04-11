@@ -114,7 +114,8 @@ const radarChartRef = ref<HTMLElement | null>(null);
 const avatarFullUrl = computed(() => {
   const url = profile.value?.avatarUrl ?? userStore.userInfo?.avatarUrl;
   if (!url) return '';
-  return url.startsWith('http') ? url : apiOrigin + url;
+  if (url.startsWith('http') || url.startsWith('/img/')) return url;
+  return apiOrigin + url;
 });
 
 function formatDateTime(iso: string) {

@@ -84,7 +84,7 @@ import { reactive, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { loginApi, getProfileApi } from '@/api/auth';
+import { loginApi, getProfileApi, getUserAvatarByIdApi } from '@/api/auth';
 import { useUserStore } from '@/store/user';
 import { throttle } from '@/utils/throttle';
 import { 
@@ -127,6 +127,17 @@ const doSubmit = () => {
           userStore.setUserInfo(profile);
         } catch {
           /* 仅有 token 时也允许进入首页 */
+        }
+      }
+      const userId = userStore.userInfo?.id;
+      if (userId) {
+        try {
+          const avatarRes = await getUserAvatarByIdApi(userId);
+          if (avatarRes.avatarUrl) {
+            userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: avatarRes.avatarUrl });
+          }
+        } catch {
+          // 头像接口失败不阻断登录
         }
       }
       ElMessage.success('登录成功');

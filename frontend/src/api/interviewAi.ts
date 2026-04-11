@@ -9,12 +9,11 @@ const MIN_STREAM_EVENT_DELAY_MS = 20;
  */
 
 export interface StartInterviewBody {
-  resume: string;
+  resume_id: number;
   position: string;
   collection_name: string;
   user_id?: string | number;
-  interview_mode?: 'text' | 'voice' | 'avatar';
-  avatar_id?: string;
+  difficulty?: 'easy' | 'medium' | 'hard' | string;
 }
 
 export interface StartInterviewRes {

@@ -55,6 +55,7 @@ import {
   ArrowDown,
 } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
+import { apiOrigin } from '@/api/request';
 
 const route = useRoute();
 const router = useRouter();
@@ -65,7 +66,15 @@ const FLOW_ROUTES = new Set(['InterviewSettings', 'InterviewSession']);
 
 const isInterviewSessionPage = computed(() => route.name === 'InterviewSession');
 
-const avatarSrc = computed(() => userStore.userInfo?.avatarUrl || undefined);
+const avatarUrlRaw = computed(() => String(userStore.userInfo?.avatarUrl || '').trim());
+const avatarBust = ref(0);
+const avatarSrc = computed(() => {
+  const raw = avatarUrlRaw.value;
+  if (!raw) return undefined;
+  const full = raw.startsWith('http') || raw.startsWith('/img/') ? raw : `${apiOrigin}${raw}`;
+  const sep = full.includes('?') ? '&' : '?';
+  return `${full}${sep}v=${avatarBust.value}`;
+});
 
 const avatarText = computed(() => {
   const name = userStore.userInfo?.username;
@@ -99,6 +108,14 @@ watch(
       return;
     }
     transitionName.value = 'fade';
+  },
+  { immediate: true }
+);
+
+watch(
+  () => avatarUrlRaw.value,
+  () => {
+    avatarBust.value = Date.now();
   },
   { immediate: true }
 );
