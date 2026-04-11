@@ -60,8 +60,6 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.6</version>
         </dependency>
-        <!-- ... existing code ... -->
-        <!-- ... existing code ... -->
         <!-- 注解处理器 -->
         <dependency>
             <groupId>com.baomidou</groupId>
@@ -152,7 +150,6 @@
             <artifactId>jsqlparser</artifactId>
             <version>4.9</version> <!-- 确保版本与日志中的一致 -->
         </dependency>
-        <!-- ... existing code ... -->
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
@@ -180,6 +177,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+
     </dependencies>
 
     <build>
