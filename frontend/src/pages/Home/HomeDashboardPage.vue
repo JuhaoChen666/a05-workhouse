@@ -168,20 +168,47 @@ function initCharts() {
   if (!chartARef.value) return;
   chartA = echarts.init(chartARef.value);
   chartA.setOption({
-    grid: { left: 8, right: 8, top: 10, bottom: 8 },
-    xAxis: { type: 'category', show: false, data: ['1', '2', '3', '4', '5'] },
-    yAxis: { type: 'value', show: false },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e5e7eb',
+      textStyle: { color: '#374151', fontSize: 13 },
+      formatter: '{b} <br/> 综合评分: <b style="color: #6366f1">{c}</b>'
+    },
+    grid: { left: 35, right: 20, top: 45, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      show: true,
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#9ca3af', fontSize: 11, margin: 8 },
+      data: ['1', '2', '3', '4', '5']
+    },
+    yAxis: {
+      type: 'value',
+      show: true,
+      splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
+      axisLabel: { color: '#9ca3af', fontSize: 11 }
+    },
     series: [
       {
         type: 'line',
         smooth: true,
-        symbol: 'none',
-        lineStyle: { width: 2, color: '#6366f1' },
+        symbol: 'circle',
+        symbolSize: 6,
+        itemStyle: { color: '#6366f1', borderWidth: 2, borderColor: '#fff' },
+        lineStyle: { width: 3, color: '#6366f1', shadowColor: 'rgba(99, 102, 241, 0.2)', shadowBlur: 10 },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(99, 102, 241, 0.25)' },
-            { offset: 1, color: 'rgba(99, 102, 241, 0.02)' },
+            { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+            { offset: 1, color: 'rgba(99, 102, 241, 0.0)' },
           ]),
+        },
+        markPoint: {
+          data: [{ type: 'max', name: '最高分' }],
+          label: { color: '#fff', fontSize: 10 },
+          itemStyle: { color: '#fbbf24' }
         },
         data: [0, 0, 0, 0, 0],
       },
@@ -197,7 +224,15 @@ async function loadScoreTrend() {
     const yData = Array.isArray(trend?.series?.[0]?.data) ? trend.series![0]!.data! : [];
     const scores = yData.map((n) => Number(n) || 0).slice(-8);
     scoreList.value = scores;
-    const xData = scores.map((_v, i) => String(i + 1));
+    
+    const xDataRaw = Array.isArray(trend?.xAxis?.data) ? trend.xAxis!.data! : [];
+    const formattedDates = xDataRaw.slice(-8).map((d: string) => {
+      const parts = d.split('-');
+      return parts.length >= 3 ? `${parts[1]}-${parts[2]}` : d;
+    });
+
+    const xData = formattedDates.length === scores.length ? formattedDates : scores.map((_v, i) => String(i + 1));
+    
     chartA?.setOption({
       xAxis: { data: xData.length ? xData : ['1', '2', '3', '4', '5'] },
       series: [{ data: scores.length ? scores : [0, 0, 0, 0, 0] }],
@@ -246,14 +281,19 @@ onBeforeUnmount(() => {
   gap: clamp(10px, 1vw, 14px);
   margin-bottom: clamp(12px, 1.1vw, 16px);
   align-items: stretch;
-  min-height: clamp(200px, 22vw, 220px);
+  min-height: clamp(250px, 28vw, 300px);
 }
-.hero-left, .panel, .card { padding: clamp(10px, 0.9vw, 14px); }
+.panel, .card { padding: clamp(10px, 0.9vw, 14px); }
 .hero-left {
+  padding: clamp(20px, 3vw, 40px);
   height: 100%;
   margin: 0 !important;
   box-sizing: border-box;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
 }
 .hero-right {
   height: 100%;
@@ -262,8 +302,8 @@ onBeforeUnmount(() => {
   display: grid;
   min-height: 0;
 }
-.hero-left h1 { margin: 0 0 10px; font-size: clamp(22px, 2vw, 30px); }
-.hero-left p { margin: 0 0 14px; color: #4b5563; font-size: clamp(13px, 1vw, 15px); }
+.hero-left h1 { margin: 0 0 12px; font-size: clamp(22px, 2.5vw, 33px); line-height: 1.3; }
+.hero-left p { margin: 0 0 24px; color: #4b5563; font-size: clamp(14px, 1.2vw, 16px); line-height: 1.5; }
 .kpi-title { font-size: clamp(12px, 0.9vw, 13px); color: #6b7280; margin-bottom: 10px; }
 .kpi-variants {
   display: grid;
@@ -283,7 +323,7 @@ onBeforeUnmount(() => {
 }
 .kpi-card h4 { margin: 0 0 4px; font-size: clamp(13px, 1vw, 15px); }
 .kpi-card p { margin: 0 0 8px; color: #6b7280; font-size: clamp(12px, 0.9vw, 13px); }
-.mini-chart { flex: 1; min-height: clamp(40px, 3.6vw, 56px); }
+.mini-chart { flex: 1; min-height: clamp(130px, 11vw, 160px); }
 .section {
   margin-bottom: clamp(12px, 1.2vw, 18px);
   padding-top: clamp(4px, 0.5vw, 8px);
