@@ -28,20 +28,23 @@
     </section>
 
     <section class="main-grid fade-in-up delay-2">
-      <div class="panel theme-card">
-        <h3>训练日历</h3>
-        <div class="calendar-placeholder">
-          <p>这里放日历组件（如 Element Plus Calendar）</p>
-          <ul>
-            <li><span class="dot done"></span>已完成面试</li>
-            <li><span class="dot plan"></span>已规划</li>
-            <li><span class="dot miss"></span>待完成</li>
-          </ul>
+      <div class="panel theme-card intelligence-panel">
+        <div class="intel-header">
+          <h3>🔥 实时面试情报局</h3>
+          <span class="live-badge">LIVE</span>
         </div>
-        <div class="today-plan">
-          <h4>今日计划</h4>
-          <p>19:30 后端开发 · 语音面试</p>
-          <p>20:10 系统设计 · 文本面试</p>
+        <p class="job-tip">全网高频考点追踪，掌握最新面试风向标</p>
+        
+        <div class="intel-viewport">
+          <div class="intel-scroll-track">
+            <template v-for="loop in 2" :key="loop">
+              <div class="intel-item" v-for="(item, idx) in intelligenceList" :key="idx">
+                <span class="intel-time">{{ item.time }}</span>
+                <span :class="['intel-tag', item.type]">{{ item.tag }}</span>
+                <span class="intel-text">{{ item.text }}</span>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -114,6 +117,14 @@ const scoreTrendDesc = computed(() => {
   return `最近一次得分：${Number(latest).toFixed(1)}`;
 });
 
+
+const intelligenceList = ref([
+  { time: '10分钟前', tag: '命中', type: 'hit', text: '有同学通过模拟训练命中了腾讯 WXG 原题！' },
+  { time: '半小时前', tag: '趋势', type: 'trend', text: '过去24小时，【Redis 缓存穿透】频频被考察' },
+  { time: '1小时前', tag: '高频', type: 'hot', text: '字节跳动集中考察了【React Hooks 底层原理】' },
+  { time: '2小时前', tag: '趋势', type: 'trend', text: '【MySQL 索引下推】成为后端一面必问题' },
+  { time: '刚刚', tag: '更新', type: 'hit', text: '系统已收录最新阿里 P6 级架构设计题解' },
+]);
 
 const displayJobs = ref<any[]>([]);
 const jobDialogVisible = ref(false);
@@ -418,6 +429,98 @@ onBeforeUnmount(() => {
   color: #4b5563;
   word-break: break-all;
 }
+
+.intelligence-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.intel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.intel-header h3 {
+  margin: 0;
+  color: #ef4444;
+}
+.live-badge {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #f87171;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  animation: pulse-live 2s infinite;
+}
+@keyframes pulse-live {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.intel-viewport {
+  flex: 1;
+  margin-top: 10px;
+  background: #fbfbfa;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #e5e7eb;
+}
+.intel-viewport::before, .intel-viewport::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 20px;
+  z-index: 2;
+  pointer-events: none;
+}
+.intel-viewport::before { top: 0; background: linear-gradient(to bottom, #fbfbfa, transparent); }
+.intel-viewport::after { bottom: 0; background: linear-gradient(to top, #fbfbfa, transparent); }
+.intel-scroll-track {
+  animation: scroll-up 15s linear infinite;
+}
+.intel-scroll-track:hover {
+  animation-play-state: paused;
+}
+@keyframes scroll-up {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); } 
+}
+.intel-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px dashed #e5e7eb;
+  font-size: clamp(12px, 0.9vw, 13px);
+  color: #374151;
+  transition: background 0.2s;
+  cursor: default;
+}
+.intel-item:hover { background: #f3f4f6; }
+.intel-time {
+  color: #9ca3af;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.intel-tag {
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.intel-tag.hit { background: #dcfce7; color: #166534; }
+.intel-tag.trend { background: #e0e7ff; color: #3730a3; }
+.intel-tag.hot { background: #fee2e2; color: #991b1b; }
+.intel-text { line-height: 1.5; }
 
 @media (max-width: 1200px) {
   .mode-grid {
