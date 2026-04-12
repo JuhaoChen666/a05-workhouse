@@ -19,10 +19,19 @@
     <section class="section fade-in-up delay-1">
       <h3>快速入口</h3>
       <div class="mode-grid">
-        <article class="card theme-card" v-for="mode in modes" :key="mode.title">
-          <h4>{{ mode.title }}</h4>
-          <p>{{ mode.desc }}</p>
-          <el-button @click="handleQuickEntry(mode.key)">开始</el-button>
+        <article
+          v-for="mode in modes"
+          :key="mode.title"
+          class="quick-card theme-card"
+          role="button"
+          tabindex="0"
+          @click="handleQuickEntry(mode.key)"
+          @keydown.enter.prevent="handleQuickEntry(mode.key)"
+        >
+          <div class="quick-card-head">
+            <h4>{{ mode.title }}</h4>
+            <p>{{ mode.desc }}</p>
+          </div>
         </article>
       </div>
     </section>
@@ -155,6 +164,13 @@ function handleQuickEntry(key: string) {
     router.push({ name: 'HomeInterviewType', query: { mode: 'avatar' } });
     return;
   }
+  if (key === 'resume') {
+    router.push({ name: 'HomeResumeOptimize' });
+    return;
+  }
+  if (key === 'question') {
+    router.push({ name: 'HomeQuestion' });
+  }
 }
 
 onMounted(() => {
@@ -178,7 +194,7 @@ onBeforeUnmount(() => {
   align-items: stretch;
   min-height: clamp(200px, 22vw, 220px);
 }
-.hero-left, .panel, .card { padding: clamp(10px, 0.9vw, 14px); }
+.hero-left, .panel { padding: clamp(10px, 0.9vw, 14px); }
 .hero-left {
   height: 100%;
   margin: 0 !important;
@@ -227,8 +243,45 @@ onBeforeUnmount(() => {
   line-height: 1.25;
 }
 .mode-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1vw, 14px); }
-.card h4 { margin: 0 0 8px; }
-.card p { margin: 0 0 12px; color: #6b7280; font-size: clamp(12px, 0.9vw, 14px); }
+
+.quick-card {
+  margin: 0 !important;
+  padding: clamp(14px, 1.1vw, 18px) clamp(12px, 1vw, 16px);
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 55%, #f3f4f6 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-height: clamp(100px, 9vw, 120px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  outline: none;
+}
+.quick-card:hover {
+  border-color: #c4b5fd;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+  transform: translateY(-2px);
+}
+.quick-card:focus-visible {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+.quick-card-head h4 {
+  margin: 0 0 6px;
+  font-size: clamp(15px, 1.1vw, 17px);
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.02em;
+}
+.quick-card-head p {
+  margin: 0;
+  color: #6b7280;
+  font-size: clamp(12px, 0.9vw, 13px);
+  line-height: 1.55;
+}
 .main-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(12px, 1.2vw, 18px); }
 .calendar-placeholder { background: #fafafa; border: 1px dashed #d1d5db; border-radius: 10px; padding: clamp(10px, 1vw, 14px); }
 .calendar-placeholder ul { margin: 8px 0 0; padding-left: 0; list-style: none; }
@@ -268,13 +321,11 @@ onBeforeUnmount(() => {
   padding: 0 6px;
 }
 
-@media (max-width: 1200px) {
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) {
   .mode-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-@media (max-width: 992px) {
   .hero,
   .main-grid {
     grid-template-columns: 1fr;

@@ -1,3 +1,4 @@
+import asyncio
 from typing import AsyncGenerator
 from app.RAG.RAG_full import RAGService
 from app.RAG.session_service import SessionService
@@ -141,3 +142,65 @@ class InterviewService:
         await SessionMapper.insert_evaluation(session_id, evaluation, user_id=session_model.user_id)
         
         return evaluation
+
+    async def stream_predict_questions(
+        self, resume_id: int, position: str
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """
+        按简历与岗位流式输出押题（NDJSON）。
+        事件：prediction_item（id, question, key_points, answer, difficulty），prediction_complete，error。
+        与线上一致；后续可在此接入 LLM / RAG。
+        """
+        resume_record = await SessionMapper.get_resume_by_id(resume_id)
+        if not resume_record:
+            yield StreamEvent(
+                type="error",
+                data={"message": f"简历 ID {resume_id} 不存在"},
+                timestamp=datetime.now().isoformat(),
+            )
+            return
+
+        pos = (position or "general").strip() or "general"
+        preview = (resume_record.content_text or "")[:400].replace("\n", " ")
+
+        samples = [
+            {
+                "question": f"结合岗位方向「{pos}」，请说明你如何保证线上服务的稳定性与可观测性？",
+                "key_points": "监控指标、日志、告警、限流降级、容灾演练、STAR 法则",
+                "answer": "可从监控指标、日志、告警、限流降级、容灾演练等角度作答；若有简历中的真实项目，请用 STAR 简述背景、动作与结果。",
+                "difficulty": "中等",
+            },
+            {
+                "question": "请介绍你最近一个项目中，技术方案选型的主要依据与权衡。",
+                "key_points": f"简历项目、{pos} 相关经验、备选方案对比、可量化结果",
+                "answer": f"建议引用简历中与「{pos}」相关的项目，对比备选方案（性能、成本、团队熟悉度、维护性），并说明最终指标是否达标。",
+                "difficulty": "中等",
+            },
+            {
+                "question": "请简述线程池的核心参数及其作用。",
+                "key_points": "corePoolSize, maximumPoolSize, workQueue, keepAliveTime, threadFactory, handler",
+                "answer": "核心参数包括：核心线程数（corePoolSize）、最大线程数（maximumPoolSize）、任务队列（workQueue）、非核心线程存活时间（keepAliveTime）、线程工厂（threadFactory）和拒绝策略（handler）。它们共同控制线程池的资源分配与任务调度。",
+                "difficulty": "简单",
+            },
+        ]
+
+        for i, row in enumerate(samples):
+            yield StreamEvent(
+                type="prediction_item",
+                data={
+                    "id": i + 1,
+                    "question": row["question"],
+                    "key_points": row["key_points"],
+                    "answer": row["answer"],
+                    "difficulty": row["difficulty"],
+                    "resume_preview_hint": preview[:120] + ("…" if len(preview) > 120 else ""),
+                },
+                timestamp=datetime.now().isoformat(),
+            )
+            await asyncio.sleep(0.28)
+
+        yield StreamEvent(
+            type="prediction_complete",
+            data={"total": len(samples)},
+            timestamp=datetime.now().isoformat(),
+        )

@@ -32,12 +32,6 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="最大轮次：">
-          <div class="slider-wrap">
-            <el-slider v-model="maxRounds" :min="5" :max="20" />
-          </div>
-        </el-form-item>
-
         <el-form-item label="麦克风：">
           <div class="mic-tools">
             <el-button
@@ -84,7 +78,6 @@ const userStore = useUserStore();
 const draft = loadInterviewSetupDraft();
 
 const difficulty = ref<InterviewDifficulty>(draft.difficulty);
-const maxRounds = ref(Number(draft.maxRounds || 8));
 const micEnabled = ref(false);
 const testing = ref(false);
 const level = ref(0);
@@ -193,7 +186,6 @@ function startInterview() {
   }
   saveInterviewSetupDraft({
     difficulty: difficulty.value,
-    maxRounds: maxRounds.value,
   });
 
   const payload = {
@@ -237,7 +229,6 @@ function startInterview() {
 .difficulty-card.active { border-color: #8b5cf6; background: #f5f3ff; }
 .difficulty-card h4 { margin: 0 0 6px; }
 .difficulty-card p { margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5; }
-.slider-wrap { width: min(420px, 100%); }
 .mic-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mic-icon-btn { width: 36px; height: 36px; border: 1px solid #d1d5db; }
 .mic-icon-btn.on { color: #10b981; border-color: #86efac; }
@@ -255,5 +246,6 @@ function startInterview() {
   background: linear-gradient(90deg, #10b981, #3b82f6);
   transition: width .08s linear;
 }
-@media (max-width: 1100px) { .difficulty-grid { grid-template-columns: 1fr; } }
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) { .difficulty-grid { grid-template-columns: 1fr; } }
 </style>

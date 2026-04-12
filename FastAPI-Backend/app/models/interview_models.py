@@ -15,6 +15,12 @@ class InterviewAnswerRequest(BaseModel):
     session_id: str
     answer: str
 
+
+class PredictQuestionsRequest(BaseModel):
+    """面试押题：按简历与岗位方向流式生成题目"""
+    resume_id: int
+    position: str
+
 class StreamEvent(BaseModel):
     """流式事件"""
     type: str  # question, analyzing, analysis_result, followup, evaluation, complete, error

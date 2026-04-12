@@ -95,6 +95,7 @@ import {
 import type { UserInfo } from '@/types/auth';
 import { useUserStore } from '@/store/user';
 import { apiOrigin } from '@/api/request';
+import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -165,6 +166,16 @@ async function loadProfileInfo() {
 async function loadAvatarProfile() {
   avatarLoading.value = true;
   try {
+    const synced = await syncUserAvatarFromAdminApi();
+    const u = userStore.userInfo;
+    if (synced && u?.avatarUrl) {
+      avatarProfile.value = {
+        id: u.id,
+        username: u.username,
+        avatarUrl: u.avatarUrl,
+      };
+      return;
+    }
     const res = await getProfileAvatarApi();
     avatarProfile.value = res;
     if (res?.avatarUrl && userStore.userInfo) {
@@ -193,14 +204,16 @@ async function handleAvatarUpload({ file }: { file: File }) {
   try {
     const res = await uploadAvatarApi(userId, form);
     if (res?.avatarUrl) {
-      avatarProfile.value = {
-        id: String(userId),
-        username: displayUsername.value,
-        avatarUrl: res.avatarUrl,
-      };
       if (userStore.userInfo) {
         userStore.setUserInfo({ ...userStore.userInfo, avatarUrl: res.avatarUrl });
       }
+      await syncUserAvatarFromAdminApi();
+      const latest = userStore.userInfo?.avatarUrl || res.avatarUrl;
+      avatarProfile.value = {
+        id: String(userId),
+        username: displayUsername.value,
+        avatarUrl: latest,
+      };
       ElMessage.success('头像已更新');
     }
   } catch (e: any) {

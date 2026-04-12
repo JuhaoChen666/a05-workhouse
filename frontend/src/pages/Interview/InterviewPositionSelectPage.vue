@@ -1,7 +1,71 @@
 <template>
   <div class="setup-page">
     <InterviewSetupProgress :active="1" />
-    <div class="layout">
+
+    <!-- 移动端：单列，岗位为远程下拉搜索，详情紧挨搜索区下方 -->
+    <template v-if="isMobile">
+      <el-card class="theme-card mobile-setup-card" shadow="hover">
+        <el-form label-width="96px" class="mobile-setup-form">
+          <el-form-item label="个人简历">
+            <el-select
+              v-model="selectedResumeId"
+              placeholder="请选择个人简历"
+              clearable
+              style="width: 100%"
+              :loading="resumeLoading"
+              popper-class="resume-select-popper"
+              @visible-change="onResumeSelectVisibleChange"
+            >
+              <el-option
+                v-for="item in resumeOptions"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="岗位">
+            <el-select
+              v-model="selectedJobId"
+              filterable
+              remote
+              reserve-keyword
+              :remote-method="remoteJobSearch"
+              :loading="jobLoading || jobLoadingMore"
+              placeholder="输入关键字，在下拉列表中选择岗位"
+              clearable
+              class="mobile-job-select"
+              popper-class="job-select-popper"
+              @visible-change="onJobSelectVisibleChange"
+              @change="onMobileJobSelectChange"
+            >
+              <el-option v-for="job in allJobs" :key="job.id" :label="job.name" :value="job.id" />
+            </el-select>
+            <div v-if="hasSearched" class="mobile-job-meta">
+              <template v-if="jobLoading">正在搜索…</template>
+              <template v-else>
+                共 <strong>{{ jobTotal }}</strong> 条
+                <span v-if="jobTotal > 0" class="meta-sub"> · 已加载 {{ allJobs.length }} 条</span>
+                <span v-if="jobLoadingMore" class="meta-loading-inline"> · 加载中…</span>
+              </template>
+            </div>
+          </el-form-item>
+        </el-form>
+
+        <div class="mobile-detail-wrap">
+          <InterviewPositionJobDetailBlock
+            :job="selectedJob"
+            :loading="detailLoading"
+            :error="detailError"
+            :detail="selectedJobDetail"
+          />
+        </div>
+      </el-card>
+    </template>
+
+    <!-- 桌面端：双栏 -->
+    <div v-else class="layout">
       <el-card class="theme-card left-card" shadow="hover">
         <el-form label-width="120px">
           <el-form-item label="个人简历：">
@@ -34,8 +98,23 @@
             </div>
           </el-form-item>
 
+          <div v-if="hasSearched" class="job-search-meta">
+            <template v-if="jobLoading">
+              <span class="meta-loading">正在搜索…</span>
+            </template>
+            <template v-else>
+              <span class="meta-count">共 <strong>{{ jobTotal }}</strong> 条岗位</span>
+              <span v-if="jobTotal > 0" class="meta-sub"> · 已加载 {{ allJobs.length }} 条</span>
+              <span v-if="jobLoadingMore" class="meta-loading-inline"> · 加载更多中…</span>
+            </template>
+          </div>
+
           <div class="job-result-wrap" v-loading="jobLoading" element-loading-text="岗位搜索中...">
-            <div v-if="filteredJobs.length > 0" class="job-cards">
+            <div
+              v-if="filteredJobs.length > 0"
+              class="job-cards"
+              @scroll.passive="onJobListScroll"
+            >
               <article
                 v-for="job in filteredJobs"
                 :key="job.id"
@@ -51,10 +130,7 @@
               </article>
             </div>
             <div v-else-if="showNoJobResult" class="job-empty-wrap">
-              <el-empty
-                description="未搜索到匹配岗位"
-                :image-size="54"
-              />
+              <el-empty description="未搜索到匹配岗位" :image-size="54" />
             </div>
             <div v-else-if="showSearchHint" class="job-search-hint">请输入关键词</div>
           </div>
@@ -62,38 +138,12 @@
       </el-card>
 
       <el-card class="theme-card right-card" shadow="hover">
-        <h3 class="detail-title">岗位详情</h3>
-        <el-empty
-          v-if="!selectedJob"
-          description="请先在左侧选择工作岗位"
-          :image-size="72"
+        <InterviewPositionJobDetailBlock
+          :job="selectedJob"
+          :loading="detailLoading"
+          :error="detailError"
+          :detail="selectedJobDetail"
         />
-        <div v-else-if="detailLoading" class="selected-job-card detail-loading">岗位详情加载中...</div>
-        <div v-else-if="detailError" class="selected-job-card detail-error">{{ detailError }}</div>
-        <div v-else class="selected-job-card">
-          <div class="header-row">
-            <h4>{{ selectedJobDetail?.name || selectedJob.name }}</h4>
-            <el-tag size="small" type="info">{{
-              selectedJobDetail?.companyName || selectedJob.companyName
-            }}</el-tag>
-          </div>
-          <p class="job-time" v-if="selectedJobDetail?.updateTime">更新时间：{{ selectedJobDetail?.updateTime }}</p>
-
-          <div class="salary-block" v-if="hasSalary(selectedJobDetail)">
-            <h5>薪资范围</h5>
-            <ul>
-              <li v-if="selectedJobDetail?.salaryJunior"><span>初级</span><b>{{ selectedJobDetail?.salaryJunior }}</b></li>
-              <li v-if="selectedJobDetail?.salaryMid"><span>中级</span><b>{{ selectedJobDetail?.salaryMid }}</b></li>
-              <li v-if="selectedJobDetail?.salarySenior"><span>高级</span><b>{{ selectedJobDetail?.salarySenior }}</b></li>
-              <li v-if="selectedJobDetail?.salaryExpert"><span>专家</span><b>{{ selectedJobDetail?.salaryExpert }}</b></li>
-            </ul>
-          </div>
-
-          <div class="text-block">
-            <h5>技能要求</h5>
-            <p class="job-content">{{ selectedJobDetail?.skillRequirements || selectedJobDetail?.jobContent || '暂无技能要求' }}</p>
-          </div>
-        </div>
       </el-card>
     </div>
 
@@ -114,9 +164,13 @@ import { getResumeListApi } from '@/api/resume';
 import { useUserStore } from '@/store/user';
 import { loadInterviewSetupDraft, saveInterviewSetupDraft } from './setupState';
 import InterviewSetupProgress from './InterviewSetupProgress.vue';
+import InterviewPositionJobDetailBlock from './InterviewPositionJobDetailBlock.vue';
+import { useViewport } from '@/composables/useViewport';
+import { MOBILE_MAX_WIDTH_PX } from '@/constants/breakpoints';
 
 const router = useRouter();
 const userStore = useUserStore();
+const { isMobile } = useViewport();
 const draft = loadInterviewSetupDraft();
 
 const useResume = ref(true);
@@ -134,8 +188,13 @@ const selectedJobId = ref<number | undefined>(undefined);
 const jobKeyword = ref('');
 const allJobs = ref<HotJobItem[]>([]);
 const jobLoading = ref(false);
+const jobLoadingMore = ref(false);
 const hasSearched = ref(false);
+const jobNextPage = ref(2);
+const jobPageSize = 8;
+const jobTotal = ref(0);
 let jobSearchTimer: number | null = null;
+let jobSelectScrollWrap: HTMLElement | null = null;
 const selectedJob = computed(() => allJobs.value.find((j) => j.id === selectedJobId.value));
 const selectedJobDetail = ref<{
   name: string;
@@ -168,40 +227,118 @@ watch(selectedResumeId, (id) => {
 const filteredJobs = computed(() => allJobs.value);
 const showNoJobResult = computed(() => hasSearched.value && !jobLoading.value && filteredJobs.value.length === 0);
 const showSearchHint = computed(() => !hasSearched.value && !jobLoading.value);
+const jobHasMore = computed(
+  () => hasSearched.value && jobTotal.value > 0 && allJobs.value.length < jobTotal.value
+);
 
-async function fetchSimplePositions() {
+function mapSimplePositionList(list: { id: unknown; name?: unknown }[]): HotJobItem[] {
+  return list.map((it) => ({
+    id: Number(it.id),
+    name: String(it.name || '未命名岗位'),
+    companyName: '岗位库',
+    companyLogo: '',
+    salaryMin: '--',
+    salaryMax: '--',
+    jobContent: '',
+    type: '岗位',
+  }));
+}
+
+async function loadJobPositionsPage(mode: 'replace' | 'append') {
   const keyword = String(jobKeyword.value || '').trim();
+  if (mode === 'append') {
+    if (!jobHasMore.value || jobLoadingMore.value || jobLoading.value) return;
+    jobLoadingMore.value = true;
+  } else {
+    jobLoading.value = true;
+  }
+
+  const page = mode === 'replace' ? 1 : jobNextPage.value;
   hasSearched.value = true;
-  jobLoading.value = true;
+
   try {
     const res = await getSimplePositionPageApi({
-      page: 1,
-      pageSize: 10,
+      page,
+      pageSize: jobPageSize,
       name: keyword || undefined,
     });
     const list = Array.isArray(res?.list) ? res.list : [];
-    allJobs.value = list.map((it) => ({
-      id: Number(it.id),
-      name: String(it.name || '未命名岗位'),
-      companyName: '岗位库',
-      companyLogo: '',
-      salaryMin: '--',
-      salaryMax: '--',
-      jobContent: '',
-      type: '岗位',
-    }));
-    if (!allJobs.value.some((j) => j.id === selectedJobId.value)) {
-      selectedJobId.value = undefined;
-      positionName.value = '';
-      positionDetail.value = '';
-      selectedJobDetail.value = null;
-      detailError.value = '';
+    const mapped = mapSimplePositionList(list);
+    const totalNum = Number(res?.total);
+    if (res?.total != null && res?.total !== '' && Number.isFinite(totalNum)) {
+      jobTotal.value = Math.max(0, totalNum);
+    } else if (mode === 'replace') {
+      jobTotal.value = mapped.length;
+    }
+
+    if (mode === 'replace') {
+      allJobs.value = mapped;
+      jobNextPage.value = 2;
+      if (!allJobs.value.some((j) => j.id === selectedJobId.value)) {
+        selectedJobId.value = undefined;
+        positionName.value = '';
+        positionDetail.value = '';
+        selectedJobDetail.value = null;
+        detailError.value = '';
+      }
+    } else {
+      if (mapped.length === 0) {
+        jobTotal.value = allJobs.value.length;
+        return;
+      }
+      const seen = new Set(allJobs.value.map((j) => j.id));
+      for (const j of mapped) {
+        if (!seen.has(j.id)) {
+          seen.add(j.id);
+          allJobs.value.push(j);
+        }
+      }
+      jobNextPage.value = page + 1;
     }
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || '岗位搜索失败');
   } finally {
     jobLoading.value = false;
+    jobLoadingMore.value = false;
   }
+}
+
+function onJobListScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  if (el.scrollTop + el.clientHeight < el.scrollHeight - 32) return;
+  void loadJobPositionsPage('append');
+}
+
+function detachJobSelectScrollListener() {
+  if (!jobSelectScrollWrap) return;
+  jobSelectScrollWrap.removeEventListener('scroll', onJobDropdownScroll);
+  jobSelectScrollWrap = null;
+}
+
+function onJobDropdownScroll(e: Event) {
+  const target = e.target as HTMLElement;
+  const reachBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+  if (!reachBottom) return;
+  void loadJobPositionsPage('append');
+}
+
+function onJobSelectVisibleChange(visible: boolean) {
+  if (!visible) {
+    detachJobSelectScrollListener();
+    return;
+  }
+  if (isMobile.value && !String(jobKeyword.value || '').trim()) {
+    void loadJobPositionsPage('replace');
+  }
+  nextTick(() => {
+    detachJobSelectScrollListener();
+    const wrap = document.querySelector('.job-select-popper .el-select-dropdown__wrap') as
+      | HTMLElement
+      | null;
+    if (!wrap) return;
+    jobSelectScrollWrap = wrap;
+    jobSelectScrollWrap.addEventListener('scroll', onJobDropdownScroll, { passive: true });
+  });
 }
 
 function selectJob(job: HotJobItem) {
@@ -259,14 +396,33 @@ function formatDateTime(input: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function hasSalary(detail: (typeof selectedJobDetail.value) | null) {
-  if (!detail) return false;
-  return Boolean(detail.salaryJunior || detail.salaryMid || detail.salarySenior || detail.salaryExpert);
-}
-
 function shorten(text: string) {
   const t = String(text || '');
   return t.length > 60 ? `${t.slice(0, 60)}...` : t;
+}
+
+function remoteJobSearch(query: string) {
+  jobKeyword.value = query;
+  if (jobSearchTimer != null) {
+    window.clearTimeout(jobSearchTimer);
+  }
+  jobSearchTimer = window.setTimeout(() => {
+    void loadJobPositionsPage('replace');
+  }, 320);
+}
+
+function onMobileJobSelectChange(val: string | number | undefined | null) {
+  const id =
+    val === '' || val == null ? undefined : typeof val === 'number' ? val : Number(val);
+  if (id == null || Number.isNaN(id)) {
+    selectedJobDetail.value = null;
+    detailError.value = '';
+    positionName.value = '';
+    positionDetail.value = '';
+    return;
+  }
+  const job = allJobs.value.find((j) => j.id === id);
+  if (job) void fetchPositionDetail(job);
 }
 
 onMounted(async () => {
@@ -275,15 +431,21 @@ onMounted(async () => {
   } catch {
     ElMessage.warning('获取简历列表失败，请稍后重试');
   }
-  try {
-    await fetchSimplePositions();
-  } catch {
-    // ignore
+  const narrow =
+    typeof window !== 'undefined' &&
+    window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH_PX}px)`).matches;
+  if (!narrow) {
+    try {
+      await loadJobPositionsPage('replace');
+    } catch {
+      // ignore
+    }
   }
 });
 
 onBeforeUnmount(() => {
   detachResumeScrollListener();
+  detachJobSelectScrollListener();
   if (jobSearchTimer != null) {
     window.clearTimeout(jobSearchTimer);
     jobSearchTimer = null;
@@ -293,11 +455,12 @@ onBeforeUnmount(() => {
 watch(
   () => jobKeyword.value,
   () => {
+    if (isMobile.value) return;
     if (jobSearchTimer != null) {
       window.clearTimeout(jobSearchTimer);
     }
     jobSearchTimer = window.setTimeout(() => {
-      void fetchSimplePositions();
+      void loadJobPositionsPage('replace');
     }, 350);
   }
 );
@@ -415,13 +578,53 @@ function goNext() {
   flex-direction: column;
   overflow: hidden;
 }
+.job-search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+.job-search-meta strong {
+  color: #111827;
+  font-weight: 700;
+}
+.meta-sub {
+  color: #9ca3af;
+  font-size: 12px;
+}
+.meta-loading {
+  color: #9ca3af;
+}
+.meta-loading-inline {
+  color: #8b5cf6;
+  font-size: 12px;
+}
+.mobile-job-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.mobile-job-meta strong {
+  color: #111827;
+  font-weight: 700;
+}
 .job-result-wrap {
   position: relative;
   margin-top: 6px;
   flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
-  height: 210px;
+  height: 75%;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
 }
 .search-row {
   width: 100%;
@@ -433,7 +636,7 @@ function goNext() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: 210px;
+  flex: 1;
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
@@ -466,7 +669,8 @@ function goNext() {
 .job-card .desc { margin: 0; color: #4b5563; font-size: 12px; line-height: 1.5; }
 .job-empty-wrap,
 .job-search-hint {
-  height: 210px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,88 +679,26 @@ function goNext() {
   color: #9ca3af;
   font-size: 13px;
 }
-.detail-title { margin: 0 0 8px; }
-.selected-job-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 14px;
-  background: #fff;
-  max-height: 340px;
-  overflow-y: auto;
-}
-.header-row {
+.mobile-setup-card :deep(.el-card__body) {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
-.header-row h4 {
-  margin: 0;
-  font-size: 16px;
+.mobile-setup-form {
+  flex-shrink: 0;
 }
-.job-time {
-  margin: 0 0 10px;
-  color: #9ca3af;
-  font-size: 12px;
+.mobile-job-select {
+  width: 100%;
 }
-.salary-block {
-  margin-bottom: 12px;
-  border: 1px solid #ede9fe;
-  background: #faf5ff;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-.salary-block h5,
-.text-block h5 {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: #374151;
-}
-.salary-block ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 6px;
-}
-.salary-block li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-  color: #4b5563;
-}
-.salary-block li b {
-  color: #111827;
-  font-weight: 700;
-}
-.text-block {
-  margin-bottom: 12px;
-}
-.job-content {
-  margin: 0;
-  color: #374151;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-.detail-loading,
-.detail-error {
-  color: #6b7280;
-  line-height: 1.7;
-}
-.detail-error {
-  color: #b91c1c;
+.mobile-detail-wrap {
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px solid #f3f4f6;
 }
 .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
-@media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .left-card,
-  .right-card {
-    max-height: none;
+@media (max-width: 768px) {
+  .actions {
+    flex-wrap: wrap;
   }
 }
 </style>

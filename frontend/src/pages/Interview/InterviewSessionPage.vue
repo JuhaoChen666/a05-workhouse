@@ -1,16 +1,258 @@
 <template>
-  <div class="interview-session-page theme-page-shell" :class="{ 'text-desktop-theme': !isAvatarInterview }">
-  
-    <el-card class="session-card theme-card" shadow="hover">
+  <div class="interview-session-root">
+    <template v-if="showFlowDock">
+      <Transition name="flow-dock-backdrop">
+        <div
+          v-show="flowPanelOpen"
+          class="flow-dock-backdrop"
+          aria-hidden="true"
+          @click="flowPanelOpen = false"
+        />
+      </Transition>
+      <Transition name="flow-dock-slide">
+        <aside v-show="flowPanelOpen" class="flow-dock-panel" aria-label="面试流程">
+        <div class="flow-dock-duration-bar" aria-live="polite">
+          <span class="flow-dock-duration-label">面试时长</span>
+          <span class="flow-dock-duration-value">{{ interviewDurationDisplay }}</span>
+        </div>
+        <div class="flow-dock-focus" aria-live="polite">
+          <div class="flow-dock-focus-head">
+            <span class="flow-dock-focus-label">当前主题</span>
+            <span class="flow-dock-focus-status">{{ flowDockFocusStatus }}</span>
+          </div>
+          <p v-if="flowDockFocusTopicDisplay" class="flow-dock-focus-topic">{{ flowDockFocusTopicDisplay }}</p>
+        </div>
+        <div class="flow-dock-header">
+          <span class="flow-dock-header-title">面试进度</span>
+        </div>
+        <div ref="flowDockBodyRef" class="flow-dock-body">
+          <div class="flow-rail-list">
+            <el-tooltip
+              v-for="(node, i) in flowNodes"
+              :key="node.id"
+              placement="right-start"
+              :show-after="180"
+              :disabled="flowNodeTooltipLines(node).length === 0"
+              popper-class="flow-node-tooltip-popper"
+              effect="light"
+            >
+              <template #content>
+                <div class="flow-node-tooltip-content">
+                  <div
+                    v-for="(line, li) in flowNodeTooltipLines(node)"
+                    :key="li"
+                    class="flow-node-tooltip-line"
+                  >
+                    {{ line }}
+                  </div>
+                </div>
+              </template>
+              <div
+                class="flow-step"
+                :data-flow-node-id="node.id"
+                :class="{
+                  'flow-step--ai': node.side === 'ai',
+                  'flow-step--user': node.side === 'user',
+                  'flow-step--thinking': node.status === 'thinking',
+                  'flow-step--has-anchor': node.messageIndex !== null,
+                }"
+                role="button"
+                tabindex="0"
+                @click="onFlowStepActivate(node)"
+                @keydown.enter.prevent="onFlowStepActivate(node)"
+              >
+                <div class="flow-step-grid">
+                  <div class="flow-step-side flow-step-side--left">
+                    <span v-if="node.side === 'ai'" class="flow-step-label flow-step-label--ai">{{ node.title }}</span>
+                  </div>
+                  <div class="flow-track">
+                    <div class="flow-dot-wrap">
+                      <span v-if="node.status === 'thinking'" class="flow-dot flow-dot--thinking" aria-hidden="true">
+                        <el-icon class="flow-spin-icon is-loading"><Loading /></el-icon>
+                      </span>
+                      <span v-else class="flow-dot" :class="node.side === 'user' ? 'flow-dot--user' : 'flow-dot--ai'" />
+                    </div>
+                    <div v-if="i < flowNodes.length - 1" class="flow-vert-line" />
+                  </div>
+                  <div class="flow-step-side flow-step-side--right">
+                    <span v-if="node.side === 'user'" class="flow-step-label flow-step-label--user">{{ node.title }}</span>
+                  </div>
+                </div>
+              </div>
+            </el-tooltip>
+          </div>
+        </div>
+        </aside>
+      </Transition>
+      <button
+        type="button"
+        class="flow-dock-tab"
+        :class="{ 'flow-dock-tab--panel-open': flowPanelOpen }"
+        :aria-expanded="flowPanelOpen"
+        :aria-label="flowPanelOpen ? '折叠流程' : '展开流程'"
+        :title="flowPanelOpen ? '折叠流程' : '展开流程'"
+        @click="flowPanelOpen = !flowPanelOpen"
+      >
+        <el-icon class="flow-dock-tab-chevron">
+          <DArrowRight v-if="!flowPanelOpen" />
+          <DArrowLeft v-else />
+        </el-icon>
+      </button>
+    </template>
+
+    <template v-if="showMaterialsDock">
+      <Transition name="material-dock-backdrop">
+        <div
+          v-show="materialsPanelOpen"
+          class="material-dock-backdrop"
+          aria-hidden="true"
+          @click="materialsPanelOpen = false"
+        />
+      </Transition>
+      <Transition name="material-dock-slide">
+        <aside v-show="materialsPanelOpen" class="material-dock-panel" aria-label="资料与助手">
+        <div class="material-dock-header">
+          <span class="material-dock-header-title">面试助手</span>
+          <el-button
+            text
+            circle
+            class="material-dock-collapse-btn"
+            title="折叠"
+            aria-label="折叠资料面板"
+            @click="materialsPanelOpen = false"
+          >
+            <el-icon><DArrowRight /></el-icon>
+          </el-button>
+        </div>
+        <div class="material-dock-body">
+          <section class="material-dock-section">
+            <div class="material-dock-section-head">
+              <h4 class="material-dock-section-title">个人简历</h4>
+              <el-button
+                v-if="hasSessionResume"
+                size="small"
+                type="primary"
+                plain
+                class="material-zoom-btn"
+                @click="resumeZoomOpen = true"
+              >
+                查看
+              </el-button>
+            </div>
+            <div v-if="sessionResumeLoading" class="material-dock-hint">加载中…</div>
+            <div v-else-if="sessionResumeError" class="material-dock-error">{{ sessionResumeError }}</div>
+            <template v-else-if="sessionResumePdfSrc">
+              <div class="material-resume-pdf-thumb" role="region" aria-label="简历 PDF 预览">
+                <div class="material-resume-pdf-toolbar">
+                  <div class="material-resume-pdf-toolbar-zoom">
+                    <el-button size="small" text class="material-resume-pdf-tool-btn" @click="resumeThumbZoomOut">
+                      <el-icon><Minus /></el-icon>
+                    </el-button>
+                    <span class="material-resume-pdf-zoom-label">{{ resumeThumbZoomPercent }}%</span>
+                    <el-button size="small" text class="material-resume-pdf-tool-btn" @click="resumeThumbZoomIn">
+                      <el-icon><Plus /></el-icon>
+                    </el-button>
+                  </div>
+                  <el-button size="small" text type="primary" class="material-resume-pdf-reset" @click="resumeThumbPanZoomReset">
+                    重置
+                  </el-button>
+                </div>
+                <p class="material-resume-pdf-hint">拖动平移 · 滚轮缩放</p>
+                <div
+                  class="material-resume-pdf-viewport"
+                  :class="{ 'is-dragging': resumeThumbDragging }"
+                  @wheel.prevent="onResumeThumbWheel"
+                  @pointerdown="onResumeThumbPointerDown"
+                  @pointermove="onResumeThumbPointerMove"
+                  @pointerup="onResumeThumbPointerUp"
+                  @pointercancel="onResumeThumbPointerUp"
+                >
+                  <div
+                    class="material-resume-pdf-pan-layer"
+                    :style="{
+                      transform: `translate(${resumeThumbPanX}px, ${resumeThumbPanY}px) scale(${resumeThumbScale})`,
+                    }"
+                  >
+                    <ResumePdfPreview :src="sessionResumePdfSrc" variant="sidebar" />
+                  </div>
+                </div>
+              </div>
+            </template>
+            <pre v-else-if="sessionResumePlainText" class="material-resume-text">{{ sessionResumePlainText }}</pre>
+            <el-empty
+              v-else
+              description="暂无本场简历快照，请从面试设置重新进入"
+              :image-size="56"
+              class="material-resume-empty"
+            />
+          </section>
+          <section class="material-dock-section material-dock-section--ai">
+            <h4 class="material-dock-section-title">面试助手</h4>
+            <div class="ai-assistant-card">
+
+            </div>
+          </section>
+        </div>
+        </aside>
+      </Transition>
+      <button
+        type="button"
+        class="material-dock-tab"
+        :class="{ 'material-dock-tab--panel-open': materialsPanelOpen }"
+        :aria-expanded="materialsPanelOpen"
+        :aria-label="materialsPanelOpen ? '折叠资料' : '展开资料'"
+        :title="materialsPanelOpen ? '折叠资料' : '展开资料'"
+        @click="materialsPanelOpen = !materialsPanelOpen"
+      >
+        <el-icon class="material-dock-tab-chevron">
+          <DArrowLeft v-if="!materialsPanelOpen" />
+          <DArrowRight v-else />
+        </el-icon>
+      </button>
+    </template>
+
+    <el-dialog
+      v-model="resumeZoomOpen"
+      :title="sessionResumeTitle || '简历预览'"
+      width="min(96vw, 920px)"
+      append-to-body
+      class="resume-zoom-dialog"
+    >
+      <ResumePdfPreview v-if="sessionResumePdfSrc" :src="sessionResumePdfSrc" variant="zoom" />
+      <pre v-else-if="sessionResumePlainText" class="resume-zoom-text">{{ sessionResumePlainText }}</pre>
+      <div v-else class="material-dock-hint">暂无可展示内容</div>
+    </el-dialog>
+
+    <div class="interview-session-page interview-session--gpt theme-page-shell">
+    <el-card class="session-card session-card--gpt" shadow="never">
       <template #header>
-        <div class="card-header">
-          <span class="card-title">{{ pageInterviewTopic }}</span>
-          <el-button circle class="close-btn" @click="onLeavePage">×</el-button>
+        <div class="gpt-topbar">
+          <div class="gpt-topbar-side gpt-topbar-side--left">
+            <div class="window-traffic-lights" role="toolbar" aria-label="窗口操作">
+              <button
+                type="button"
+                class="window-traffic-slot window-traffic-btn window-traffic-btn--close"
+                title="结束面试"
+                aria-label="结束面试"
+                @click="onLeavePage"
+              >
+                <span class="window-traffic-dot window-traffic-dot--close" aria-hidden="true" />
+              </button>
+              <span class="window-traffic-slot window-traffic-slot--decorative" aria-hidden="true">
+                <span class="window-traffic-dot window-traffic-dot--min" />
+              </span>
+              <span class="window-traffic-slot window-traffic-slot--decorative" aria-hidden="true">
+                <span class="window-traffic-dot window-traffic-dot--zoom" />
+              </span>
+            </div>
+          </div>
+          <div class="gpt-topbar-center">
+            <span class="gpt-title-text">{{ pageInterviewTopic }}</span>
+            <el-tag v-if="isAvatarInterview" size="small" effect="plain" class="gpt-mode-tag">虚拟人</el-tag>
+          </div>
+          <div class="gpt-topbar-side gpt-topbar-side--right" aria-hidden="true" />
         </div>
       </template>
-      <div class="toolbar">
-        <el-tag v-if="isAvatarInterview" size="small" type="success">虚拟人面试</el-tag>
-      </div>
 
       <el-alert
         v-if="showMissingSessionAlert"
@@ -22,10 +264,7 @@
       />
 
       <template v-else-if="canRenderInterview">
-        <div
-          class="session-workspace"
-          :class="{ 'conference-layout': isAvatarInterview}"
-        >
+        <div class="session-workspace" :class="{ 'conference-layout': isAvatarInterview }">
 
           <div v-if="isAvatarInterview" class="conference-left">
             <div class="participant-card">
@@ -53,8 +292,15 @@
           </div>
 
           <div class="conference-right">
-            <div class="chat-panel" ref="chatPanelRef">
-              <div v-for="(m, idx) in messages" :key="idx" class="msg" :class="m.role === 'user' ? 'msg-user' : 'msg-ai'">
+            <div class="chat-panel-wrap">
+              <div class="chat-panel" ref="chatPanelRef" @scroll.passive="onChatPanelScroll">
+              <div
+                v-for="(m, idx) in messages"
+                :key="idx"
+                class="msg"
+                :class="m.role === 'user' ? 'msg-user' : 'msg-ai'"
+                :data-chat-index="idx"
+              >
                 <div class="msg-row">
                   <el-avatar class="msg-avatar" :size="30" :src="m.role === 'user' ? userAvatar : aiAvatarSrc">
                     {{ m.role === 'user' ? '我' : 'AI' }}
@@ -113,6 +359,19 @@
                   </div>
                 </div>
               </div>
+              </div>
+              <transition name="chat-scroll-fab">
+                <button
+                  v-show="showChatScrollToBottomFab"
+                  type="button"
+                  class="chat-scroll-to-bottom-fab"
+                  aria-label="回到底部"
+                  title="回到底部"
+                  @click="onClickScrollChatToBottom"
+                >
+                  <el-icon><ArrowDown /></el-icon>
+                </button>
+              </transition>
             </div>
 
             <div class="composer composer-integrated">
@@ -130,6 +389,8 @@
                   v-model="userInput"
                   type="textarea"
                   :autosize="{ minRows: 2, maxRows: 6 }"
+                  :maxlength="INTERVIEW_ANSWER_MAX_LEN"
+                  show-word-limit
                   :placeholder="
                     isRecording ? '录音中…' : '输入回答，Enter 发送 · Shift+Enter 换行'
                   "
@@ -138,6 +399,16 @@
                   @keydown.enter.exact.prevent="sendMessage"
                 />
                 <div class="composer-toolbar">
+                  <el-button
+                    circle
+                    type="danger"
+                    class="composer-tool-btn composer-hangup-btn"
+                    title="结束面试"
+                    aria-label="结束面试"
+                    @click="onLeavePage"
+                  >
+                    <el-icon class="composer-hangup-icon"><PhoneFilled /></el-icon>
+                  </el-button>
                   <el-button
                     circle
                     :type="isRecording ? 'danger' : 'default'"
@@ -165,14 +436,27 @@
         </div>
       </template>
     </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, watchEffect, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useViewport } from '@/composables/useViewport';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Microphone, Right, ArrowRight } from '@element-plus/icons-vue';
+import {
+  Microphone,
+  Right,
+  ArrowDown,
+  ArrowRight,
+  Loading,
+  DArrowLeft,
+  DArrowRight,
+  Plus,
+  Minus,
+  PhoneFilled,
+} from '@element-plus/icons-vue';
 import {
   startInterviewApi,
   streamInterviewAnswer,
@@ -184,13 +468,63 @@ import {
   endAvatarInterviewSessionApi,
   type StartInterviewBody,
   type InterviewAnswerStreamEvent,
+  type InterviewSessionInfo,
 } from '@/api/interviewAi';
 import { useUserStore } from '@/store/user';
 import { apiOrigin } from '@/api/request';
+import { getResumeItemApi } from '@/api/resume';
+import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
+import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
+
+/** 文字作答最大字数（与输入框 maxlength 一致） */
+const INTERVIEW_ANSWER_MAX_LEN = 400;
+
+const SESSION_RESUME_STORAGE_PREFIX = 'interviewSessionResumeMeta:';
+
+type PendingInterviewStart = Partial<StartInterviewBody> & {
+  resume?: string;
+  interview_mode?: string;
+  avatar_id?: string;
+};
+
+type SessionResumeCache = {
+  resumeId?: number;
+  resumeText?: string;
+  displayName?: string;
+};
+
+function sessionResumeStorageKey(sessionId: string) {
+  return `${SESSION_RESUME_STORAGE_PREFIX}${sessionId}`;
+}
+
+function readSessionResumeCache(sessionId: string): SessionResumeCache | null {
+  if (!sessionId.trim()) return null;
+  try {
+    const raw = sessionStorage.getItem(sessionResumeStorageKey(sessionId));
+    if (!raw) return null;
+    return JSON.parse(raw) as SessionResumeCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionResumeCache(sessionId: string, data: SessionResumeCache) {
+  sessionStorage.setItem(sessionResumeStorageKey(sessionId), JSON.stringify(data));
+}
+
+function buildCacheFromPending(p: PendingInterviewStart): SessionResumeCache {
+  const rid = p.resume_id;
+  const resumeId = typeof rid === 'number' && Number.isFinite(rid) ? rid : undefined;
+  const resumeText =
+    typeof p.resume === 'string' && p.resume.trim() ? p.resume.trim() : undefined;
+  const displayName = String(p.position || '').trim() || '本场简历';
+  return { resumeId, resumeText, displayName };
+}
 
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const { isMobile } = useViewport();
 
 const jobName = computed(() => (route.query.jobName as string) || '');
 const pageInterviewTopic = computed(() => `${jobName.value || '未设置岗位'}`);
@@ -201,6 +535,15 @@ watch(
   (q) => {
     if (q != null && String(q).trim()) effectiveSessionId.value = String(q).trim();
   }
+);
+
+watch(
+  () => [String(route.name || ''), String(route.query.jobName || '').trim()] as const,
+  ([n, job]) => {
+    if (n !== 'InterviewSession') return;
+    document.title = job || '面试';
+  },
+  { immediate: true }
 );
 const userAvatar = computed(() => {
   const raw = String(userStore.userInfo?.avatarUrl || '').trim();
@@ -242,14 +585,713 @@ const userInput = ref('');
 const streaming = ref(false);
 const streamingText = ref('');
 const chatPanelRef = ref<HTMLElement | null>(null);
+const showChatScrollToBottomFab = ref(false);
+/** 距底部小于该像素视为「在底部」，隐藏回到底部按钮 */
+const CHAT_SCROLL_BOTTOM_EPS_PX = 80;
+
+function isChatPanelNearBottom(el: HTMLElement): boolean {
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - CHAT_SCROLL_BOTTOM_EPS_PX;
+}
+
+function onChatPanelScroll() {
+  const el = chatPanelRef.value;
+  if (!el) {
+    showChatScrollToBottomFab.value = false;
+    return;
+  }
+  if (el.scrollHeight <= el.clientHeight + 2) {
+    showChatScrollToBottomFab.value = false;
+    return;
+  }
+  showChatScrollToBottomFab.value = !isChatPanelNearBottom(el);
+}
+
+function onClickScrollChatToBottom() {
+  const el = chatPanelRef.value;
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+}
+
+watchEffect((onCleanup) => {
+  const el = chatPanelRef.value;
+  if (!el) return;
+  const ro = new ResizeObserver(() => onChatPanelScroll());
+  ro.observe(el);
+  onChatPanelScroll();
+  onCleanup(() => ro.disconnect());
+});
+
 const showThinkingHint = computed(() => streaming.value && !streamingText.value);
+
+/** 文本面试左侧流程（虚拟人模式不展示） */
+type InterviewFlowNode = {
+  id: string;
+  side: 'ai' | 'user';
+  title: string;
+  status: 'thinking' | 'done';
+  messageIndex: number | null;
+  /** 悬浮气泡用元信息（不含完整题干） */
+  flowRound?: number;
+  flowTopic?: string;
+  flowAt?: string;
+  flowDepthScore?: number;
+};
+
+type FlowMetaInput = {
+  flowRound?: number | null;
+  flowTopic?: string;
+  flowAt?: string;
+  flowDepthScore?: number | null;
+};
+
+const flowNodes = ref<InterviewFlowNode[]>([]);
+const flowActiveThinkingId = ref<string | null>(null);
+/** 最近一次题目轮次，用于用户作答节点关联 */
+const lastStreamQuestionRound = ref<number | null>(null);
+let flowIdSeq = 0;
+
+function flowEnabled() {
+  return !isAvatarInterview.value;
+}
+
+function truncateFlowTitle(s: string, n = 22): string {
+  const t = String(s || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return '…';
+  return t.length <= n ? t : `${t.slice(0, n - 1)}…`;
+}
+
+function metaFields(meta?: FlowMetaInput): Partial<InterviewFlowNode> {
+  if (!meta) return {};
+  const o: Partial<InterviewFlowNode> = {};
+  if (meta.flowRound != null && meta.flowRound > 0) o.flowRound = meta.flowRound;
+  const tp = meta.flowTopic?.replace(/\n/g, ' ').trim();
+  if (tp) o.flowTopic = tp.length > 100 ? `${tp.slice(0, 99)}…` : tp;
+  if (meta.flowAt?.trim()) o.flowAt = meta.flowAt.trim();
+  if (meta.flowDepthScore != null && Number.isFinite(Number(meta.flowDepthScore))) {
+    o.flowDepthScore = Number(meta.flowDepthScore);
+  }
+  return o;
+}
+
+function patchFlowMeta(node: InterviewFlowNode, meta?: FlowMetaInput) {
+  Object.assign(node, metaFields(meta));
+}
+
+/** 从历史消息摘一行的短主题（非全文） */
+function shortTopicFromQuestionContent(content: string): string | undefined {
+  const oneLine = String(content || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/[。\n]/)[0]
+    ?.trim();
+  if (!oneLine) return undefined;
+  return oneLine.length > 72 ? `${oneLine.slice(0, 71)}…` : oneLine;
+}
+
+function formatFlowTooltipTime(iso?: string): string | undefined {
+  if (!iso?.trim()) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toLocaleString('zh-CN', { hour12: false });
+}
+
+function flowNodeTooltipLines(node: InterviewFlowNode): string[] {
+  const lines: string[] = [];
+  if (node.flowRound != null && node.flowRound > 0) {
+    lines.push(`轮次：第 ${node.flowRound} 轮`);
+  }
+  const topic = node.flowTopic?.trim();
+  if (topic) {
+    lines.push(`主题：${topic}`);
+  }
+  const timeStr = formatFlowTooltipTime(node.flowAt);
+  if (timeStr) lines.push(`时间：${timeStr}`);
+  if (node.flowDepthScore != null && Number.isFinite(node.flowDepthScore)) {
+    lines.push(`深度得分：${node.flowDepthScore}`);
+  }
+  if (!lines.length && node.status === 'thinking') {
+    lines.push('面试官处理中…');
+  } else if (!lines.length && node.messageIndex != null) {
+    lines.push('点击可定位到聊天记录');
+  }
+  return lines;
+}
+
+function flowStartAiThinking(label: string, meta?: FlowMetaInput) {
+  if (!flowEnabled()) return;
+  if (interviewEnded.value) return;
+  const text = truncateFlowTitle(label, 24);
+  const id = flowActiveThinkingId.value;
+  if (id) {
+    const node = flowNodes.value.find((x) => x.id === id);
+    if (node) {
+      node.title = text;
+      patchFlowMeta(node, meta);
+      return;
+    }
+  }
+  const newId = `f-${flowIdSeq++}`;
+  flowActiveThinkingId.value = newId;
+  flowNodes.value.push({
+    id: newId,
+    side: 'ai',
+    title: text,
+    status: 'thinking',
+    messageIndex: null,
+    ...metaFields(meta),
+  });
+}
+
+function flowFinishThinkingOnly() {
+  const id = flowActiveThinkingId.value;
+  if (!id) return;
+  const node = flowNodes.value.find((x) => x.id === id);
+  if (node) node.status = 'done';
+  flowActiveThinkingId.value = null;
+}
+
+/** 将当前「思考中」节点标为完成并绑定标题与消息锚点；若无思考节点则追加一条 */
+function flowSettleAiThinking(title: string, messageIndex: number | null, meta?: FlowMetaInput) {
+  if (!flowEnabled()) return;
+  const short = truncateFlowTitle(title, 22);
+  const id = flowActiveThinkingId.value;
+  if (id) {
+    const node = flowNodes.value.find((x) => x.id === id);
+    if (node) {
+      node.title = short;
+      node.status = 'done';
+      node.messageIndex = messageIndex;
+      patchFlowMeta(node, meta);
+      flowActiveThinkingId.value = null;
+      return;
+    }
+    flowActiveThinkingId.value = null;
+  }
+  flowNodes.value.push({
+    id: `f-${flowIdSeq++}`,
+    side: 'ai',
+    title: short,
+    status: 'done',
+    messageIndex,
+    ...metaFields(meta),
+  });
+}
+
+function flowPushAiDone(title: string, messageIndex: number | null, meta?: FlowMetaInput) {
+  if (!flowEnabled()) return;
+  flowFinishThinkingOnly();
+  flowNodes.value.push({
+    id: `f-${flowIdSeq++}`,
+    side: 'ai',
+    title: truncateFlowTitle(title, 22),
+    status: 'done',
+    messageIndex,
+    ...metaFields(meta),
+  });
+}
+
+function flowPushUserNode(title: string, messageIndex: number) {
+  if (!flowEnabled()) return;
+  const r = lastStreamQuestionRound.value;
+  flowNodes.value.push({
+    id: `f-${flowIdSeq++}`,
+    side: 'user',
+    title: truncateFlowTitle(title, 16),
+    status: 'done',
+    messageIndex,
+    ...metaFields({
+      flowRound: r != null && r > 0 ? r : null,
+      flowAt: new Date().toISOString(),
+    }),
+  });
+}
+
+function rebuildFlowFromMessages() {
+  if (!flowEnabled()) return;
+  flowNodes.value = [];
+  flowActiveThinkingId.value = null;
+  flowIdSeq = 0;
+  let round = 0;
+  let lastQRound: number | null = null;
+  const list = messages.value;
+  list.forEach((m, idx) => {
+    if (m.role === 'user') {
+      flowNodes.value.push({
+        id: `hf-${flowIdSeq++}`,
+        side: 'user',
+        title: m.kind === 'voice' ? '语音作答' : '我的回答',
+        status: 'done',
+        messageIndex: idx,
+        ...metaFields({
+          flowRound: lastQRound != null && lastQRound > 0 ? lastQRound : null,
+        }),
+      });
+      return;
+    }
+    if (m.role === 'assistant') {
+      if (m.tone === 'error') {
+        flowNodes.value.push({
+          id: `hf-${flowIdSeq++}`,
+          side: 'ai',
+          title: '系统提示',
+          status: 'done',
+          messageIndex: idx,
+        });
+        return;
+      }
+      round += 1;
+      lastQRound = round;
+      const trailing = idx === list.length - 1;
+      const topicHint = shortTopicFromQuestionContent(m.content);
+      flowNodes.value.push({
+        id: `hf-${flowIdSeq++}`,
+        side: 'ai',
+        title: trailing ? '当前提问' : `第 ${round} 轮提问`,
+        status: 'done',
+        messageIndex: idx,
+        flowRound: round,
+        ...(topicHint ? { flowTopic: topicHint } : {}),
+      });
+    }
+  });
+  lastStreamQuestionRound.value = round > 0 ? round : null;
+  scheduleScrollFlowCurrent();
+}
+
+function scrollToMessageIndex(idx: number | null) {
+  if (idx == null || idx < 0) return;
+  nextTick(() => {
+    const panel = chatPanelRef.value;
+    if (!panel) return;
+    const el = panel.querySelector(`[data-chat-index="${idx}"]`);
+    (el as HTMLElement | null)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function onFlowStepActivate(node: InterviewFlowNode) {
+  if (node.messageIndex != null) {
+    scrollToMessageIndex(node.messageIndex);
+  }
+}
 /** 面试已结束：展示报告分享卡片并禁用作答 */
 const interviewEnded = ref(false);
 const showReportInvite = ref(false);
+
+/** 侧栏「当前焦点」：考察主题（与后端 topic / current_topic 同步） */
+const sessionFocusTopic = ref('');
+
+function mergeSessionFocusTopic(raw: unknown) {
+  const s = String(raw ?? '')
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (s) sessionFocusTopic.value = s;
+}
+
+const flowDockFocusTopicDisplay = computed(() => {
+  const t = sessionFocusTopic.value.trim();
+  if (!t) return '';
+  return t.length > 80 ? `${t.slice(0, 79)}…` : t;
+});
+
+const flowDockFocusStatus = computed(() => {
+  if (interviewEnded.value) return '面试已结束';
+  if (streaming.value) {
+    if (showThinkingHint.value) return '面试官思考中…';
+    const st = streamingText.value.trim();
+    if (st) return st.length > 40 ? `${st.slice(0, 39)}…` : st;
+    return '处理中…';
+  }
+  const list = messages.value;
+  const last = list[list.length - 1];
+  if (!last) return '准备作答';
+  if (last.role === 'assistant' && last.tone !== 'error') return '请作答';
+  if (last.role === 'user') return '等待面试官响应…';
+  return '进行中';
+});
+
+/** 流程侧栏：面试时长（起算优先服务端 created_at / 历史最早时间戳） */
+const interviewEpochMs = ref<number | null>(null);
+const interviewFrozenElapsedMs = ref<number | null>(null);
+const interviewDurationDisplay = ref('00:00');
+let interviewDurationTimer: ReturnType<typeof setInterval> | null = null;
+
+function pickInterviewStartMs(info: InterviewSessionInfo): number | null {
+  for (const key of ['started_at', 'created_at'] as const) {
+    const s = info[key];
+    if (typeof s === 'string' && s.trim()) {
+      const t = Date.parse(s);
+      if (!Number.isNaN(t)) return t;
+    }
+  }
+  for (const h of info.history || []) {
+    if (h.timestamp?.trim()) {
+      const t = Date.parse(h.timestamp);
+      if (!Number.isNaN(t)) return t;
+    }
+  }
+  return null;
+}
+
+function pickLatestHistoryTimestampMs(info: InterviewSessionInfo): number | null {
+  let last: number | null = null;
+  for (const h of info.history || []) {
+    if (!h.timestamp?.trim()) continue;
+    const t = Date.parse(h.timestamp);
+    if (!Number.isNaN(t)) last = t;
+  }
+  return last;
+}
+
+function formatInterviewDuration(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function tickInterviewDuration() {
+  const start = interviewEpochMs.value;
+  if (start == null) {
+    interviewDurationDisplay.value = '—';
+    return;
+  }
+  const frozen = interviewFrozenElapsedMs.value;
+  const ms = frozen != null ? frozen : Date.now() - start;
+  interviewDurationDisplay.value = formatInterviewDuration(ms);
+}
+
+function stopInterviewDurationTimer() {
+  if (interviewDurationTimer != null) {
+    clearInterval(interviewDurationTimer);
+    interviewDurationTimer = null;
+  }
+}
+
+function startInterviewDurationTimer() {
+  stopInterviewDurationTimer();
+  tickInterviewDuration();
+  interviewDurationTimer = window.setInterval(tickInterviewDuration, 1000);
+}
+
+function resumeInterviewDurationFromSession(info: InterviewSessionInfo) {
+  stopInterviewDurationTimer();
+  interviewFrozenElapsedMs.value = null;
+  const startMs = pickInterviewStartMs(info) ?? Date.now();
+  interviewEpochMs.value = startMs;
+
+  if (info.status === 'ended') {
+    const endMs = pickLatestHistoryTimestampMs(info);
+    if (endMs != null && endMs >= startMs) {
+      interviewFrozenElapsedMs.value = endMs - startMs;
+    } else {
+      interviewFrozenElapsedMs.value = Date.now() - startMs;
+    }
+    tickInterviewDuration();
+    return;
+  }
+
+  if (interviewEnded.value) {
+    interviewFrozenElapsedMs.value = Date.now() - startMs;
+    tickInterviewDuration();
+    return;
+  }
+
+  startInterviewDurationTimer();
+}
+
+watch(interviewEnded, (ended) => {
+  if (!ended || interviewEpochMs.value == null) return;
+  if (interviewFrozenElapsedMs.value != null) return;
+  interviewFrozenElapsedMs.value = Date.now() - interviewEpochMs.value;
+  stopInterviewDurationTimer();
+  tickInterviewDuration();
+});
 const canRenderInterview = computed(
   () => Boolean(effectiveSessionId.value || hasPendingStart.value)
 );
 const showMissingSessionAlert = computed(() => !canRenderInterview.value);
+
+/** 文本面试：页面左侧可折叠流程浮层（不在聊天卡片内）；移动端默认收起 */
+const flowPanelOpen = ref(!isMobile.value);
+const showFlowDock = computed(() => canRenderInterview.value && !isAvatarInterview.value);
+const flowDockBodyRef = ref<HTMLElement | null>(null);
+
+/** 文本面试：右侧「资料 · 助手」浮层（与流程侧栏形态一致）；移动端默认收起 */
+const materialsPanelOpen = ref(!isMobile.value);
+const showMaterialsDock = computed(() => showFlowDock.value);
+const resumeZoomOpen = ref(false);
+const sessionResumePdfSrc = ref('');
+const sessionResumePlainText = ref('');
+const sessionResumeTitle = ref('');
+const sessionResumeLoading = ref(false);
+const sessionResumeError = ref('');
+const hasSessionResume = computed(
+  () => Boolean(sessionResumePdfSrc.value) || Boolean(sessionResumePlainText.value)
+);
+
+/** 侧栏 PDF 小窗：平移 + 缩放（与 session 无关，换简历或离开时重置） */
+const RESUME_THUMB_SCALE_MIN = 0.45;
+const RESUME_THUMB_SCALE_MAX = 2.75;
+const RESUME_THUMB_ZOOM_STEP = 0.12;
+const RESUME_THUMB_WHEEL_FACTOR = 0.09;
+
+const resumeThumbScale = ref(1);
+const resumeThumbPanX = ref(0);
+const resumeThumbPanY = ref(0);
+const resumeThumbDragging = ref(false);
+let resumeThumbPointerId = -1;
+let resumeThumbDragLastX = 0;
+let resumeThumbDragLastY = 0;
+
+const resumeThumbZoomPercent = computed(() => Math.round(resumeThumbScale.value * 100));
+
+function resumeThumbPanZoomReset() {
+  resumeThumbScale.value = 1;
+  resumeThumbPanX.value = 0;
+  resumeThumbPanY.value = 0;
+}
+
+function resumeThumbZoomIn() {
+  resumeThumbScale.value = Math.min(
+    RESUME_THUMB_SCALE_MAX,
+    Math.round((resumeThumbScale.value + RESUME_THUMB_ZOOM_STEP) * 100) / 100
+  );
+}
+
+function resumeThumbZoomOut() {
+  resumeThumbScale.value = Math.max(
+    RESUME_THUMB_SCALE_MIN,
+    Math.round((resumeThumbScale.value - RESUME_THUMB_ZOOM_STEP) * 100) / 100
+  );
+}
+
+function onResumeThumbWheel(e: WheelEvent) {
+  const delta = e.deltaY > 0 ? -RESUME_THUMB_WHEEL_FACTOR : RESUME_THUMB_WHEEL_FACTOR;
+  const next = Math.min(
+    RESUME_THUMB_SCALE_MAX,
+    Math.max(RESUME_THUMB_SCALE_MIN, resumeThumbScale.value + delta)
+  );
+  resumeThumbScale.value = Math.round(next * 100) / 100;
+}
+
+function onResumeThumbPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
+  const el = e.currentTarget as HTMLElement;
+  resumeThumbDragging.value = true;
+  resumeThumbPointerId = e.pointerId;
+  resumeThumbDragLastX = e.clientX;
+  resumeThumbDragLastY = e.clientY;
+  try {
+    el.setPointerCapture(e.pointerId);
+  } catch {
+    /* ignore */
+  }
+}
+
+function onResumeThumbPointerMove(e: PointerEvent) {
+  if (!resumeThumbDragging.value || e.pointerId !== resumeThumbPointerId) return;
+  const dx = e.clientX - resumeThumbDragLastX;
+  const dy = e.clientY - resumeThumbDragLastY;
+  resumeThumbPanX.value += dx;
+  resumeThumbPanY.value += dy;
+  resumeThumbDragLastX = e.clientX;
+  resumeThumbDragLastY = e.clientY;
+}
+
+function onResumeThumbPointerUp(e: PointerEvent) {
+  if (e.pointerId !== resumeThumbPointerId) return;
+  resumeThumbDragging.value = false;
+  resumeThumbPointerId = -1;
+  const el = e.currentTarget as HTMLElement;
+  try {
+    el.releasePointerCapture(e.pointerId);
+  } catch {
+    /* ignore */
+  }
+}
+
+watch(sessionResumePdfSrc, () => {
+  resumeThumbPanZoomReset();
+});
+
+/** 本场 PDF 简历内存缓存（object URL），离开面试页时释放 */
+let sessionResumePdfObjectUrl: string | null = null;
+
+function revokeSessionResumePdfBlob() {
+  if (sessionResumePdfObjectUrl) {
+    URL.revokeObjectURL(sessionResumePdfObjectUrl);
+    sessionResumePdfObjectUrl = null;
+  }
+}
+
+/**
+ * 拉取 PDF 一次并缓存在本地 Blob URL，侧栏与放大弹窗共用，避免重复请求。
+ * 若 fetch 失败（如跨域无 CORS），回退为直链由浏览器自行缓存。
+ */
+async function loadSessionPdfIntoLocalCache(remoteUrl: string): Promise<void> {
+  sessionResumeError.value = '';
+  try {
+    const res = await fetch(remoteUrl, { credentials: 'omit', mode: 'cors' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    revokeSessionResumePdfBlob();
+    sessionResumePdfObjectUrl = URL.createObjectURL(blob);
+    sessionResumePdfSrc.value = sessionResumePdfObjectUrl;
+  } catch {
+    sessionResumePdfSrc.value = remoteUrl;
+  }
+}
+
+/** 与 sessionStorage 条目无关，仅标识「同一份简历内容」，用于跳过重复拉取 */
+const resumeLoadFingerprint = ref('');
+
+function resumeCacheFingerprint(c: SessionResumeCache): string {
+  const t = c.resumeText;
+  if (typeof t === 'string' && t.trim()) {
+    return `text:${t.length}:${t.slice(0, 240)}`;
+  }
+  if (c.resumeId != null && Number.isFinite(c.resumeId)) {
+    return `id:${c.resumeId}`;
+  }
+  return '';
+}
+
+/** 释放 PDF Blob URL 与内存中的简历展示状态（离开面试页或切换会话时调用） */
+function disposeInterviewResumeLocalCache() {
+  resumeLoadFingerprint.value = '';
+  revokeSessionResumePdfBlob();
+  sessionResumePdfSrc.value = '';
+  sessionResumePlainText.value = '';
+  resumeZoomOpen.value = false;
+  resumeThumbPanZoomReset();
+}
+
+/**
+ * 根据缓存元数据加载简历（PDF / 纯文本）。简历 id 与正文均来自面试启动前的 pending 载荷，不依赖会话接口或首题。
+ */
+async function loadResumeFromSessionCacheEntry(cached: SessionResumeCache) {
+  const fp = resumeCacheFingerprint(cached);
+  if (
+    fp &&
+    resumeLoadFingerprint.value === fp &&
+    (sessionResumePdfSrc.value || sessionResumePlainText.value)
+  ) {
+    return;
+  }
+
+  revokeSessionResumePdfBlob();
+  sessionResumePdfSrc.value = '';
+  sessionResumePlainText.value = '';
+  sessionResumeTitle.value = cached.displayName || '本场简历';
+  sessionResumeError.value = '';
+  resumeLoadFingerprint.value = '';
+
+  if (typeof cached.resumeText === 'string' && cached.resumeText.trim()) {
+    sessionResumePlainText.value = cached.resumeText;
+    resumeLoadFingerprint.value = fp;
+    return;
+  }
+
+  if (cached.resumeId == null) return;
+
+  const uid = userStore.userInfo?.id;
+  if (uid == null || uid === '') {
+    sessionResumeError.value = '请登录后查看已选简历文件';
+    return;
+  }
+
+  sessionResumeLoading.value = true;
+  try {
+    const item = await getResumeItemApi(cached.resumeId);
+    const fileKey = String(item?.unique_filename || item?.filename || '').trim();
+    if (!fileKey) {
+      sessionResumeError.value = '未获取到简历文件名，无法预览';
+      return;
+    }
+    const remoteUrl = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(fileKey)}`;
+    await loadSessionPdfIntoLocalCache(remoteUrl);
+    if (item?.filename) sessionResumeTitle.value = String(item.filename);
+    resumeLoadFingerprint.value = fp;
+  } catch (e: unknown) {
+    sessionResumeError.value = (e as Error).message || '加载简历失败';
+  } finally {
+    sessionResumeLoading.value = false;
+  }
+}
+
+async function hydrateSessionResume(sessionId: string) {
+  const sid = String(sessionId || '').trim();
+  // 无 sessionId 时不清空界面：新建会话流程中可能已通过 pending 预加载简历
+  if (!sid) return;
+
+  const cached = readSessionResumeCache(sid);
+  if (!cached) return;
+
+  await loadResumeFromSessionCacheEntry(cached);
+}
+
+watch(
+  effectiveSessionId,
+  (id) => {
+    void hydrateSessionResume(String(id || '').trim());
+  },
+  { immediate: true }
+);
+
+function scrollFlowCurrentIntoView(behavior: ScrollBehavior = 'smooth') {
+  const root = flowDockBodyRef.value;
+  if (!root || !showFlowDock.value || !flowPanelOpen.value) return;
+  const targetId = flowActiveThinkingId.value ?? flowNodes.value[flowNodes.value.length - 1]?.id;
+  if (!targetId) return;
+  const el = root.querySelector(`[data-flow-node-id="${targetId}"]`) as HTMLElement | null;
+  el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior });
+}
+
+function scheduleScrollFlowCurrent() {
+  if (!showFlowDock.value || !flowPanelOpen.value) return;
+  nextTick(() => {
+    requestAnimationFrame(() => scrollFlowCurrentIntoView());
+  });
+}
+
+watch(
+  () => [
+    flowNodes.value.length,
+    flowNodes.value[flowNodes.value.length - 1]?.id ?? '',
+    flowActiveThinkingId.value ?? '',
+    streaming.value,
+    messages.value.length,
+  ],
+  () => scheduleScrollFlowCurrent()
+);
+
+watch(isMobile, (mobile) => {
+  if (mobile) {
+    flowPanelOpen.value = false;
+    materialsPanelOpen.value = false;
+  } else {
+    flowPanelOpen.value = true;
+    materialsPanelOpen.value = true;
+  }
+});
+
+watch(flowPanelOpen, (open) => {
+  if (open && isMobile.value && showMaterialsDock.value) {
+    materialsPanelOpen.value = false;
+  }
+  if (open) scheduleScrollFlowCurrent();
+});
+
+watch(materialsPanelOpen, (open) => {
+  if (open && isMobile.value && showFlowDock.value) {
+    flowPanelOpen.value = false;
+  }
+});
 
 const isRecording = ref(false);
 const waveformBars = ref<number[]>(Array.from({ length: 24 }, () => 0));
@@ -342,6 +1384,7 @@ onBeforeUnmount(() => {
   recordChunks = [];
   isRecording.value = false;
   stopMicTracks();
+  stopInterviewDurationTimer();
 });
 
 function stopMicTracks() {
@@ -356,6 +1399,7 @@ async function renderStreamingText(text: string) {
   streamingText.value = '';
   if (!full) return;
   for (let i = 0; i < full.length; i += 1) {
+    if (interviewEnded.value) break;
     streamingText.value += full.slice(i, i + 1);
     // 稍慢一点的逐字显示，提升阅读感知
     // eslint-disable-next-line no-await-in-loop
@@ -376,6 +1420,7 @@ watch(
 );
 
 function backToSettings() {
+  disposeInterviewResumeLocalCache();
   router.push({ name: 'Home' });
 }
 
@@ -676,11 +1721,19 @@ onMounted(async () => {
   if (!sid) {
     const pending = sessionStorage.getItem('pendingInterviewStart');
     if (!pending) return;
+    let payload: PendingInterviewStart;
+    try {
+      payload = JSON.parse(pending) as PendingInterviewStart;
+    } catch {
+      return;
+    }
+    // 简历 id/正文均在 pending 里，与 startInterview / 首题无关，提前加载侧栏预览
+    void loadResumeFromSessionCacheEntry(buildCacheFromPending(payload));
     try {
       streaming.value = true;
-      const payload = JSON.parse(pending) as StartInterviewBody;
-      const started = await startInterviewApi(payload);
+      const started = await startInterviewApi(payload as StartInterviewBody);
       sid = started.session_id;
+      writeSessionResumeCache(sid, buildCacheFromPending(payload));
       effectiveSessionId.value = sid;
       sessionStorage.removeItem('pendingInterviewStart');
       hasPendingStart.value = false;
@@ -697,82 +1750,198 @@ onMounted(async () => {
       sessionStorage.removeItem('pendingInterviewStart');
       hasPendingStart.value = false;
       streaming.value = false;
+      disposeInterviewResumeLocalCache();
       ElMessage.error((e as Error).message || '创建面试会话失败');
       return;
     }
   }
+  let loadedSessionInfo: InterviewSessionInfo | null = null;
   try {
     await initAvatarSession(sid);
     const info = await getInterviewSessionApi(sid);
+    loadedSessionInfo = info;
+    mergeSessionFocusTopic(info.current_topic);
+    const hist = info.history || [];
+    if (!sessionFocusTopic.value.trim() && hist.length) {
+      mergeSessionFocusTopic(hist[hist.length - 1]?.topic);
+    }
     (info.history || []).forEach((h) => {
       messages.value.push({ role: 'assistant', content: h.question, kind: 'text' });
       messages.value.push({ role: 'user', content: h.answer, kind: 'text' });
     });
     if (info.current_question) messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
+    rebuildFlowFromMessages();
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || '恢复会话失败');
   } finally {
     streaming.value = false;
   }
   await refreshSessionEndedState();
+  resumeInterviewDurationFromSession(
+    loadedSessionInfo ?? {
+      session_id: sid,
+      status: interviewEnded.value ? 'ended' : 'questioning',
+      total_rounds: 0,
+      current_topic: '',
+      current_question: '',
+      history: [],
+    }
+  );
+});
+
+onBeforeUnmount(() => {
+  disposeInterviewResumeLocalCache();
 });
 
 function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
   let uiChain: Promise<void> = Promise.resolve();
   const onEvent = (evt: InterviewAnswerStreamEvent) => {
     updateVoiceTranscriptAt(voiceMessageIndex, pickTranscriptText(evt.data));
+
+    if (evt.type === 'interview_complete') {
+      if (!interviewEnded.value) {
+        interviewEnded.value = true;
+        showReportInvite.value = true;
+        streaming.value = false;
+        streamingText.value = '';
+        const hint = String(evt.data.message || '').trim() || '面试已结束，可查看评估报告。';
+        messages.value.push({ role: 'assistant', content: hint, kind: 'text' });
+        flowSettleAiThinking('面试结束', messages.value.length - 1, {
+          flowAt: evt.timestamp,
+          flowRound: lastStreamQuestionRound.value ?? null,
+        });
+        scrollToBottom();
+      }
+      return;
+    }
+
+    if (interviewEnded.value) {
+      return;
+    }
+
     if (evt.type === 'voice_processing' || evt.type === 'analyzing') {
       const hint = String(evt.data.message || '').trim();
       if (hint) streamingText.value = hint;
+      flowStartAiThinking(hint || (evt.type === 'voice_processing' ? '语音处理中…' : '分析中…'), {
+        flowAt: evt.timestamp,
+      });
+    } else if (evt.type === 'checking_completeness') {
+      const hint = String(evt.data.message || '').trim();
+      if (hint) streamingText.value = hint;
+      flowStartAiThinking(hint || '检查完整性…', { flowAt: evt.timestamp });
     } else if (evt.type === 'analysis_result') {
       const feedback = String(evt.data.feedback || '').trim();
+      const depthRaw = Number(evt.data.depth_score);
+      const analysisDepth = Number.isFinite(depthRaw) ? depthRaw : null;
+      const analysisTs = evt.timestamp;
       if (feedback) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(feedback, false);
         }
         uiChain = uiChain.then(async () => {
+          if (interviewEnded.value) return;
           await renderStreamingText(feedback);
+          if (interviewEnded.value) return;
           messages.value.push({ role: 'assistant', content: feedback });
+          const idx = messages.value.length - 1;
+          flowSettleAiThinking('评价反馈', idx, {
+            flowAt: analysisTs,
+            flowDepthScore: analysisDepth,
+            flowRound: lastStreamQuestionRound.value ?? null,
+          });
           streamingText.value = '';
           scrollToBottom();
         });
+      } else {
+        flowSettleAiThinking('评价反馈', null, {
+          flowAt: analysisTs,
+          flowDepthScore: analysisDepth,
+          flowRound: lastStreamQuestionRound.value ?? null,
+        });
       }
+    } else if (evt.type === 'completeness_result') {
+      const ok = Boolean(evt.data.is_sufficient);
+      flowSettleAiThinking(ok ? '完整性通过' : '待补充要点', null, {
+        flowAt: evt.timestamp,
+        flowRound: lastStreamQuestionRound.value ?? null,
+      });
+    } else if (evt.type === 'topic_completed') {
+      const topic = String(evt.data.topic || '')
+        .replace(/\n/g, ' ')
+        .trim();
+      mergeSessionFocusTopic(topic);
+      const reason = String(evt.data.reason || '').trim();
+      const tail = topic ? ` · ${truncateFlowTitle(topic, 14)}` : '';
+      const reasonPart = reason ? ` · ${truncateFlowTitle(reason, 12)}` : '';
+      const topicLine = [topic, reason].filter(Boolean).join(' · ');
+      flowPushAiDone(`话题完成${tail}${reasonPart}`, null, {
+        flowAt: evt.timestamp,
+        flowTopic: topicLine || undefined,
+        flowRound: lastStreamQuestionRound.value ?? null,
+      });
     } else if (evt.type === 'followup') {
+      const topicLine = String(evt.data.topic || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      mergeSessionFocusTopic(topicLine);
       const msg = String(evt.data.message || '').trim();
       if (msg) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(msg, false);
         }
         uiChain = uiChain.then(async () => {
+          if (interviewEnded.value) return;
           await renderStreamingText(msg);
+          if (interviewEnded.value) return;
           messages.value.push({ role: 'assistant', content: msg });
+          const idx = messages.value.length - 1;
+          const r = Number(evt.data.round);
+          const rl = Number.isFinite(r) && r > 0 ? r : lastStreamQuestionRound.value;
+          if (rl != null && rl > 0) lastStreamQuestionRound.value = rl;
+          flowSettleAiThinking('追问', idx, {
+            flowAt: evt.timestamp,
+            flowRound: rl ?? null,
+            flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
+          });
           streamingText.value = '';
           scrollToBottom();
         });
       }
     } else if (evt.type === 'question') {
+      const topicLine = String(evt.data.topic || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      mergeSessionFocusTopic(topicLine);
       const msg = String(evt.data.answer || evt.data.question || '').trim();
+      const round = Number(evt.data.round);
+      const roundLabel = Number.isFinite(round) && round > 0 ? round : null;
+      const isFollowup = Boolean(evt.data.is_followup);
+      const qTitle = isFollowup ? '追问' : roundLabel != null ? `第 ${roundLabel} 轮提问` : '提问';
+      if (roundLabel != null) lastStreamQuestionRound.value = roundLabel;
       if (msg) {
         if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
           speakByAvatarSdk(msg, true);
         }
         uiChain = uiChain.then(async () => {
+          if (interviewEnded.value) return;
           await renderStreamingText(msg);
+          if (interviewEnded.value) return;
           messages.value.push({ role: 'assistant', content: msg });
+          const idx = messages.value.length - 1;
+          flowSettleAiThinking(qTitle, idx, {
+            flowAt: evt.timestamp,
+            flowRound: roundLabel ?? lastStreamQuestionRound.value ?? null,
+            flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
+          });
+          streamingText.value = '';
           scrollToBottom();
         });
       }
-    } else if (evt.type === 'interview_complete') {
-      interviewEnded.value = true;
-      showReportInvite.value = true;
-      streamingText.value = '';
-      const hint = String(evt.data.message || '').trim() || '面试已结束，可查看评估报告。';
-      messages.value.push({ role: 'assistant', content: hint, kind: 'text' });
-      scrollToBottom();
     } else if (evt.type === 'error') {
       const msg = String(evt.data.message || '').trim() || '处理失败';
       streamingText.value = '';
       messages.value.push({ role: 'assistant', content: msg, tone: 'error' });
+      flowSettleAiThinking('处理失败', messages.value.length - 1, { flowAt: evt.timestamp });
       ElMessage.error(msg);
       scrollToBottom();
     }
@@ -790,8 +1959,13 @@ async function sendMessage() {
   if (interviewEnded.value) return;
   const text = userInput.value.trim();
   if (!text || streaming.value) return;
+  if (text.length > INTERVIEW_ANSWER_MAX_LEN) {
+    ElMessage.warning(`回答请勿超过 ${INTERVIEW_ANSWER_MAX_LEN} 字`);
+    return;
+  }
 
   messages.value.push({ role: 'user', content: text, kind: 'text' });
+  flowPushUserNode('文字作答', messages.value.length - 1);
   userInput.value = '';
   streaming.value = true;
   streamingText.value = '';
@@ -821,6 +1995,7 @@ async function sendVoiceFile(file: File, voiceDurationSec?: number) {
 
   messages.value.push(createVoicePlaceholderMessage(voiceDurationSec));
   const voiceMsgIndex = messages.value.length - 1;
+  flowPushUserNode('语音作答', voiceMsgIndex);
   streaming.value = true;
   streamingText.value = '';
 
@@ -946,115 +2121,1043 @@ async function onLeavePage() {
 </script>
 
 <style scoped>
-.interview-session-page { width: 100%; height: 100%; margin: 0 auto;display: flex;align-content: center; }
-.interview-session-page.theme-page-shell { max-width: 980px; padding: 0 0 12px; }
-.session-top-header { margin-bottom: 10px; }
-.session-card { width: 100%; height: 86vh; align-self: center; }
-.card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.card-title { font-weight: 600; color: #374151; font-size: 14px; text-align: left; }
-.close-btn {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  font-size: 16px;
-  line-height: 1;
-  border-color: #e5e7eb;
+/* 根容器（流程面板为 fixed 浮层，不挤压聊天卡片） */
+.interview-session-root {
+  width: 100%;
+  min-height: 100%;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* —— 左侧流程浮层（独立于聊天卡片） —— */
+.flow-dock-backdrop {
+  display: none;
+}
+.flow-dock-backdrop-enter-active,
+.flow-dock-backdrop-leave-active {
+  transition: opacity 0.26s ease;
+}
+.flow-dock-backdrop-enter-from,
+.flow-dock-backdrop-leave-to {
+  opacity: 0;
+}
+.flow-dock-slide-enter-active.flow-dock-panel,
+.flow-dock-slide-leave-active.flow-dock-panel {
+  transition:
+    transform 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.22s ease;
+}
+.flow-dock-slide-enter-from.flow-dock-panel,
+.flow-dock-slide-leave-to.flow-dock-panel {
+  transform: translate(-100%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.flow-dock-panel {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 280px;
+  height: min(86vh, calc(100vh - 24px));
+  max-height: calc(100vh - 16px);
+  bottom: auto;
+  z-index: 2000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* 与 .theme-card 一致的浅渐变 + 内高光 */
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 0 16px 16px 0;
+  box-shadow:
+    4px 0 24px rgba(0, 0, 0, 0.04),
+    4px 0 32px -8px rgba(59, 130, 246, 0.1),
+    4px 0 28px -12px rgba(168, 85, 247, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.flow-dock-duration-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(90deg, rgba(245, 243, 255, 0.85) 0%, rgba(239, 246, 255, 0.75) 100%);
+}
+.flow-dock-duration-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #6b7280;
 }
-.close-btn:hover {
-  color: #fff;
-  border-color: #ef4444;
-  background: #ef4444;
+.flow-dock-duration-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #111827;
+  background: linear-gradient(90deg, #6d28d9, #2563eb);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-.toolbar { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.mb-16 { margin-bottom: 16px; }
-.session-workspace { display: block; }
-.desktop-layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 12px;
-  align-items: stretch;
+.flow-dock-focus {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.65);
 }
-.desktop-left-pane {
-  min-height: 440px;
-  padding: 14px;
+.flow-dock-focus-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
 }
-.desktop-left-pane h4 {
-  margin: 0 0 10px;
+.flow-dock-focus-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.flow-dock-focus-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6d28d9;
+  text-align: right;
+  line-height: 1.35;
+  min-width: 0;
+}
+.flow-dock-focus-topic {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #374151;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.flow-dock-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 12px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+.flow-dock-header-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   color: #111827;
 }
-.desktop-left-pane p {
-  margin: 0;
-  color: #6b7280;
-  line-height: 1.7;
+.flow-dock-header-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #a855f7, #3b82f6);
 }
+.flow-dock-collapse-btn {
+  flex-shrink: 0;
+  margin-top: -2px;
+  color: #6b7280 !important;
+}
+.flow-dock-collapse-btn:hover {
+  color: #7c3aed !important;
+  background: #f5f3ff !important;
+}
+.flow-dock-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 8px 14px;
+  scrollbar-gutter: stable;
+}
+.flow-dock-tab {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  z-index: 2001;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-height: 64px;
+  padding: 6px 0;
+  margin: 0;
+  /* 对齐 .theme-back-btn */
+  border: 1px solid #d8dbe3;
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  color: #374151;
+  line-height: 1;
+  transition:
+    left 0.22s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.flow-dock-tab:hover {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #6d28d9;
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.12);
+  transform: translateY(calc(-50% - 1px));
+}
+.flow-dock-tab--panel-open {
+  left: 280px;
+}
+.flow-dock-tab-chevron {
+  font-size: 16px;
+  color: #7c3aed;
+}
+.flow-dock-tab:hover .flow-dock-tab-chevron {
+  color: #6d28d9;
+}
+
+@media (max-width: 768px) {
+  .flow-dock-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1999;
+    background: rgba(15, 23, 42, 0.35);
+  }
+  .flow-dock-panel {
+    width: min(288px, 86vw);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    height: auto;
+    max-height: none;
+    transform: none;
+    border-radius: 0 12px 12px 0;
+  }
+  .flow-dock-tab--panel-open {
+    left: min(288px, 86vw);
+  }
+  .flow-dock-slide-enter-from.flow-dock-panel,
+  .flow-dock-slide-leave-to.flow-dock-panel {
+    transform: translateX(-100%);
+  }
+}
+
+/* —— 右侧资料 · 助手浮层 —— */
+.material-dock-backdrop {
+  display: none;
+}
+.material-dock-backdrop-enter-active,
+.material-dock-backdrop-leave-active {
+  transition: opacity 0.26s ease;
+}
+.material-dock-backdrop-enter-from,
+.material-dock-backdrop-leave-to {
+  opacity: 0;
+}
+.material-dock-slide-enter-active.material-dock-panel,
+.material-dock-slide-leave-active.material-dock-panel {
+  transition:
+    transform 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.22s ease;
+}
+.material-dock-slide-enter-from.material-dock-panel,
+.material-dock-slide-leave-to.material-dock-panel {
+  transform: translate(100%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.material-dock-panel {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 280px;
+  height: min(86vh, calc(100vh - 24px));
+  max-height: calc(100vh - 16px);
+  z-index: 2000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(215deg, #ffffff 0%, #f9fafb 100%);
+  border-left: 1px solid #e5e7eb;
+  border-radius: 16px 0 0 16px;
+  box-shadow:
+    -4px 0 24px rgba(0, 0, 0, 0.04),
+    -4px 0 32px -8px rgba(59, 130, 246, 0.1),
+    -4px 0 28px -12px rgba(168, 85, 247, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.material-dock-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 12px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+.material-dock-header-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #111827;
+}
+.material-dock-header-title::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3b82f6, #a855f7);
+}
+.material-dock-collapse-btn {
+  flex-shrink: 0;
+  margin-top: -2px;
+  color: #6b7280 !important;
+}
+.material-dock-collapse-btn:hover {
+  color: #2563eb !important;
+  background: #eff6ff !important;
+}
+.material-dock-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-gutter: stable;
+}
+.material-dock-section {
+  flex-shrink: 0;
+}
+.material-dock-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.material-dock-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #374151;
+  letter-spacing: 0.04em;
+}
+.material-zoom-btn {
+  flex-shrink: 0;
+}
+.material-dock-hint {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 8px 0;
+}
+.material-dock-error {
+  font-size: 12px;
+  color: #b91c1c;
+  line-height: 1.45;
+}
+.material-resume-pdf-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 268px;
+  max-height: 268px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 6px 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+}
+.material-resume-pdf-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.material-resume-pdf-toolbar-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.material-resume-pdf-tool-btn {
+  padding: 4px 8px !important;
+  min-height: 28px !important;
+}
+.material-resume-pdf-zoom-label {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #374151;
+  min-width: 38px;
+  text-align: center;
+}
+.material-resume-pdf-reset {
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+}
+.material-resume-pdf-hint {
+  margin: 0;
+  font-size: 10px;
+  color: #9ca3af;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+.material-resume-pdf-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e5e7eb;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.material-resume-pdf-viewport.is-dragging {
+  cursor: grabbing;
+}
+.material-resume-pdf-pan-layer {
+  transform-origin: 0 0;
+  will-change: transform;
+  width: max-content;
+  max-width: none;
+}
+.material-resume-pdf-pan-layer :deep(.resume-pdf-preview--sidebar) {
+  min-height: 240px;
+  width: 232px;
+  overflow: visible;
+}
+.material-resume-text {
+  max-height: 240px;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  margin: 0;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  color: #1f2937;
+  font-family: inherit;
+}
+.material-resume-empty {
+  padding: 8px 0;
+}
+.material-dock-section--ai {
+  padding-top: 4px;
+  border-top: 1px dashed #e5e7eb;
+}
+.ai-assistant-desc {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #6b7280;
+}
+.ai-assistant-card {
+  padding: 10px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+}
+.ai-assistant-bubble {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  max-width: 100%;
+}
+.ai-assistant-bubble--ai {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+}
+.ai-assistant-bubble--hint {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px dashed rgba(37, 99, 235, 0.25);
+  color: #1d4ed8;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.ai-assistant-input :deep(.el-textarea__inner) {
+  font-size: 12px;
+  resize: none;
+}
+.material-dock-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  z-index: 2001;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-height: 64px;
+  padding: 6px 0;
+  margin: 0;
+  border: 1px solid #d8dbe3;
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  color: #374151;
+  line-height: 1;
+  transition:
+    right 0.22s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.material-dock-tab:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+  transform: translateY(calc(-50% - 1px));
+}
+.material-dock-tab--panel-open {
+  right: 280px;
+}
+.material-dock-tab-chevron {
+  font-size: 16px;
+  color: #2563eb;
+}
+.material-dock-tab:hover .material-dock-tab-chevron {
+  color: #1d4ed8;
+}
+
+.resume-zoom-text {
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+@media (max-width: 768px) {
+  .material-dock-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1999;
+    background: rgba(15, 23, 42, 0.35);
+  }
+  .material-dock-panel {
+    width: min(288px, 86vw);
+    top: 0;
+    bottom: 0;
+    right: 0;
+    height: auto;
+    max-height: none;
+    transform: none;
+    border-radius: 12px 0 0 12px;
+  }
+  .material-dock-tab--panel-open {
+    right: min(288px, 86vw);
+  }
+  .material-dock-slide-enter-from.material-dock-panel,
+  .material-dock-slide-leave-to.material-dock-panel {
+    transform: translateX(100%);
+  }
+}
+
+/* —— GPT 风格：中性灰、扁平对话区、无「桌面」渐变 —— */
+.interview-session--gpt {
+  width: 100%;
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ececf1;
+}
+.interview-session--gpt.theme-page-shell {
+  max-width: 900px;
+  width: 100%;
+  padding: 12px 16px 20px;
+  box-sizing: border-box;
+}
+
+.session-card--gpt {
+  width: 100%;
+  height: 86vh;
+  max-height: calc(100vh - 24px);
+  align-self: center;
+  display: flex !important;
+  flex-direction: column;
+  border: 1px solid #d9d9e0 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+}
+.session-card--gpt:hover {
+  border-color: #d9d9e0 !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06) !important;
+}
+.session-card--gpt :deep(.el-card__header) {
+  padding: 0 !important;
+  border-bottom: 1px solid #ececec !important;
+  background: #fff !important;
+}
+.session-card--gpt :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  background: #f7f7f8;
+  overflow: hidden;
+}
+
+.gpt-topbar {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(0, 2.2fr) minmax(72px, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 10px 12px;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+.gpt-topbar-side--left {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  min-width: 0;
+}
+.gpt-topbar-side--right {
+  min-width: 0;
+}
+.gpt-topbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+.gpt-title-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #202123;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.gpt-mode-tag {
+  flex-shrink: 0;
+  border-color: #d9d9e0 !important;
+  color: #565869 !important;
+  background: #f7f7f8 !important;
+}
+/* macOS 风格三色圆点：仅红色可点，结束面试 */
+.window-traffic-lights {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+/* 小圆点紧凑排列，点击格略大于 11px 圆点即可 */
+.window-traffic-slot {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.window-traffic-slot--decorative {
+  pointer-events: none;
+}
+.window-traffic-dot {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow:
+    inset 0 0 0 0.4px rgba(0, 0, 0, 0.18),
+    0 0.5px 1px rgba(0, 0, 0, 0.08);
+}
+.window-traffic-dot--close {
+  background: linear-gradient(180deg, #ff857c 0%, #ff5f57 100%);
+}
+.window-traffic-dot--min {
+  background: linear-gradient(180deg, #ffd078 0%, #febc2e 100%);
+}
+.window-traffic-dot--zoom {
+  background: linear-gradient(180deg, #63de6e 0%, #28c840 100%);
+}
+.window-traffic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  transition: background 0.15s ease;
+}
+.window-traffic-btn:focus-visible {
+  outline: 2px solid rgba(32, 33, 35, 0.35);
+  outline-offset: 1px;
+}
+.window-traffic-btn--close:hover {
+  background: rgba(255, 95, 87, 0.14);
+}
+.window-traffic-btn--close:active {
+  background: rgba(255, 95, 87, 0.22);
+}
+
+.mb-16 {
+  margin: 12px 16px;
+  flex-shrink: 0;
+}
+
+.session-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 纯文本面试：仅右侧栏时占满高度 */
+.session-workspace > .conference-right {
+  flex: 1;
+  min-height: 0;
+}
+
+.session-workspace:not(.conference-layout) {
+  border-top: 1px solid #ececec;
+}
+
+.flow-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.flow-step {
+  user-select: none;
+  cursor: pointer;
+  padding: 6px 4px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  transition: color 0.18s ease;
+}
+.flow-step:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.5);
+  outline-offset: 2px;
+}
+/* AI：主题紫系（.theme-section-decoration 左端） */
+.flow-step:hover .flow-step-label--ai {
+  color: #5b21b6;
+  font-weight: 700;
+}
+/* 用户：主题蓝系（装饰条右端） */
+.flow-step:hover .flow-step-label--user {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.flow-step:hover .flow-dot--ai {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.32);
+}
+.flow-step:hover .flow-dot--user {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.32);
+}
+.flow-step:hover .flow-dot--thinking .flow-spin-icon {
+  color: #9333ea;
+}
+.flow-step--has-anchor:hover .flow-step-label--ai,
+.flow-step--has-anchor:hover .flow-step-label--user {
+  text-decoration: underline;
+  text-decoration-color: rgba(124, 58, 237, 0.45);
+  text-underline-offset: 2px;
+}
+.flow-step-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 6px;
+  min-height: 28px;
+}
+.flow-step-side {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+.flow-step-side--left {
+  text-align: right;
+}
+.flow-step-side--right {
+  text-align: left;
+}
+.flow-step-label {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-word;
+}
+.flow-step-label--ai {
+  color: #6d28d9;
+  font-weight: 600;
+}
+.flow-step-label--user {
+  color: #2563eb;
+  font-weight: 600;
+}
+.flow-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+.flow-dot-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+}
+.flow-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.flow-dot--ai {
+  background: linear-gradient(145deg, #c084fc, #7c3aed);
+}
+.flow-dot--user {
+  background: linear-gradient(145deg, #93c5fd, #2563eb);
+}
+.flow-dot--thinking {
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+}
+.flow-spin-icon {
+  font-size: 15px;
+  color: #8b5cf6;
+  transition: color 0.18s ease;
+}
+.flow-vert-line {
+  width: 2px;
+  flex: 1;
+  min-height: 10px;
+  margin: 4px 0 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.55), rgba(59, 130, 246, 0.5));
+}
+.flow-step--thinking .flow-step-label--ai {
+  color: #7c3aed;
+}
+
 .conference-layout {
   display: grid;
-  grid-template-columns: 400px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 0;
   align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid #ececec;
 }
 .conference-left {
   display: grid;
-  grid-template-rows: 160px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  border-right: 1px solid #ececec;
+  background: #fafafa;
+  padding: 12px;
 }
 .conference-right {
   display: grid;
-  grid-template-rows: minmax(320px, 1fr) auto;
-  gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  min-height: 0;
+  background: #f7f7f8;
 }
+
+.chat-panel-wrap {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-panel-wrap .chat-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-scroll-to-bottom-fab {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f4f6 100%);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  color: #374151;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+.chat-scroll-to-bottom-fab:hover {
+  border-color: #c5c5d2;
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow:
+    0 4px 14px rgba(37, 99, 235, 0.12),
+    0 2px 4px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+.chat-scroll-to-bottom-fab:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
+}
+.chat-scroll-to-bottom-fab .el-icon {
+  font-size: 18px;
+}
+
+.chat-scroll-fab-enter-active,
+.chat-scroll-fab-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.chat-scroll-fab-enter-from,
+.chat-scroll-fab-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
 .participant-card {
-  border: 1px solid #e4e7ed;
+  border: 1px solid #e3e3e8;
   border-radius: 10px;
   background: #fff;
-  padding: 10px;
+  padding: 10px 12px;
 }
 .participant-title {
-  font-size: 12px;
-  color: #606266;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8e8ea0;
   margin-bottom: 8px;
 }
 .participant-stage {
-  height: 116px;
+  height: 112px;
   border-radius: 8px;
-  background: #f5f7fa;
-  border: 1px solid #ebeef5;
+  background: #ececf1;
+  border: 1px solid #e3e3e8;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.participant-avatar { border: 2px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.participant-avatar {
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
 .avatar-panel {
   padding: 12px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid #e3e3e8;
   border-radius: 10px;
   background: #fff;
-  min-height: 260px;
+  min-height: 200px;
 }
 .avatar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  color: #303133;
+  color: #202123;
   font-weight: 600;
+  font-size: 13px;
 }
 .avatar-stage {
   position: relative;
   width: 100%;
-  height: 220px;
+  height: 200px;
   border-radius: 8px;
   overflow: hidden;
-  background: #f5f7fa;
-  border: 1px solid #ebeef5;
+  background: #ececf1;
+  border: 1px solid #e3e3e8;
 }
 .avatar-sdk-mount {
   position: absolute;
   inset: 0;
   z-index: 2;
 }
-.avatar-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
 .avatar-sdk-mount :deep(video),
 .avatar-sdk-mount :deep(canvas) {
   width: 100% !important;
@@ -1072,48 +3175,62 @@ async function onLeavePage() {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #909399;
+  color: #8e8ea0;
   font-size: 13px;
 }
-.avatar-tip { margin-top: 6px; color: #909399; font-size: 12px; }
-.chat-panel { min-height: 360px; max-height: 520px; overflow-y: auto; padding: 12px; background: #f5f7fa; border-radius: 8px; margin-bottom: 16px; }
-.conference-right .chat-panel { margin-bottom: 0; max-height: none; }
+.avatar-tip {
+  margin-top: 6px;
+  color: #8e8ea0;
+  font-size: 12px;
+}
 
-/* 类微信分享卡片：引导跳转评估报告页 */
+.chat-panel {
+  flex: 1;
+  min-height: 200px;
+  max-height: none;
+  overflow-y: auto;
+  padding: 20px 16px 16px;
+  background: linear-gradient(180deg, #efeff2 0%, #f4f4f6 48%, #f7f7f8 100%);
+  scrollbar-gutter: stable;
+}
+.conference-right .chat-panel {
+  margin-bottom: 0;
+}
+
 .report-share-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 12px 0 16px;
-  padding: 12px 14px;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  margin: 8px 0 12px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafb 100%);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   max-width: 100%;
 }
 .report-share-card:hover {
-  border-color: #c8e6c9;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border-color: #c5c5d2;
+  background: #fafafa;
 }
 .report-share-card:focus {
-  outline: 2px solid var(--el-color-primary-light-5);
-  outline-offset: 2px;
+  outline: 2px solid #202123;
+  outline-offset: 1px;
 }
 .report-share-thumb {
-  flex: 0 0 52px;
-  width: 52px;
-  height: 52px;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
-  background: linear-gradient(145deg, #e8f5e9, #c8e6c9);
+  background: #ececf1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .report-share-icon {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1;
 }
 .report-share-body {
@@ -1121,27 +3238,45 @@ async function onLeavePage() {
   min-width: 0;
 }
 .report-share-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: #202123;
   margin-bottom: 4px;
 }
 .report-share-desc {
   font-size: 12px;
-  color: #909399;
+  color: #8e8ea0;
   line-height: 1.4;
 }
 .report-share-arrow {
   flex-shrink: 0;
-  font-size: 18px;
-  color: #c0c4cc;
+  font-size: 16px;
+  color: #8e8ea0;
 }
 
-.msg { margin-bottom: 14px; }
-.msg-row { display: inline-flex; align-items: flex-start; gap: 8px; }
-.msg-user { text-align: right; }
-.msg-user .msg-row { flex-direction: row-reverse; }
-.msg-user .msg-bubble { background: #409eff; color: #fff; margin-left: auto; }
+.msg {
+  margin-bottom: 16px;
+}
+.msg-row {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.msg-user {
+  text-align: right;
+}
+.msg-user .msg-row {
+  flex-direction: row-reverse;
+}
+/* 用户消息：纯色灰气泡 */
+.msg-user .msg-bubble {
+  background: #ececf1;
+  color: #1a1a1e;
+  margin-left: auto;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  border-radius: 18px 18px 5px 18px;
+}
 .msg-user .msg-bubble.msg-bubble-voice {
   display: inline-block;
   min-width: 220px;
@@ -1153,49 +3288,109 @@ async function onLeavePage() {
   justify-content: flex-end;
   gap: 8px;
   font-weight: 500;
+  color: #202123;
 }
-.voice-icon { font-size: 14px; line-height: 1; }
-.voice-duration { font-size: 14px; }
+.voice-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.voice-duration {
+  font-size: 13px;
+}
 .msg-transcript {
   margin-top: 8px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.95);
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  color: #353740;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   padding-top: 8px;
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.msg-ai .msg-bubble { background: #fff; border: 1px solid #ebeef5; }
-.msg-ai .msg-bubble.msg-bubble-error {
-  background: #fef0f0;
-  border-color: #fde2e2;
-  color: #c45656;
+.msg-ai .msg-bubble {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  color: #2d2d33;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 2px 8px rgba(0, 0, 0, 0.03);
+  border-radius: 18px 18px 18px 5px;
 }
-.msg-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
-.msg-user .msg-label { text-align: right; }
-.msg-avatar { margin-top: 2px; flex: 0 0 30px; width: 30px; height: 30px; min-width: 30px; min-height: 30px; overflow: hidden; }
-.msg-avatar :deep(img) { width: 100%; height: 100%; object-fit: cover; }
-.msg-bubble { display: inline-block; max-width: 85%; padding: 10px 14px; border-radius: 10px; text-align: left; white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-size: 14px; }
-.thinking-hint { color: #909399; font-size: 12px; }
-.streaming .cursor { animation: blink 1s step-end infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.composer-integrated { margin-top: 4px; }
+.msg-ai .msg-bubble.msg-bubble-error {
+  background: #fff5f5;
+  border-color: rgba(220, 38, 38, 0.22);
+  color: #b42318;
+  box-shadow: 0 1px 3px rgba(180, 35, 24, 0.08);
+  border-radius: 18px 18px 18px 5px;
+}
+.msg-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8e8ea0;
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+.msg-user .msg-label {
+  text-align: right;
+}
+.msg-avatar {
+  margin-top: 2px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  overflow: hidden;
+}
+.msg-avatar :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg-bubble {
+  display: inline-block;
+  max-width: min(85%, 720px);
+  padding: 12px 16px;
+  border-radius: 18px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.thinking-hint {
+  color: #8e8ea0;
+  font-size: 12px;
+}
+.streaming .cursor {
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.composer-integrated {
+  padding: 12px 16px 16px;
+  background: #f7f7f8;
+  border-top: 1px solid #ececec;
+}
 .composer-shell {
-  border: 1px solid var(--el-border-color);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 16px;
   padding: 10px 12px 8px;
-  background: var(--el-bg-color);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .composer-shell:focus-within {
-  border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 0 0 1px var(--el-color-primary-light-7);
+  border-color: #202123;
+  box-shadow: 0 0 0 1px rgba(32, 33, 35, 0.12);
 }
 .composer-shell--recording {
-  border-color: var(--el-color-danger-light-5);
-  box-shadow: 0 0 0 1px var(--el-color-danger-light-7);
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.2);
 }
 .composer-wave {
   display: flex;
@@ -1210,17 +3405,17 @@ async function onLeavePage() {
   width: 4px;
   min-height: 4px;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--el-color-primary-light-3), var(--el-color-primary));
+  background: linear-gradient(180deg, #9ca3af, #4b5563);
   transform-origin: center bottom;
   transition: transform 0.06s ease-out;
 }
 .composer-shell--recording .composer-wave-bar {
-  background: linear-gradient(180deg, #f89898, var(--el-color-danger));
+  background: linear-gradient(180deg, #f87171, #dc2626);
 }
 .composer-rec-hint {
   margin: 0 0 8px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #8e8ea0;
   text-align: center;
 }
 .composer-field :deep(.el-textarea__inner) {
@@ -1231,6 +3426,8 @@ async function onLeavePage() {
   background: transparent;
   border-radius: 8px;
   line-height: 1.55;
+  color: #202123;
+  font-size: 14px;
 }
 .composer-field :deep(.el-textarea__inner):focus {
   box-shadow: none;
@@ -1240,50 +3437,98 @@ async function onLeavePage() {
   padding: 0;
   background: transparent;
 }
+.composer-field :deep(.el-input__count) {
+  font-size: 12px;
+  color: #8e8ea0;
+  background: transparent;
+}
 .composer-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 4px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  margin-top: 2px;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #ececf1;
+  margin-top: 4px;
 }
 .composer-tool-btn {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   padding: 0;
 }
 .composer-send-btn.el-button--primary {
-  --el-button-hover-bg-color: var(--el-color-primary-light-3);
+  background: #202123 !important;
+  border-color: #202123 !important;
+  color: #fff !important;
+  --el-button-hover-bg-color: #ffffff !important;
+  --el-button-hover-border-color: #202123 !important;
+  --el-button-hover-text-color: #202123 !important;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 }
-.text-desktop-theme {
-  padding: 12px;
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 38%),
-    radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.18), transparent 42%),
-    linear-gradient(180deg, #eaf2ff 0%, #dfe9f7 52%, #d6e0ee 100%);
+.composer-send-btn.el-button--primary:hover:not(.is-disabled) {
+  background: #ffffff !important;
+  border-color: #202123 !important;
+  color: #202123 !important;
 }
-.text-desktop-theme :deep(.el-card__header) {
-  background: linear-gradient(180deg, #f8fafc, #eef2f7);
-  border-bottom-color: #e5e7eb;
+/* 挂断：与左上角红色圆点同色渐变 */
+.composer-hangup-btn.el-button--danger {
+  background: linear-gradient(180deg, #ff857c 0%, #ff5f57 100%) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  color: #fff !important;
+  --el-button-hover-bg-color: #e04b44 !important;
+  --el-button-hover-border-color: rgba(0, 0, 0, 0.18) !important;
 }
-@media (max-width: 1200px) {
-  .interview-session-page.theme-page-shell {
-    max-width: 900px;
+.composer-hangup-icon {
+  transform: rotate(135deg);
+  font-size: 18px;
+}
+
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) {
+  .interview-session--gpt.theme-page-shell {
+    max-width: 100%;
+    padding: 8px 10px 12px;
   }
-}
-@media (max-width: 992px) {
-  .interview-session-page.theme-page-shell {
-    max-width: none;
-    padding: 0 0 8px;
-  }
-  .desktop-layout {
+  .conference-layout {
     grid-template-columns: 1fr;
   }
-  .desktop-left-pane {
-    min-height: 120px;
+  .conference-left {
+    border-right: none;
+    border-bottom: 1px solid #ececec;
   }
+}
+</style>
+
+<style>
+/* 流程节点气泡挂载在 body 上，需全局样式 */
+.flow-node-tooltip-popper.el-popper {
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%) !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 12px 28px -8px rgba(59, 130, 246, 0.12),
+    0 8px 20px -10px rgba(168, 85, 247, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+}
+.flow-node-tooltip-popper .flow-node-tooltip-content {
+  max-width: 256px;
+}
+.flow-node-tooltip-popper .flow-node-tooltip-line {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #374151;
+}
+.flow-node-tooltip-popper .flow-node-tooltip-line:first-child {
+  color: #111827;
+  font-weight: 600;
+}
+.flow-node-tooltip-popper .flow-node-tooltip-line + .flow-node-tooltip-line {
+  margin-top: 4px;
 }
 </style>

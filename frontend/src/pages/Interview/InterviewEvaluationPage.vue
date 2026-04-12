@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getInterviewEvaluationApi, type InterviewEvaluationData } from '@/api/interviewAi';
@@ -107,6 +107,15 @@ async function load() {
     loading.value = false;
   }
 }
+
+watch(
+  () => [String(route.name || ''), String(route.query.jobName || '').trim()] as const,
+  ([n, job]) => {
+    if (n !== 'InterviewEvaluation') return;
+    document.title = job || '面试评估报告';
+  },
+  { immediate: true }
+);
 
 onMounted(load);
 </script>

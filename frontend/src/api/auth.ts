@@ -122,10 +122,17 @@ export function uploadAvatarApi(userId: string | number, form: FormData) {
   });
 }
 
-// 根据用户 ID 获取头像信息：GET /admin/users/{id}/avatar
-export async function getUserAvatarByIdApi(userId: string | number) {
-  const raw = await adminRequest.get<unknown>(`/users/${userId}/avatar`);
-  const obj = (raw ?? {}) as Record<string, unknown>;
-  const avatarUrl = String(obj.avatarUrl ?? obj.avatar_url ?? obj.url ?? '').trim();
+// 根据用户 ID 获取头像地址：GET /admin/users/{id}/avatar（与文档一致，code/msg/data.avatarUrl）
+export async function getUserAvatarByIdApi(userId: string | number): Promise<{ avatarUrl: string }> {
+  const raw = await adminRequest.get<unknown>(`/users/${encodeURIComponent(String(userId))}/avatar`);
+  if (raw == null || typeof raw !== 'object') {
+    return { avatarUrl: '' };
+  }
+  const obj = raw as Record<string, unknown>;
+  const inner =
+    obj.data != null && typeof obj.data === 'object' && !Array.isArray(obj.data)
+      ? (obj.data as Record<string, unknown>)
+      : obj;
+  const avatarUrl = String(inner.avatarUrl ?? inner.avatar_url ?? inner.url ?? '').trim();
   return { avatarUrl };
 }

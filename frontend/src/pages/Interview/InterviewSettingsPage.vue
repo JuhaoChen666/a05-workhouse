@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import type { FormInstance, FormRules, UploadFile, UploadFiles } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
@@ -244,6 +244,15 @@ async function onStartInterview() {
     starting.value = false;
   }
 }
+
+watch(
+  () => [String(route.name || ''), form.positionName.trim()] as const,
+  ([n, pos]) => {
+    if (n !== 'InterviewSettings') return;
+    document.title = pos || '面试设置';
+  },
+  { immediate: true }
+);
 
 onMounted(async () => {
   const id = Number(route.params.id);

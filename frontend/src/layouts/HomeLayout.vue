@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import {
@@ -56,6 +56,7 @@ import {
 } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
 import { apiOrigin } from '@/api/request';
+import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 
 const route = useRoute();
 const router = useRouter();
@@ -119,6 +120,10 @@ watch(
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  void syncUserAvatarFromAdminApi();
+});
 
 function handleUserCommand(command: string) {
   if (command === 'profile') {
@@ -238,5 +243,21 @@ function handleUserCommand(command: string) {
 .slide-right-fade-leave-to {
   opacity: 0;
   transform: translateX(28px);
+}
+
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) {
+  .main-inner {
+    padding: 12px;
+  }
+  .header {
+    padding: 0 12px;
+  }
+  .username {
+    display: none;
+  }
+  .avatar-wrap {
+    gap: 4px;
+  }
 }
 </style>
