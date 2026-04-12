@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-from app.api import interview_routes, resume_routes
+from app.api import interview_routes, resume_routes, resume_optimize_routes
 from app.RAG.interview_service import InterviewService
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.add_middleware(
 # 注册路由
 app.include_router(interview_routes.router)
 app.include_router(resume_routes.router)
+app.include_router(resume_optimize_routes.router)
 
 # 挂载静态文件目录，允许访问简历 PDF
 UPLOAD_DIR = "data/resumes"

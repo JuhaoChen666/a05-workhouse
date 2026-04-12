@@ -7,7 +7,9 @@ import com.example.springbootbackend.utils.PermissionUtil;
 import com.example.springbootbackend.utils.Result;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -204,4 +206,61 @@ public class UserController {
             return Result.error("删除用户失败：" + e.getMessage());
         }
     }
+    
+    /**
+     * 上传用户头像 - 全员可访问
+     */
+    @PostMapping("/{id}/avatar")
+    public Result uploadAvatar(@PathVariable int id, @RequestParam("file") MultipartFile file) {
+        try {
+            // 检查用户是否存在
+            User existUser = userService.findByUserID(id);
+            if (existUser == null) {
+                return Result.userNotExist();
+            }
+            
+            // 调用 Service 层上传头像
+            String avatarUrl = userService.uploadAvatar(id, file);
+            
+            // 返回成功结果和头像 URL
+            Map<String, Object> data = new HashMap<>();
+            data.put("avatarUrl", avatarUrl);
+            
+            return Result.success(data);
+        } catch (ServiceException e) {
+            return Result.error("头像上传失败：" + e.getMessage());
+        } catch (Exception e) {
+            return Result.error("头像上传失败：" + e.getMessage());
+        }
+    }
+
+
+    /**
+     * 获取用户头像 - 全员可访问
+     */
+    @GetMapping("/{id}/avatar")
+    public Result getUserAvatar(@PathVariable int id) {
+        try {
+            // 检查用户是否存在
+            User existUser = userService.findByUserID(id);
+            if (existUser == null) {
+                return Result.userNotExist();
+            }
+
+            // 调用 Service 层获取头像
+            String avatarUrl = userService.getAvatarById(id);
+
+            // 返回成功结果和头像 URL
+            Map<String, Object> data = new HashMap<>();
+            data.put("avatarUrl", avatarUrl);
+
+            return Result.success(data);
+        } catch (ServiceException e) {
+            return Result.error("获取头像失败：" + e.getMessage());
+        } catch (Exception e) {
+            return Result.error("获取头像失败：" + e.getMessage());
+        }
+    }
+
 }
+

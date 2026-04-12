@@ -48,6 +48,8 @@ public class EmailService {
         String cachedCode = redisUtils.get("captcha:" + email);
         if (inputCode == null || inputCode.isEmpty()) {
             throw new ServiceException("验证码不能为空");
+        } else if (cachedCode == null) {
+            throw new ServiceException("验证码已过期或未发送，请重新获取");
         } else if (!cachedCode.equals(inputCode)) {
             throw new ServiceException("验证码错误");
         }else{

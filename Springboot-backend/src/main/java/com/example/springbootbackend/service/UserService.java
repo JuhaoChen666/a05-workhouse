@@ -3,10 +3,15 @@ package com.example.springbootbackend.service;
 import com.example.springbootbackend.entity.User;
 import com.example.springbootbackend.exception.ServiceException;
 import com.example.springbootbackend.mapper.UserMapper;
+import com.example.springbootbackend.utils.AvatarUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +65,8 @@ public class UserService {
         }
         String encryptedPwd = PasswordEncoder.encode(user.getPassword()); // [!code focus]
         user.setPassword(encryptedPwd);
-        user.setAvatar("D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/avatar_default.png");
+        // 存储相对路径而不是绝对路径来保护数据隐私和方便项目迁移
+        user.setAvatar(AvatarUtil.getAvatarUrl("avatar_default.webp"));
         user.setRole_id(1);
         // 基于时间戳自动生成用户 ID
         int generatedId = (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
@@ -121,5 +127,86 @@ public class UserService {
             user.setPassword(null);
         }
         return userMapper.updateUser(user);
+    }
+    
+    /**
+     * 上传用户头像
+     * @param userId 用户 ID
+     * @param file 上传的文件
+     * @return 新头像的访问 URL
+     */
+    public String uploadAvatar(int userId, MultipartFile file) {
+        // 1. 检查用户是否存在
+        User user = findByUserID(userId);
+        if (user == null) {
+            throw new ServiceException("用户不存在");
+        }
+        
+        // 2. 验证文件是否为空
+        if (file == null || file.isEmpty()) {
+            throw new ServiceException("上传文件不能为空");
+        }
+        
+        // 3. 验证文件格式
+        String originalFilename = file.getOriginalFilename();
+        if (!AvatarUtil.isAllowedFormat(originalFilename)) {
+            throw new ServiceException("不支持的图片格式，仅支持：jpg、jpeg、png、gif、bmp");
+        }
+        
+        try {
+            // 4. 读取上传的图片
+            BufferedImage image = AvatarUtil.readImage(file.getInputStream());
+            if (image == null) {
+                throw new ServiceException("图片文件损坏或格式不正确");
+            }
+            
+            // 5. 生成唯一文件名
+            String newFilename = AvatarUtil.generateUniqueFilename(userId);
+            System.out.println("[头像上传] 生成新文件名: " + newFilename);
+            
+            // 6. 转换并保存为 WebP 格式（必须保证新图片真正转换且保存成功，才可以开始下一步的删除和入库）
+            String savedPath = AvatarUtil.convertAndSave(image, newFilename);
+            System.out.println("[头像上传] 新头像保存路径: " + savedPath);
+
+            // 7. 删除旧头像（如果有旧头像且并非默认头像，则删除它的文件实体）
+            String oldAvatar = user.getAvatar();
+            System.out.println("[头像上传] 旧头像路径: " + oldAvatar);
+            if (oldAvatar != null && !oldAvatar.isEmpty()) {
+                boolean isDefault = AvatarUtil.isDefaultAvatar(oldAvatar);
+                System.out.println("[头像上传] 是否为默认头像: " + isDefault);
+                if (!isDefault) {
+                    AvatarUtil.deleteOldAvatar(oldAvatar);
+                    System.out.println("[头像上传] 已删除旧头像");
+                } else {
+                    System.out.println("[头像上传] 默认头像，跳过删除");
+                }
+            }
+            
+            // 8. 获取新头像的 URL（为了数据安全，直接将该相对路径存放入库）
+            String avatarUrl = AvatarUtil.getAvatarUrl(newFilename);
+            System.out.println("[头像上传] 数据库存储且将返回的 URL: " + avatarUrl);
+            
+            // 9. 更新数据库
+            int updateCount = userMapper.updateAvatar(userId, avatarUrl);
+            System.out.println("[头像上传] 数据库更新结果: " + updateCount + " 行受影响");
+            
+            if (updateCount == 0) {
+                throw new ServiceException("数据库更新失败");
+            }
+            
+            // 10. 返回头像 URL
+            return avatarUrl;
+            
+        } catch (IOException e) {
+            System.err.println("[头像上传] IO异常: " + e.getMessage());
+            e.printStackTrace();
+            throw new ServiceException("头像上传失败：" + e.getMessage());
+        }
+    }
+
+
+    //根据ID获取用户头像
+    public String getAvatarById(int userId) {
+        return userMapper.getAvatarById(userId);
     }
 }

@@ -49,4 +49,12 @@ public interface UserMapper {
             "WHERE id = #{id}" +
             "</script>")
     int updateUser(User user);
+    
+    // 更新用户头像
+    @Update("UPDATE user SET avatar = #{avatar} WHERE id = #{id}")
+    int updateAvatar(@Param("id") int id, @Param("avatar") String avatar);
+
+    //根据ID获取用户头像
+    @Select("SELECT avatar FROM user WHERE id = #{id}")
+    String getAvatarById(@Param("id") int id);
 }

@@ -67,3 +67,15 @@ class ResumeModel(Base):
     local_path = Column(String(511), nullable=False)
     content_text = Column(Text, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.now)
+
+class ResumeOptimizationModel(Base):
+    __tablename__ = 'resume_optimizations'
+
+    session_id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    original_text = Column(Text, nullable=True)
+    optimized_text = Column(Text, nullable=True)
+    progress = Column(Integer, default=0)
+    status = Column(String(20), default='pending')
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
