@@ -47,15 +47,50 @@
 
       <div class="panel theme-card">
         <h3>热门岗位方向</h3>
-        <p class="job-tip">按岗位大类聚合统计，点击标签可进入对应方向。</p>
+        <p class="job-tip">按岗位大类聚合统计，点击标签可查看完整的岗位招聘内容。</p>
         <div class="job-tags">
-          <button class="job-tag" v-for="job in hotCategories" :key="job.name">
+          <button class="job-tag" v-for="(job, index) in displayJobs" :key="job.id || index" @click="handleJobClick(job)">
             <span class="job-tag-name">{{ job.name }}</span>
-            <span class="job-tag-count">{{ job.count }}</span>
+            <span class="job-tag-count" v-if="job.companyName">
+              <img v-if="getLocalCompanyLogo(job.companyName, job.companyLogo)" :src="getLocalCompanyLogo(job.companyName, job.companyLogo)" class="mini-logo" alt="logo" />
+              {{ job.companyName }}
+            </span>
+            <span class="job-tag-count" v-else>{{ job.count }}</span>
           </button>
         </div>
       </div>
     </section>
+
+    <!-- 职位详情弹窗 -->
+    <el-dialog
+      v-model="jobDialogVisible"
+      :title="selectedJob?.name || '岗位详情'"
+      width="600px">
+      <div v-if="selectedJob" class="job-detail-content">
+        <template v-if="selectedJob.companyName">
+          <div class="job-header">
+            <h3>{{ selectedJob.name }}</h3>
+            <div class="job-meta">
+              <span class="company">
+                <img v-if="getLocalCompanyLogo(selectedJob.companyName, selectedJob.companyLogo)" :src="getLocalCompanyLogo(selectedJob.companyName, selectedJob.companyLogo)" class="meta-logo" alt="logo" />
+                企业：{{ selectedJob.companyName }}
+              </span>
+              <span class="salary" v-if="selectedJob.salaryMin || selectedJob.salaryMax">
+                薪资：{{ formatSalaryRange(selectedJob.salaryMin, selectedJob.salaryMax) }}
+              </span>
+            </div>
+          </div>
+          <el-divider style="margin: 16px 0;" />
+          <div class="job-html" v-html="selectedJob.jobContent?.replace(/\n/g, '<br>') || '暂无详细描述'"></div>
+        </template>
+        <template v-else>
+          <div class="job-header">
+            <h3>{{ selectedJob.name }}</h3>
+            <p>这是一个聚合方向的统计数据模块，具体岗位内容请确认接入真实API后体验。</p>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -65,6 +100,8 @@ import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
 import { useUserStore } from '@/store/user';
 import { getUserEvaluationTrendApi } from '@/api/interviewAi';
+import { getHotJobsApi, getJobDetailApi, formatSalaryRange } from '@/api/jobs';
+import type { HotJobItem } from '@/api/jobs';
 
 const chartARef = ref<HTMLElement | null>(null);
 let chartA: echarts.ECharts | null = null;
@@ -77,16 +114,48 @@ const scoreTrendDesc = computed(() => {
   return `最近一次得分：${Number(latest).toFixed(1)}`;
 });
 
-const hotCategories = [
-  { name: '后端开发', count: 128 },
-  { name: '前端开发', count: 103 },
-  { name: 'Android开发', count: 67 },
-  { name: 'iOS开发', count: 54 },
-  { name: '测试开发', count: 49 },
-  { name: '算法工程师', count: 73 },
-  { name: '数据开发', count: 41 },
-  { name: '运维开发', count: 36 },
-];
+
+const displayJobs = ref<any[]>([]);
+const jobDialogVisible = ref(false);
+const selectedJob = ref<any>(null);
+
+function getLocalCompanyLogo(name?: string, fallbackUrl?: string) {
+  if (!name) return fallbackUrl || '';
+  const n = name.toLowerCase();
+  if (n.includes('阿里') || n.includes('alibaba')) return '/img/Alibaba.ico';
+  if (n.includes('字节') || n.includes('bytedance')) return '/img/ByteDance.ico';
+  if (n.includes('华为') || n.includes('huawei')) return '/img/Huawei.ico';
+  if (n.includes('美团') || n.includes('meituan')) return '/img/Meituan.ico';
+  if (n.includes('腾讯') || n.includes('tencent')) return '/img/Tencent.ico';
+  if (n.includes('网易') || n.includes('wangyi')) return '/img/Wangyi.ico';
+  return fallbackUrl || '';
+}
+
+async function loadJobTags() {
+  try {
+    const list = await getHotJobsApi({ limit: 12 });
+    if (list && list.length > 0) {
+      displayJobs.value = list;
+    }
+  } catch (err) {
+    console.error('Failed to load hot jobs', err);
+  }
+}
+
+async function handleJobClick(job: any) {
+  selectedJob.value = job;
+  jobDialogVisible.value = true;
+  if (job.id) {
+    try {
+      const detail = await getJobDetailApi(job.id);
+      if (detail) {
+        selectedJob.value = { ...job, ...detail };
+      }
+    } catch (err) {
+      console.error('Failed to fetch job detail', err);
+    }
+  }
+}
 
 const modes = [
   { key: 'ai', title: 'AI面试', desc: '智能追问与结构化反馈' },
@@ -160,6 +229,7 @@ function handleQuickEntry(key: string) {
 onMounted(() => {
   initCharts();
   void loadScoreTrend();
+  void loadJobTags();
   window.addEventListener('resize', resizeCharts);
 });
 
@@ -266,6 +336,47 @@ onBeforeUnmount(() => {
   background: #7c3aed;
   color: #fff;
   padding: 0 6px;
+}
+
+.job-header h3 {
+  margin: 0 0 10px 0;
+  font-size: clamp(16px, 1.2vw, 20px);
+  color: #111827;
+}
+.job-meta {
+  display: flex;
+  gap: 15px;
+  font-size: clamp(12px, 0.9vw, 14px);
+}
+.mini-logo {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 4px;
+  object-fit: cover;
+}
+.meta-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  margin-right: 6px;
+  object-fit: cover;
+}
+.job-meta .company {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 500;
+  color: #374151;
+}
+.job-meta .salary {
+  color: #f59e0b;
+  font-weight: bold;
+}
+.job-html {
+  font-size: clamp(13px, 1vw, 15px);
+  line-height: 1.6;
+  color: #4b5563;
+  word-break: break-all;
 }
 
 @media (max-width: 1200px) {
