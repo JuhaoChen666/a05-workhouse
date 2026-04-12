@@ -446,10 +446,6 @@ onBeforeUnmount(() => {
   padding: 0 6px;
 }
 
-<<<<<<< HEAD
-/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
-@media (max-width: 768px) {
-=======
 .job-header h3 {
   margin: 0 0 10px 0;
   font-size: clamp(16px, 1.2vw, 20px);
@@ -584,7 +580,6 @@ onBeforeUnmount(() => {
 .intel-text { line-height: 1.5; }
 
 @media (max-width: 1200px) {
->>>>>>> cafdaa2355ec8c0e58ace56072c6271ff7b6ad45
   .mode-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
