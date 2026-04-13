@@ -9,7 +9,7 @@
       <div class="header-left">
         <div class="logo">
           <el-icon class="logo-icon"><Platform /></el-icon>
-          <span class="logo-text">AI 面试官</span>
+          <span class="logo-text">面智通途</span>
         </div>
         <div class="picture-logo">
           <img src="@/assets/logo1.png" alt="Logo" style="width: 50px; height: 50px;" />
@@ -139,7 +139,7 @@ const features = [
   {
     icon: Microphone,
     title: '智能语音交互',
-    desc: '拟真语音对话体验，AI面试官实时提问、追问，还原高压真实面试场景。'
+    desc: '拟真语音对话体验，智能面试官实时提问、追问，还原高压真实面试场景。'
   },
   {
     icon: DocumentChecked,

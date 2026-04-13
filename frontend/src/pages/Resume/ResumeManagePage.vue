@@ -6,7 +6,7 @@
         <p>支持上传、在线预览与管理，简历将用于后续面试配置。</p>
       </div>
       <div class="resume-upload-area">
-        <el-button class="optimize-btn" @click="goResumeOptimize">简历优化</el-button>
+        <el-button class="optimize-btn" @click="openOptimizeDialog">简历优化</el-button>
         <el-upload
           :show-file-list="false"
           :auto-upload="false"
@@ -55,17 +55,19 @@
       <h4 class="dialog-title">{{ currentResume?.name || '--' }}</h4>
       <div v-if="previewLoading" class="dialog-content">预览加载中...</div>
       <div v-else-if="previewError" class="dialog-content">{{ previewError }}</div>
-      <div v-else-if="previewSrc" class="pdf-wrap">
-        <VueOfficePdf :src="previewSrc" />
-      </div>
+      <ResumePdfPreview v-else-if="previewSrc" :src="previewSrc" variant="dialog" />
       <div v-else class="dialog-content">暂无可预览内容</div>
     </el-dialog>
 
+    <ResumeOptimizeUploadDialog
+      v-model="optimizeUploadDialogVisible"
+      context="manage"
+      @confirmed="onOptimizeUploadConfirmed"
+    />
+
     <el-dialog v-model="uploadPreviewVisible" title="上传前预览" width="900px" append-to-body>
       <h4 class="dialog-title">{{ pendingUploadName || '--' }}</h4>
-      <div v-if="uploadPreviewSrc" class="pdf-wrap">
-        <VueOfficePdf :src="uploadPreviewSrc" />
-      </div>
+      <ResumePdfPreview v-if="uploadPreviewSrc" :src="uploadPreviewSrc" variant="dialog" />
       <div v-else class="dialog-content">暂无可预览内容</div>
       <template #footer>
         <el-button @click="cancelPendingUpload">取消</el-button>
@@ -80,8 +82,10 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { deleteResumeApi, getResumeItemApi, getResumeListApi, uploadResumeApi } from '@/api/resume';
+import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
 import { useUserStore } from '@/store/user';
-import VueOfficePdf from '@vue-office/pdf';
+import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
+import ResumeOptimizeUploadDialog from '@/components/ResumeOptimizeUploadDialog.vue';
 
 type ResumeItem = { id: number; name: string; content: string; updatedAt: string };
 const resumeList = ref<ResumeItem[]>([]);
@@ -102,10 +106,14 @@ let uploadPreviewObjectUrl = '';
 const currentPage = ref(1);
 const pageSize = ref(5);
 const total = ref(0);
-const RESUME_FILE_BASE_URL = 'http://10.105.2.13:8000/data/resumes/';
+const optimizeUploadDialogVisible = ref(false);
 
-function goResumeOptimize() {
-  router.push({ name: 'HomeResumeOptimize' });
+function openOptimizeDialog() {
+  optimizeUploadDialogVisible.value = true;
+}
+
+function onOptimizeUploadConfirmed() {
+  void router.push({ name: 'HomeResumeOptimize' });
 }
 
 function nowText() {
@@ -261,7 +269,7 @@ async function viewResume(row: ResumeItem) {
       previewError.value = '未获取到简历文件名，无法预览';
       return;
     }
-    previewSrc.value = `${RESUME_FILE_BASE_URL}${encodeURIComponent(fileKey)}`;
+    previewSrc.value = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(fileKey)}`;
   } catch (e: unknown) {
     previewError.value = (e as Error).message || '获取简历详情失败';
   } finally {
@@ -353,10 +361,6 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
   line-height: 1.75;
   color: #374151;
-}
-.pdf-wrap {
-  height: 70vh;
-  overflow: auto;
 }
 .pagination-wrap {
   display: flex;

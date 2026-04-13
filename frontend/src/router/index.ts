@@ -3,6 +3,7 @@ import type { RouteRecordRaw } from 'vue-router';
 import type { Pinia } from 'pinia';
 import { ElMessage } from 'element-plus';
 import { useUserStore } from '../store/user';
+import { resolveDocumentTitle } from '@/utils/documentTitle';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -13,16 +14,19 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
+    meta: { title: '登录' },
     component: () => import('../pages/Login/LoginPage.vue'),
   },
   {
     path: '/register',
     name: 'Register',
+    meta: { title: '注册' },
     component: () => import('../pages/Register/RegisterPage.vue'),
   },
   {
     path: '/forgot-password',
     name: 'ForgotPassword',
+    meta: { title: '找回密码' },
     component: () => import('../pages/ForgotPassword/ForgotPasswordPage.vue'),
   },
   {
@@ -43,29 +47,37 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'question',
             name: 'HomeQuestion',
-            meta: { title: '题库' },
+            meta: { title: '面试押题' },
             component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
+          },
+          {
+            path: 'question/predict',
+            name: 'HomePredictQuestions',
+            meta: { title: '面试押题' },
+            component: () => import('../pages/QuestionBank/PredictQuestionsPage.vue'),
           },
           {
             path: 'resume',
             name: 'HomeResume',
-            meta: { title: '简历' },
+            meta: { title: '简历管理' },
             component: () => import('../pages/Resume/ResumeManagePage.vue'),
           },
           {
             path: 'resume/optimize',
             name: 'HomeResumeOptimize',
             meta: { title: '简历优化' },
-            component: () => import('../pages/Common/PlaceholderPage.vue'),
-            props: {
-              title: '简历优化',
-              desc: '简历优化功能正在建设中，后续会提供智能分析与优化建议。',
-            },
+            component: () => import('../pages/Resume/ResumeOptimizePreviewPage.vue'),
+          },
+          {
+            path: 'resume/optimize/run',
+            name: 'HomeResumeOptimizeRun',
+            meta: { title: '简历优化' },
+            component: () => import('../pages/Resume/ResumeOptimizeRunPage.vue'),
           },
           {
             path: 'job',
             name: 'HomeJob',
-            meta: { title: '岗位' },
+            meta: { title: '岗位检索' },
             component: () => import('../pages/JobSearch/JobSearchPage.vue'),
           },
           {
@@ -94,7 +106,7 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'doc',
             name: 'HomeDoc',
-            meta: { title: '文档' },
+            meta: { title: '帮助文档' },
             component: () => import('../pages/Common/PlaceholderPage.vue'),
             props: { title: '文档', desc: '文档模块正在建设中，后续会提供使用说明与常见问题。' },
           },
@@ -115,16 +127,19 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'job-search',
         name: 'JobSearch',
+        meta: { title: '岗位检索' },
         component: () => import('../pages/JobSearch/JobSearchPage.vue'),
       },
       {
         path: 'interview/settings/:id(\\d+)',
         name: 'InterviewSettings',
+        meta: { title: '面试设置' },
         component: () => import('../pages/Interview/InterviewSettingsPage.vue'),
       },
       {
         path: 'interview/session/:id',
         name: 'InterviewSession',
+        meta: { title: '面试' },
         component: () => import('../pages/Interview/InterviewSessionPage.vue'),
       },
       {
@@ -136,21 +151,25 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'question-bank',
         name: 'QuestionBank',
+        meta: { title: '面试押题' },
         component: () => import('../pages/QuestionBank/QuestionBankPage.vue'),
       },
       {
         path: 'records',
         name: 'InterviewRecordList',
+        meta: { title: '面试记录' },
         component: () => import('../pages/InterviewRecordList/InterviewRecordListPage.vue'),
       },
       {
         path: 'report/:id',
         name: 'ReportDetail',
+        meta: { title: '面试报告' },
         component: () => import('../pages/ReportDetail/ReportDetailPage.vue'),
       },
       {
         path: 'job/:id(\\d+)',
         name: 'JobDetail',
+        meta: { title: '岗位详情' },
         component: () => import('../pages/JobDetail/JobDetailPage.vue'),
       },
       {
@@ -209,18 +228,6 @@ const router = createRouter({
   routes,
 });
 
-const APP_TITLE = 'AI 模拟面试平台';
-
-function pickRouteTitle(to: { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown }): string {
-  const matchedTitle = [...to.matched]
-    .reverse()
-    .map((r) => r.meta?.title)
-    .find((t) => typeof t === 'string' && t.trim()) as string | undefined;
-  if (matchedTitle) return matchedTitle.trim();
-  if (typeof to.name === 'string' && to.name.trim()) return to.name.trim();
-  return APP_TITLE;
-}
-
 // 在 app 挂载前守卫里用 store 时，必须传入 pinia，否则 getActivePinia() 未就绪
 export function setupRouterGuard(pinia: Pinia) {
   router.beforeEach((to) => {
@@ -247,8 +254,7 @@ export function setupRouterGuard(pinia: Pinia) {
   });
 
   router.afterEach((to) => {
-    const pageTitle = pickRouteTitle(to as { matched: Array<{ meta: Record<string, unknown> }>; name?: unknown });
-    document.title = pageTitle;
+    document.title = resolveDocumentTitle(to);
   });
 }
 

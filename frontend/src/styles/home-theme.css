@@ -6,6 +6,14 @@
   padding: 8px 0 24px;
 }
 
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) {
+  .theme-page-shell {
+    padding: 4px 0 16px;
+    max-width: 100%;
+  }
+}
+
 .theme-section-header {
   margin-bottom: 14px;
 }

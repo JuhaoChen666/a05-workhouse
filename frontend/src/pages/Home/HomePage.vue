@@ -1,15 +1,33 @@
 
 <template>
-  <div class="home-shell">
+  <div
+    class="home-shell"
+    :class="{
+      'home-shell--mobile-expanded': isMobile && !sidebarMobileCollapsed,
+      'home-shell--mobile-collapsed': isMobile && sidebarMobileCollapsed,
+    }"
+  >
     <div class="home-sidebar-shell">
       <aside
         class="home-sidebar"
-        :class="{ collapsed: !sidebarExpanded }"
-        @mouseenter="sidebarExpanded = true"
-        @mouseleave="sidebarExpanded = false"
+        :class="{ collapsed: sidebarCollapsedVisual, 'home-sidebar--mobile': isMobile }"
+        @mouseenter="onSidebarEnter"
+        @mouseleave="onSidebarLeave"
       >
-        <div class="sidebar-top">
-          <el-icon class="collapse-icon"><Fold /></el-icon>
+        <div
+          class="sidebar-top"
+          role="button"
+          tabindex="0"
+          :aria-label="isMobile ? (sidebarMobileCollapsed ? '展开侧栏文字' : '折叠侧栏仅图标') : undefined"
+          @click="onCollapseTriggerClick"
+          @keydown.enter.prevent="onCollapseTriggerClick"
+        >
+          <el-icon
+            class="collapse-icon"
+            :class="{ 'collapse-icon--folded': isMobile && sidebarMobileCollapsed }"
+          >
+            <Fold />
+          </el-icon>
         </div>
         <nav class="menu-list">
           <RouterLink
@@ -20,7 +38,7 @@
             :to="{ name: item.name }"
           >
             <el-icon><component :is="item.icon" /></el-icon>
-            <span v-if="sidebarExpanded">{{ item.label }}</span>
+            <span v-if="showSidebarLabels">{{ item.label }}</span>
           </RouterLink>
         </nav>
       </aside>
@@ -47,26 +65,46 @@ import { computed, ref, watch } from "vue";
 import { useRoute, RouterLink, RouterView } from "vue-router";
 import {
   ChatDotRound,
-  Collection,
   Document,
   Fold,
   HomeFilled,
   Notebook,
-  Suitcase,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/store/user";
 import { loadInterviewSetupDraft } from "@/pages/Interview/setupState";
+import { useViewport } from "@/composables/useViewport";
 
 const route = useRoute();
 const userStore = useUserStore();
+const { isMobile } = useViewport();
 
+/** 桌面端：悬停展开；移动端：默认展开显示文字，可点击折叠为仅图标 */
 const sidebarExpanded = ref(false);
+const sidebarMobileCollapsed = ref(false);
+
+const showSidebarLabels = computed(
+  () => (isMobile.value ? !sidebarMobileCollapsed.value : sidebarExpanded.value)
+);
+const sidebarCollapsedVisual = computed(() =>
+  isMobile.value ? sidebarMobileCollapsed.value : !sidebarExpanded.value
+);
+
+function onSidebarEnter() {
+  if (isMobile.value) return;
+  sidebarExpanded.value = true;
+}
+function onSidebarLeave() {
+  if (isMobile.value) return;
+  sidebarExpanded.value = false;
+}
+function onCollapseTriggerClick() {
+  if (!isMobile.value) return;
+  sidebarMobileCollapsed.value = !sidebarMobileCollapsed.value;
+}
 const menuItems = [
   { name: "Home", label: "首页", icon: HomeFilled },
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
-  { name: "HomeQuestion", label: "题库", icon: Collection },
-  { name: "HomeResume", label: "简历", icon: Document },
-  { name: "HomeJob", label: "岗位", icon: Suitcase },
+  { name: "HomeResume", label: "简历管理", icon: Document },
   { name: "HomeDoc", label: "帮助文档", icon: Notebook },
 ];
 
@@ -76,12 +114,15 @@ const titleMap: Record<string, string> = {
   HomeInterviewPosition: "面试设置",
   HomeInterviewConfig: "面试设置",
   HomeInterview: "面试设置",
-  HomeQuestion: "题库",
-  HomeResume: "简历",
-  HomeJob: "岗位",
+  HomeQuestion: "面试押题",
+  HomePredictQuestions: "面试押题",
+  HomeResume: "简历管理",
+  HomeResumeOptimize: "简历优化",
+  HomeResumeOptimizeRun: "简历优化",
+  HomeJob: "岗位检索",
   HomeDoc: "帮助文档",
-  Profile: "个人信息",
-  ProfileEdit: "个人信息",
+  Profile: "个人中心",
+  ProfileEdit: "编辑资料",
 };
 
 const activeRouteName = computed(() => String(route.name || "Home"));
@@ -122,15 +163,9 @@ const pageSubtitle = computed(() =>
       ? ""
     : activeRouteName.value.startsWith("HomeInterview")
       ? ""
+    : activeRouteName.value === "HomeQuestion" || activeRouteName.value === "HomePredictQuestions"
+      ? ""
       : "保持节奏，稳步提升面试竞争力"
-);
-
-watch(
-  currentPageTitle,
-  (title) => {
-    document.title = title;
-  },
-  { immediate: true }
 );
 
 watch(
@@ -189,9 +224,11 @@ watch(
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+  cursor: default;
 }
 .collapse-icon {
   color: #94a3b8;
+  transition: transform 0.2s ease;
 }
 .menu-list {
   display: grid;
@@ -226,6 +263,55 @@ watch(
   border-color: #c4b5fd;
   color: #4338ca;
 }
+
+/* 移动端：侧栏更窄；文字默认显示；点击折叠仅图标；悬停不再改变宽度 */
+.home-sidebar--mobile .sidebar-top {
+  cursor: pointer;
+  border-radius: 10px;
+}
+.home-sidebar--mobile .sidebar-top:active {
+  background: rgba(148, 163, 184, 0.2);
+}
+.collapse-icon--folded {
+  transform: rotate(-90deg);
+}
+.home-sidebar--mobile:not(.collapsed) {
+  width: 62px !important;
+  padding: 8px 4px;
+}
+.home-sidebar--mobile.collapsed {
+  width: 42px !important;
+  padding: 8px 4px;
+}
+.home-sidebar--mobile.collapsed .menu-item {
+  min-height: 40px;
+  padding: 6px 2px;
+}
+.home-sidebar--mobile:hover {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+.home-sidebar--mobile .menu-item span {
+  font-size: 10px;
+  max-width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.home-shell--mobile-expanded {
+  padding-left: 68px;
+}
+.home-shell--mobile-collapsed {
+  padding-left: 46px;
+}
+.home-shell--mobile-expanded .home-sidebar-shell,
+.home-shell--mobile-collapsed .home-sidebar-shell {
+  width: auto;
+  min-width: 0;
+}
+
 .home-main {
   color: #1f2937;
   flex: 1;

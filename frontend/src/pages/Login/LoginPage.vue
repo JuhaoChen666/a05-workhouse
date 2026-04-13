@@ -13,8 +13,8 @@
       <div class="auth-card">
         <div class="auth-header">
           <div class="logo">
-            <el-icon class="logo-icon"><Platform /></el-icon>
-            <span class="logo-text">AI 面试官</span>
+            <img :src="loginBrandLogo" alt="" class="logo-img" role="presentation" />
+            <span class="logo-text">面智通途</span>
           </div>
           <h2 class="title">欢迎回来</h2>
           <p class="subtitle">登录您的账号，继续智能面试之旅</p>
@@ -84,12 +84,12 @@ import { reactive, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { loginApi, getProfileApi, getUserAvatarByIdApi } from '@/api/auth';
+import { loginApi, getProfileApi } from '@/api/auth';
+import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 import { useUserStore } from '@/store/user';
 import { throttle } from '@/utils/throttle';
-import { 
-  Platform, ArrowLeft, User, Lock
-} from '@element-plus/icons-vue';
+import { ArrowLeft, User, Lock } from '@element-plus/icons-vue';
+import loginBrandLogo from '@/assets/logo2 .webp';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -129,17 +129,7 @@ const doSubmit = () => {
           /* 仅有 token 时也允许进入首页 */
         }
       }
-      const userId = userStore.userInfo?.id;
-      if (userId) {
-        try {
-          const avatarRes = await getUserAvatarByIdApi(userId);
-          if (avatarRes.avatarUrl) {
-            userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: avatarRes.avatarUrl });
-          }
-        } catch {
-          // 头像接口失败不阻断登录
-        }
-      }
+      await syncUserAvatarFromAdminApi();
       ElMessage.success('登录成功');
       await nextTick();
       await router.replace({ name: 'Home' }).catch(() => {});
@@ -245,17 +235,26 @@ const goLanding = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 20px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: -0.5px;
+  gap: 12px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
-.logo-icon {
-  font-size: 24px;
+.logo-img {
+  display: block;
+  max-height: 48px;
+  width: auto;
+  max-width: min(160px, 40vw);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 22px;
+  font-weight: 800;
   color: #111827;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
 }
 
 .title {

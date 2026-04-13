@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import * as echarts from 'echarts';
 import { HomeFilled, Collection, Document, Suitcase, Notebook, Fold } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
@@ -183,7 +183,6 @@ const menuPageMeta: Record<string, { subtitle: string; title: string; desc: stri
 const pageSubtitle = computed(() => menuPageMeta[activeMenu.value]?.subtitle || 'Dashboard');
 const currentPageTitle = computed(() => menuPageMeta[activeMenu.value]?.title || '页面');
 const currentPageDesc = computed(() => menuPageMeta[activeMenu.value]?.desc || '页面建设中');
-const APP_TITLE = 'AI 模拟面试平台';
 type ResumeItem = { id: number; name: string; content: string; updatedAt: string };
 const resumeList = ref<ResumeItem[]>([]);
 
@@ -254,13 +253,6 @@ onBeforeUnmount(() => {
   chartA?.dispose();
 });
 
-watch(
-  currentPageTitle,
-  (title) => {
-    document.title = `${title} - ${APP_TITLE}`;
-  },
-  { immediate: true }
-);
 </script>
 
 <style scoped>

@@ -5,6 +5,9 @@ import 'element-plus/dist/index.css';
 import './styles/home-theme.css';
 import App from './App.vue';
 import router, { setupRouterGuard } from './router';
+import { applySiteFavicon } from './utils/setSiteFavicon';
+
+applySiteFavicon();
 
 const app = createApp(App);
 const pinia = createPinia();

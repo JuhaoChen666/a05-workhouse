@@ -13,8 +13,8 @@
       <div class="auth-card">
         <div class="auth-header">
           <div class="logo">
-            <el-icon class="logo-icon"><Platform /></el-icon>
-            <span class="logo-text">AI 面试官</span>
+            <img :src="loginBrandLogo" alt="" class="logo-img" role="presentation" />
+            <span class="logo-text">面智通途</span>
           </div>
           <h2 class="title">找回密码</h2>
           <p class="subtitle">请输入相关信息以重置您的密码</p>
@@ -124,9 +124,8 @@ import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { sendCodeApi, verifyCodeResetApi } from '@/api/auth';
-import { 
-  Platform, ArrowLeft, User, Message, Key, Lock, Select
-} from '@element-plus/icons-vue';
+import { ArrowLeft, User, Message, Key, Lock, Select } from '@element-plus/icons-vue';
+import loginBrandLogo from '@/assets/logo2 .webp';
 
 const router = useRouter();
 const formRef = ref<FormInstance>();
@@ -309,17 +308,26 @@ const goLogin = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 20px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: -0.5px;
+  gap: 12px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
-.logo-icon {
-  font-size: 24px;
+.logo-img {
+  display: block;
+  max-height: 48px;
+  width: auto;
+  max-width: min(160px, 40vw);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 22px;
+  font-weight: 800;
   color: #111827;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
 }
 
 .title {

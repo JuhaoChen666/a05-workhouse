@@ -41,6 +41,9 @@ export interface InterviewSessionInfo {
   current_question: string;
   history: InterviewSessionHistoryItem[];
   interview_mode?: 'text' | 'voice' | 'avatar';
+  /** 部分后端会返回，用于前端计算面试已进行时长 */
+  created_at?: string;
+  started_at?: string;
 }
 
 /** GET /interview/session/:sessionId/evaluation（8000 等服务端） */
@@ -116,6 +119,8 @@ export interface AvatarSessionRefreshRes {
  * 面试回答流式 NDJSON（与后端一致）。
  * - voice_processing / analyzing：进度文案在 data.message
  * - analysis_result：评价与引导在 data.feedback，另有 depth_score、is_vague、need_followup 等
+ * - checking_completeness / completeness_result：主题完整性检查阶段
+ * - topic_completed：本话题结束（data.topic / reason）
  * - error：业务失败，data.message 为人类可读说明；收到后前端应停止继续解析后续 NDJSON
  */
 export interface InterviewAnswerStreamEvent {
@@ -123,6 +128,9 @@ export interface InterviewAnswerStreamEvent {
     | 'voice_processing'
     | 'analyzing'
     | 'analysis_result'
+    | 'checking_completeness'
+    | 'completeness_result'
+    | 'topic_completed'
     | 'followup'
     | 'question_chunk'
     | 'question'
@@ -280,6 +288,10 @@ async function readNdjsonStream(
         void reader.cancel().catch(() => {});
         break readLoop;
       }
+      if (evt.type === 'interview_complete') {
+        void reader.cancel().catch(() => {});
+        break readLoop;
+      }
     }
   }
 }
@@ -337,6 +349,87 @@ export async function streamInterviewVoiceAnswer(
     body: fd,
   });
   await readNdjsonStream(res, onEvent, { url: voiceUrl });
+}
+
+/** 押题流式事件（与 8000 `/api/interview/predict-questions/stream` 对齐） */
+export interface PredictQuestionStreamEvent {
+  type: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface PredictQuestionsBody {
+  resume_id: number;
+  position: string;
+}
+
+/**
+ * POST `/interview/predict-questions/stream`，NDJSON：
+ * - prediction_item：{ id, question, key_points, answer, difficulty }
+ * - prediction_complete / predict_complete：结束
+ * - error
+ */
+export async function streamPredictQuestions(
+  body: PredictQuestionsBody,
+  onEvent: (evt: PredictQuestionStreamEvent) => void
+): Promise<void> {
+  const store = useUserStore();
+  const token = store.token;
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const url = `${interviewApiJsonBase}/interview/predict-questions/stream`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/x-ndjson',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const bodyPreview = (text || '').trim().slice(0, 800);
+    throw new Error(
+      `HTTP ${res.status} — ${bodyPreview || res.statusText || '无响应体'}`
+    );
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('无法读取响应流');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  readLoop: while (true) {
+    const { done, value } = await reader.read();
+    if (done) break readLoop;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const raw = line.trim();
+      if (!raw) continue;
+      let evt: PredictQuestionStreamEvent;
+      try {
+        evt = JSON.parse(raw) as PredictQuestionStreamEvent;
+      } catch {
+        throw new Error(`NDJSON 解析失败，行片段: ${raw.slice(0, 200)}`);
+      }
+      onEvent(evt);
+      if (
+        evt.type === 'error' ||
+        evt.type === 'predict_complete' ||
+        evt.type === 'prediction_complete'
+      ) {
+        void reader.cancel().catch(() => {});
+        break readLoop;
+      }
+    }
+  }
 }
 
 export async function streamInterviewOpening(

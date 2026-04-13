@@ -95,5 +95,6 @@ onMounted(() => {
   background: linear-gradient(90deg, #9ca3af, #d1d5db);
   opacity: 0.6;
 }
-@media (max-width: 1100px) { .card-grid { grid-template-columns: 1fr; } }
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
+@media (max-width: 768px) { .card-grid { grid-template-columns: 1fr; } }
 </style>

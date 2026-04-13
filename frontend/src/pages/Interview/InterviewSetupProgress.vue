@@ -19,4 +19,11 @@ defineProps<{
   margin-bottom: 12px;
   padding: 8px 12px;
 }
+
+/* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致：移动端隐藏步骤条节省纵向空间 */
+@media (max-width: 768px) {
+  .setup-progress {
+    display: none;
+  }
+}
 </style>

@@ -90,6 +90,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as echarts from 'echarts';
 import { getProfileApi } from '@/api/auth';
+import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 import {
   getUserEvaluationTrendApi,
   getSessionEvaluationRadarApi,
@@ -134,6 +135,10 @@ async function loadProfile() {
     const res = await getProfileApi();
     profile.value = res;
     if (res?.avatarUrl) userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
+    await syncUserAvatarFromAdminApi();
+    if (userStore.userInfo?.avatarUrl) {
+      profile.value = { ...profile.value!, avatarUrl: userStore.userInfo.avatarUrl };
+    }
   } catch (e: any) {
     ElMessage.error(e.message || '获取用户信息失败');
   }

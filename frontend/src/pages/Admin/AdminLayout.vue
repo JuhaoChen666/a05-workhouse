@@ -1,9 +1,8 @@
 <template>
-  <!-- 后台管理整体布局：左侧菜单 + 顶部栏 + 内容区 -->
+  <!-- 后台管理整体布局：左侧菜单 + 顶部栏 + 内容区；窄屏侧栏收入抽屉 -->
   <el-container class="layout">
-    <el-aside width="220px" class="aside">
+    <el-aside v-if="!isMobile" width="220px" class="aside">
       <div class="logo">管理后台</div>
-      <!-- 使用 router 模式的菜单，根据当前路由高亮 -->
       <el-menu
         :default-active="activeMenu"
         router
@@ -31,7 +30,18 @@
     </el-aside>
     <el-container>
       <el-header class="header">
-        <span class="page-title">{{ pageTitle }}</span>
+        <div class="header-left">
+          <el-button
+            v-if="isMobile"
+            text
+            class="nav-toggle"
+            aria-label="打开菜单"
+            @click="drawerVisible = true"
+          >
+            <el-icon :size="22"><Menu /></el-icon>
+          </el-button>
+          <span class="page-title">{{ pageTitle }}</span>
+        </div>
         <div class="right">
           <span class="username">{{ userStore.userInfo?.username }}</span>
           <el-tag v-if="userStore.userInfo?.roleName" size="small">{{ userStore.userInfo.roleName }}</el-tag>
@@ -39,36 +49,80 @@
         </div>
       </el-header>
       <el-main class="main">
-        <!-- 子路由页面渲染区域 -->
         <router-view />
       </el-main>
     </el-container>
+
+    <el-drawer
+      v-if="isMobile"
+      v-model="drawerVisible"
+      direction="ltr"
+      size="260px"
+      class="admin-drawer"
+      :with-header="true"
+      title="管理后台"
+      append-to-body
+    >
+      <div class="drawer-menu-wrap">
+        <el-menu
+          :default-active="activeMenu"
+          router
+          background-color="#1a1a2e"
+          text-color="#e4e7ed"
+          active-text-color="#409eff"
+          @select="drawerVisible = false"
+        >
+          <el-menu-item index="/admin/users">
+            <el-icon><User /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/positions">
+            <el-icon><Briefcase /></el-icon>
+            <span>岗位管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/question-bank">
+            <el-icon><Document /></el-icon>
+            <span>题库管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/learning-resource">
+            <el-icon><Reading /></el-icon>
+            <span>学习资源</span>
+          </el-menu-item>
+        </el-menu>
+      </div>
+    </el-drawer>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { User, Briefcase, Document, Reading } from '@element-plus/icons-vue';
+import { User, Briefcase, Document, Reading, Menu } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
+import { useViewport } from '@/composables/useViewport';
 
-// 当前路由和路由实例
 const route = useRoute();
 const router = useRouter();
-// 全局用户状态（含用户名、角色等）
 const userStore = useUserStore();
+const { isMobile } = useViewport();
 
-// 用当前完整路径作为菜单选中项，确保刷新后也能高亮
+const drawerVisible = ref(false);
+
 const activeMenu = computed(() => route.path);
 
-// 页面标题优先取路由 meta.title
 const pageTitle = computed(() => (route.meta.title as string) || '管理后台');
 
-// 退出登录，清除 token 并回到登录页
-const onLogout = () => {
+watch(
+  () => route.path,
+  () => {
+    drawerVisible.value = false;
+  }
+);
+
+function onLogout() {
   userStore.logout();
   router.push({ name: 'Login' });
-};
+}
 </script>
 
 <style scoped>
@@ -90,6 +144,11 @@ const onLogout = () => {
   border-bottom: 1px solid #2c2c3e;
 }
 
+.drawer-menu-wrap {
+  min-height: 100%;
+  background-color: #1a1a2e;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -99,15 +158,31 @@ const onLogout = () => {
   border-bottom: 1px solid #ebeef5;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nav-toggle {
+  flex-shrink: 0;
+  padding: 8px !important;
+}
+
 .page-title {
   font-size: 18px;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .right {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .username {
@@ -120,5 +195,23 @@ const onLogout = () => {
   background: #f5f7fa;
   overflow: auto;
 }
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+  }
+  .main {
+    padding: 12px;
+  }
+  .username {
+    display: none;
+  }
+}
 </style>
 
+<style>
+.admin-drawer.el-drawer .el-drawer__body {
+  padding: 0;
+  background-color: #1a1a2e;
+}
+</style>
