@@ -310,21 +310,30 @@ onBeforeUnmount(() => {
   align-items: stretch;
   min-height: clamp(250px, 28vw, 300px);
 }
-<<<<<<< HEAD
-.hero-left, .panel { padding: clamp(10px, 0.9vw, 14px); }
-=======
-.panel, .card { padding: clamp(10px, 0.9vw, 14px); }
->>>>>>> cafdaa2355ec8c0e58ace56072c6271ff7b6ad45
+
+.panel {
+  padding: clamp(8px, 0.75vw, 12px) clamp(10px, 0.9vw, 14px) clamp(12px, 0.95vw, 15px)
+    clamp(8px, 0.75vw, 12px);
+}
+
 .hero-left {
-  padding: clamp(20px, 3vw, 40px);
+  /* 上、右、下、左：略收紧左上，内容视觉上靠左上一些 */
+  padding: clamp(12px, 1.8vw, 22px) clamp(18px, 2.8vw, 38px) clamp(22px, 3.2vw, 42px)
+    clamp(14px, 2.2vw, 28px);
   height: 100%;
   margin: 0 !important;
   box-sizing: border-box;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
+  justify-content: flex-start;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.hero-left > .theme-primary-btn {
+  align-self: flex-start;
 }
 .hero-right {
   height: 100%;
@@ -343,7 +352,8 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 .kpi-card {
-  padding: clamp(8px, 0.8vw, 10px);
+  padding: clamp(6px, 0.65vw, 8px) clamp(8px, 0.8vw, 10px) clamp(10px, 0.85vw, 12px)
+    clamp(6px, 0.65vw, 8px);
   height: 100%;
   margin: 0 !important;
   min-height: 0;

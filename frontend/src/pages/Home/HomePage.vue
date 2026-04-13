@@ -34,7 +34,7 @@
             v-for="item in menuItems"
             :key="item.name"
             class="menu-item"
-            :class="{ active: activeRouteName === item.name }"
+            :class="{ active: isMenuActive(item.name) }"
             :to="{ name: item.name }"
           >
             <el-icon><component :is="item.icon" /></el-icon>
@@ -104,9 +104,17 @@ function onCollapseTriggerClick() {
 const menuItems = [
   { name: "Home", label: "首页", icon: HomeFilled },
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
+  { name: "HomeQuestion", label: "AI押题", icon: ChatDotRound },
   { name: "HomeResume", label: "简历管理", icon: Document },
   { name: "HomeDoc", label: "帮助文档", icon: Notebook },
 ];
+
+function isMenuActive(name: string) {
+  if (name === "HomeQuestion") {
+    return activeRouteName.value === "HomeQuestion" || activeRouteName.value === "HomePredictQuestions";
+  }
+  return activeRouteName.value === name;
+}
 
 const titleMap: Record<string, string> = {
   Home: "首页",

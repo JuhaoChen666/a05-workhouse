@@ -6,6 +6,7 @@ import { apiOrigin } from './request';
 export interface HotJobItem {
   id: number;
   name: string;
+  englishName?: string | null;
   companyName: string;
   companyLogo: string;
   salaryMin: number | string;
@@ -29,6 +30,8 @@ export interface SearchJobsResult {
 export interface SimplePositionItem {
   id: number;
   name: string;
+  englishName?: string | null;
+  responsibility?: string;
 }
 
 export interface SimplePositionPageRes {
@@ -72,6 +75,7 @@ export async function getSimplePositionPageApi(params: {
   pageSize: number;
   name?: string;
 }) {
+  // 该接口为公开岗位检索，避免携带过期 Authorization 触发 403
   const { data } = await axios.get<unknown>(`${apiOrigin}/positions/simple/page`, {
     params,
     timeout: 10000,

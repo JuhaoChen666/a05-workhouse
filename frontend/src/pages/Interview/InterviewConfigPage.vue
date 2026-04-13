@@ -32,6 +32,23 @@
           </div>
         </el-form-item>
 
+        <el-form-item v-if="isAvatarMode" label="面试官：">
+          <div class="interviewer-grid">
+            <article
+              v-for="item in INTERVIEWER_OPTIONS"
+              :key="item.avatarId"
+              class="interviewer-card"
+              :class="{ active: selectedInterviewerId === item.avatarId }"
+              @click="selectedInterviewerId = item.avatarId"
+            >
+              <el-avatar :size="50" class="interviewer-avatar">{{ item.name.slice(-1) }}</el-avatar>
+              <div class="interviewer-meta">
+                <h4>{{ item.name }}</h4>
+              </div>
+            </article>
+          </div>
+        </el-form-item>
+
         <el-form-item label="麦克风：">
           <div class="mic-tools">
             <el-button
@@ -65,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/store/user';
@@ -77,7 +94,25 @@ const router = useRouter();
 const userStore = useUserStore();
 const draft = loadInterviewSetupDraft();
 
+type InterviewerOption = {
+  name: string;
+  avatarId: string;
+  vcn: string;
+};
+
+const INTERVIEWER_OPTIONS: InterviewerOption[] = [
+  { name: '面试官A', avatarId: '110592026', vcn: 'x4_chaoge' },
+  { name: '面试官B', avatarId: '110592043', vcn: 'x4_lingfeiyi_oral' },
+  { name: '面试官C', avatarId: '111204004', vcn: 'x4_yezi' },
+];
+
 const difficulty = ref<InterviewDifficulty>(draft.difficulty);
+const isAvatarMode = computed(() => draft.mode === 'avatar');
+const selectedInterviewerId = ref(
+  INTERVIEWER_OPTIONS.some((it) => it.avatarId === draft.avatarId)
+    ? String(draft.avatarId)
+    : INTERVIEWER_OPTIONS[0].avatarId
+);
 const micEnabled = ref(false);
 const testing = ref(false);
 const level = ref(0);
@@ -186,14 +221,23 @@ function startInterview() {
   }
   saveInterviewSetupDraft({
     difficulty: difficulty.value,
+    avatarId: selectedInterviewerId.value,
   });
+
+  const selectedInterviewer =
+    INTERVIEWER_OPTIONS.find((it) => it.avatarId === selectedInterviewerId.value) ||
+    INTERVIEWER_OPTIONS[0];
+  const collectionNameFromPosition = String(latest.positionEnglishName || '').trim();
 
   const payload = {
     resume_id: Number(latest.resumeId),
     position: latest.positionName,
-    collection_name: 'general_engineer',
+    collection_name: collectionNameFromPosition || 'general_engineer',
     user_id: userStore.userInfo?.id,
     difficulty: difficulty.value,
+    interview_mode: latest.mode || 'text',
+    avatar_id: selectedInterviewer.avatarId,
+    avatar_vcn: selectedInterviewer.vcn,
   };
   sessionStorage.setItem('pendingInterviewStart', JSON.stringify(payload));
   router.push({
@@ -202,7 +246,8 @@ function startInterview() {
     query: {
       jobName: latest.positionName,
       interviewMode: latest.mode,
-      avatarId: latest.avatarId || '110592024',
+      avatarId: selectedInterviewer.avatarId,
+      avatarVcn: selectedInterviewer.vcn,
     },
   });
 }
@@ -229,6 +274,40 @@ function startInterview() {
 .difficulty-card.active { border-color: #8b5cf6; background: #f5f3ff; }
 .difficulty-card h4 { margin: 0 0 6px; }
 .difficulty-card p { margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5; }
+.interviewer-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.interviewer-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all .2s ease;
+}
+.interviewer-card:hover { border-color: #c4b5fd; background: #faf5ff; }
+.interviewer-card.active { border-color: #8b5cf6; background: #f5f3ff; }
+.interviewer-avatar {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #fff;
+  font-weight: 700;
+}
+.interviewer-meta h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.interviewer-meta p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .mic-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mic-icon-btn { width: 36px; height: 36px; border: 1px solid #d1d5db; }
 .mic-icon-btn.on { color: #10b981; border-color: #86efac; }
@@ -247,5 +326,10 @@ function startInterview() {
   transition: width .08s linear;
 }
 /* 与 constants/breakpoints.ts MOBILE_MAX_WIDTH_PX 保持一致 */
-@media (max-width: 768px) { .difficulty-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .difficulty-grid,
+  .interviewer-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

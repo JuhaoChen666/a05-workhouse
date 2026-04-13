@@ -21,12 +21,13 @@
             {{ detail?.city }}
           </el-descriptions-item>
           <el-descriptions-item label="排序值">
-            {{ detail?.sortOrder }}
+            {{ detail?.sortOrder ?? detail?.sort_order }}
           </el-descriptions-item>
-          <el-descriptions-item label="薪资范围">
-            <span v-if="detail">
+          <el-descriptions-item label="薪资范围（数值）">
+            <span v-if="detail && (detail.salaryMin != null || detail.salaryMax != null)">
               {{ detail.salaryMin }} - {{ detail.salaryMax }}
             </span>
+            <span v-else class="muted">—</span>
           </el-descriptions-item>
           <el-descriptions-item label="工作经验">
             {{ detail?.workExperience }}
@@ -46,18 +47,33 @@
           </el-descriptions-item>
         </el-descriptions>
 
+        <el-descriptions title="薪资档位（文本）" :column="2" border style="margin-top: 20px">
+          <el-descriptions-item label="初级">
+            {{ detail?.salary_junior || detail?.salaryJunior }}
+          </el-descriptions-item>
+          <el-descriptions-item label="中级">
+            {{ detail?.salary_mid || detail?.salaryMid }}
+          </el-descriptions-item>
+          <el-descriptions-item label="高级">
+            {{ detail?.salary_senior || detail?.salarySenior }}
+          </el-descriptions-item>
+          <el-descriptions-item label="专家">
+            {{ detail?.salary_expert || detail?.salaryExpert }}
+          </el-descriptions-item>
+        </el-descriptions>
+
         <el-descriptions title="职责描述" :column="1" border style="margin-top: 20px">
           <el-descriptions-item>
             <div class="pre-text">
-              {{ detail?.responsibilities }}
+              {{ detail?.responsibility || detail?.responsibilities }}
             </div>
           </el-descriptions-item>
         </el-descriptions>
 
-        <el-descriptions title="任职要求" :column="1" border style="margin-top: 20px">
+        <el-descriptions title="技能 / 任职要求" :column="1" border style="margin-top: 20px">
           <el-descriptions-item>
             <div class="pre-text">
-              {{ detail?.requirements }}
+              {{ detail?.skill_requirements || detail?.requirements }}
             </div>
           </el-descriptions-item>
         </el-descriptions>
@@ -142,6 +158,10 @@ onMounted(fetchDetail);
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.muted {
+  color: #9ca3af;
 }
 </style>
 

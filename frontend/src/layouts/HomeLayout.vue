@@ -63,9 +63,16 @@ const router = useRouter();
 const userStore = useUserStore();
 const transitionName = ref('fade');
 
-const FLOW_ROUTES = new Set(['InterviewSettings', 'InterviewSession']);
+const FLOW_ROUTES = new Set([
+  'InterviewSettings',
+  'InterviewSession',
+  'InterviewSessionText',
+  'InterviewSessionAvatar',
+]);
 
-const isInterviewSessionPage = computed(() => route.name === 'InterviewSession');
+const isInterviewSessionPage = computed(() =>
+  ['InterviewSession', 'InterviewSessionText', 'InterviewSessionAvatar'].includes(String(route.name || ''))
+);
 
 const avatarUrlRaw = computed(() => String(userStore.userInfo?.avatarUrl || '').trim());
 const avatarBust = ref(0);
@@ -100,11 +107,19 @@ watch(
       transitionName.value = 'slide-right-fade';
       return;
     }
-    if (fromName === 'InterviewSettings' && toName === 'InterviewSession') {
+    if (
+      fromName === 'InterviewSettings' &&
+      (toName === 'InterviewSession' || toName === 'InterviewSessionText' || toName === 'InterviewSessionAvatar')
+    ) {
       transitionName.value = 'slide-left-fade';
       return;
     }
-    if (fromName === 'InterviewSession' && toName === 'InterviewSettings') {
+    if (
+      (fromName === 'InterviewSession' ||
+        fromName === 'InterviewSessionText' ||
+        fromName === 'InterviewSessionAvatar') &&
+      toName === 'InterviewSettings'
+    ) {
       transitionName.value = 'slide-right-fade';
       return;
     }

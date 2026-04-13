@@ -231,16 +231,20 @@ const jobHasMore = computed(
   () => hasSearched.value && jobTotal.value > 0 && allJobs.value.length < jobTotal.value
 );
 
-function mapSimplePositionList(list: { id: unknown; name?: unknown }[]): HotJobItem[] {
+function mapSimplePositionList(
+  list: { id: unknown; name?: unknown; responsibility?: unknown; englishName?: unknown }[]
+): HotJobItem[] {
   return list.map((it) => ({
     id: Number(it.id),
     name: String(it.name || '未命名岗位'),
+    englishName: it.englishName == null ? null : String(it.englishName),
     companyName: '岗位库',
     companyLogo: '',
     salaryMin: '--',
     salaryMax: '--',
-    jobContent: '',
-    type: '岗位',
+    // 搜索卡片展示：优先用 simple/page 返回的 responsibility
+    jobContent: String(it.responsibility || '').trim(),
+    type: String(it.englishName || '岗位'),
   }));
 }
 
@@ -545,6 +549,7 @@ function goNext() {
     resumeName: resumeName.value,
     resumeType: resumeType.value,
     positionName: positionName.value.trim(),
+    positionEnglishName: String(selectedJob.value?.englishName || '').trim(),
     positionDetail: positionDetail.value.trim(),
   });
   router.push({ name: 'HomeInterviewConfig' });

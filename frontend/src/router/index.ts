@@ -140,7 +140,26 @@ const routes: RouteRecordRaw[] = [
         path: 'interview/session/:id',
         name: 'InterviewSession',
         meta: { title: '面试' },
-        component: () => import('../pages/Interview/InterviewSessionPage.vue'),
+        redirect: (to) => {
+          const mode = String(to.query.interviewMode || '').trim().toLowerCase();
+          return {
+            name: mode === 'avatar' ? 'InterviewSessionAvatar' : 'InterviewSessionText',
+            params: to.params,
+            query: to.query,
+          };
+        },
+      },
+      {
+        path: 'interview/session/:id/text',
+        name: 'InterviewSessionText',
+        meta: { title: '面试' },
+        component: () => import('../pages/Interview/InterviewSessionTextPage.vue'),
+      },
+      {
+        path: 'interview/session/:id/avatar',
+        name: 'InterviewSessionAvatar',
+        meta: { title: '面试' },
+        component: () => import('../pages/Interview/InterviewSessionAvatarPage.vue'),
       },
       {
         path: 'interview/evaluation/:sessionId',
@@ -194,6 +213,18 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminUsers',
         meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true },
         component: () => import('../pages/Admin/UserManagePage.vue'),
+      },
+      {
+        path: 'resumes',
+        name: 'AdminResumes',
+        meta: { title: '简历管理', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/ResumeManagePage.vue'),
+      },
+      {
+        path: 'sessions',
+        name: 'AdminSessions',
+        meta: { title: '会话管理', requiresAuth: true, requiresAdmin: true },
+        component: () => import('../pages/Admin/SessionManagePage.vue'),
       },
       {
         path: 'positions',

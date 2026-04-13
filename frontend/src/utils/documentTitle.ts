@@ -17,7 +17,12 @@ export function resolveDocumentTitle(to: RouteLocationNormalized): string {
     return DOCUMENT_TITLE_BRAND;
   }
 
-  if (name === 'InterviewSettings' || name === 'InterviewSession') {
+  if (
+    name === 'InterviewSettings' ||
+    name === 'InterviewSession' ||
+    name === 'InterviewSessionText' ||
+    name === 'InterviewSessionAvatar'
+  ) {
     const fromQuery = String(to.query.jobName || '').trim();
     if (fromQuery) return fromQuery;
     if (name === 'InterviewSettings') {

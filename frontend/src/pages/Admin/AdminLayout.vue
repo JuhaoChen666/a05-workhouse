@@ -14,17 +14,17 @@
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/resumes">
+          <el-icon><Files /></el-icon>
+          <span>简历管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/sessions">
+          <el-icon><Memo /></el-icon>
+          <span>会话管理</span>
+        </el-menu-item>
         <el-menu-item index="/admin/positions">
           <el-icon><Briefcase /></el-icon>
           <span>岗位管理</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/question-bank">
-          <el-icon><Document /></el-icon>
-          <span>题库管理</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/learning-resource">
-          <el-icon><Reading /></el-icon>
-          <span>学习资源</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -76,17 +76,17 @@
             <el-icon><User /></el-icon>
             <span>用户管理</span>
           </el-menu-item>
+          <el-menu-item index="/admin/resumes">
+            <el-icon><Files /></el-icon>
+            <span>简历管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/sessions">
+            <el-icon><Memo /></el-icon>
+            <span>会话管理</span>
+          </el-menu-item>
           <el-menu-item index="/admin/positions">
             <el-icon><Briefcase /></el-icon>
             <span>岗位管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/question-bank">
-            <el-icon><Document /></el-icon>
-            <span>题库管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/learning-resource">
-            <el-icon><Reading /></el-icon>
-            <span>学习资源</span>
           </el-menu-item>
         </el-menu>
       </div>
@@ -97,7 +97,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { User, Briefcase, Document, Reading, Menu } from '@element-plus/icons-vue';
+import { User, Briefcase, Menu, Files, Memo } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
 import { useViewport } from '@/composables/useViewport';
 

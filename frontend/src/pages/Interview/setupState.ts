@@ -9,6 +9,8 @@ export interface InterviewSetupDraft {
   resumeName?: string;
   resumeType?: string;
   positionName: string;
+  /** 岗位英文标识（来自 /positions/simple/page englishName），用于 startInterview.collection_name */
+  positionEnglishName?: string;
   positionDetail: string;
   difficulty: InterviewDifficulty;
   enableFollowup: boolean;
@@ -22,6 +24,7 @@ export const defaultInterviewSetupDraft: InterviewSetupDraft = {
   avatarId: '110592024',
   useResume: false,
   positionName: '',
+  positionEnglishName: '',
   positionDetail: '',
   difficulty: 'medium',
   enableFollowup: true,

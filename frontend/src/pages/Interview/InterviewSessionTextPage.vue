@@ -65,7 +65,6 @@
           </div>
           <div class="gpt-topbar-center">
             <span class="gpt-title-text">{{ pageInterviewTopic }}</span>
-            <el-tag v-if="isAvatarInterview" size="small" effect="plain" class="gpt-mode-tag">虚拟人</el-tag>
           </div>
           <div class="gpt-topbar-side gpt-topbar-side--right" aria-hidden="true" />
         </div>
@@ -81,39 +80,7 @@
       />
 
       <template v-else-if="canRenderInterview">
-        <div class="session-workspace" :class="{ 'conference-layout': isAvatarInterview }">
-
-          <div v-if="isAvatarInterview" class="conference-left" :class="avatarCardClass">
-            <div class="avatar-panel">
-              <div class="avatar-header">
-                <el-tag size="small" :type="avatarReady ? 'success' : 'warning'">
-                  {{ avatarReady ? '已连接' : '连接中' }}
-                </el-tag>
-              </div>
-              <div class="avatar-stage">
-                <div ref="avatarStageRef" class="avatar-sdk-mount"></div>
-                <div v-if="!avatarMountedBySdk" class="avatar-loading-center" aria-busy="true">
-                  <div class="avatar-loading-inner">
-                    <span class="avatar-boot-label">虚拟人初始化</span>
-                    <el-progress indeterminate :show-text="false" stroke-width="5" />
-                    <span class="avatar-loading-text">{{ avatarStatusText || '正在初始化虚拟人...' }}</span>
-                  </div>
-                </div>
-                <el-button
-                  v-if="avatarReady"
-                  circle
-                  class="avatar-interrupt-btn"
-                  type="warning"
-                  title="打断播报"
-                  aria-label="打断播报"
-                  @click="interruptAvatarSpeech"
-                >
-                  <el-icon><CloseBold /></el-icon>
-                </el-button>
-              </div>
-            </div>
-          </div>
-
+        <div class="session-workspace">
           <div class="conference-right">
             <div class="chat-panel-wrap">
               <div class="chat-panel" ref="chatPanelRef" @scroll.passive="onChatPanelScroll">
@@ -168,21 +135,6 @@
                 </div>
                 <el-icon class="report-share-arrow"><ArrowRight /></el-icon>
               </div>
-              <div v-if="showAvatarStartButton" class="avatar-start-card">
-                <div class="avatar-start-title">欢迎使用虚拟人面试</div>
-                <div class="avatar-start-desc">
-                  {{ avatarWelcoming ? '欢迎词播报中，可直接开始面试并中断播报。' : '点击下方按钮开始正式面试。' }}
-                </div>
-                <el-button
-                  type="primary"
-                  class="theme-primary-btn"
-                  :loading="avatarStartSubmitting"
-                  @click="onClickAvatarStartInterview"
-                >
-                  开始面试
-                </el-button>
-              </div>
-
               <div v-if="streaming" class="msg msg-ai">
                 <div class="msg-row">
                   <el-avatar class="msg-avatar" :size="30" :src="aiAvatarSrc">AI</el-avatar>
@@ -231,7 +183,7 @@
                   :placeholder="
                     isRecording ? '录音中…' : '输入回答，Enter 发送 · Shift+Enter 换行'
                   "
-                  :disabled="streaming || isRecording || interviewEnded || showAvatarStartButton"
+                  :disabled="streaming || isRecording || interviewEnded"
                   class="composer-field"
                   @keydown.enter.exact.prevent="sendMessage"
                 />
@@ -249,7 +201,7 @@
                   <el-button
                     circle
                     :type="isRecording ? 'danger' : 'default'"
-                    :disabled="streaming || interviewEnded || showAvatarStartButton"
+                    :disabled="streaming || interviewEnded"
                     class="composer-tool-btn"
                     :title="isRecording ? '停止并发送' : '语音回答'"
                     @click="toggleVoiceRecord"
@@ -259,7 +211,7 @@
                   <el-button
                     circle
                     type="primary"
-                    :disabled="streaming || isRecording || interviewEnded || showAvatarStartButton || !userInput.trim()"
+                    :disabled="streaming || isRecording || interviewEnded || !userInput.trim()"
                     class="composer-tool-btn composer-send-btn"
                     title="发送"
                     @click="sendMessage"
@@ -289,7 +241,6 @@ import {
   ArrowDown,
   ArrowRight,
   PhoneFilled,
-  CloseBold,
 } from '@element-plus/icons-vue';
 import {
   startInterviewApi,
@@ -308,15 +259,6 @@ import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
 import InterviewFlowDock from '@/pages/Home/components/InterviewFlowDock.vue';
 import InterviewMaterialsDock from '@/pages/Home/components/InterviewMaterialsDock.vue';
 
-const props = withDefaults(
-  defineProps<{
-    forcedMode?: 'text' | 'avatar';
-  }>(),
-  {
-    forcedMode: undefined,
-  }
-);
-
 /** 文字作答最大字数（与输入框 maxlength 一致） */
 const INTERVIEW_ANSWER_MAX_LEN = 400;
 
@@ -325,8 +267,6 @@ const SESSION_RESUME_STORAGE_PREFIX = 'interviewSessionResumeMeta:';
 type PendingInterviewStart = Partial<StartInterviewBody> & {
   resume?: string;
   interview_mode?: string;
-  avatar_id?: string;
-  avatar_vcn?: string;
 };
 
 type SessionResumeCache = {
@@ -382,7 +322,7 @@ watch(
 watch(
   () => [String(route.name || ''), String(route.query.jobName || '').trim()] as const,
   ([n, job]) => {
-    if (n !== 'InterviewSession') return;
+    if (n !== 'InterviewSession' && n !== 'InterviewSessionText') return;
     document.title = job || '面试';
   },
   { immediate: true }
@@ -395,94 +335,6 @@ const userAvatar = computed(() => {
 });
 const aiAvatarSrc = computed(() => '/img/mentor-a.png');
 const hasPendingStart = ref(false);
-const avatarPendingStartPayload = ref<PendingInterviewStart | null>(null);
-const avatarWelcoming = ref(false);
-const avatarWelcomeStreamAbort = ref(false);
-const avatarStartSubmitting = ref(false);
-const avatarEndActionPlayed = ref(false);
-const showAvatarStartButton = computed(
-  () => isAvatarInterview.value && !effectiveSessionId.value && Boolean(avatarPendingStartPayload.value)
-);
-const isAvatarInterview = computed(() => {
-  if (props.forcedMode === 'avatar') return true;
-  if (props.forcedMode === 'text') return false;
-  return String(route.query.interviewMode || '') === 'avatar';
-});
-const selectedAvatarId = computed(() => String(route.query.avatarId || '110592024'));
-const selectedAvatarVcn = computed(() => String(route.query.avatarVcn || '').trim());
-const avatarCardClass = computed(() =>
-  selectedAvatarId.value === '111204004' ? 'avatar-fit-c' : ''
-);
-const avatarReady = ref(false);
-const avatarStatusText = ref('');
-const avatarStageRef = ref<HTMLElement | null>(null);
-const avatarMountedBySdk = ref(false);
-const AVATAR_SDK_SCRIPT_URL =
-  (import.meta.env.VITE_AVATAR_SDK_SCRIPT_URL as string | undefined)?.trim() || '';
-// 按当前需求：在前端写死虚拟人鉴权信息（注意：存在泄露风险，仅建议内网/临时联调）
-const AVATAR_APP_ID_HARDCODED = 'ac94ae70';
-const AVATAR_SCENE_ID_HARDCODED = '293609504069783552';
-const AVATAR_SERVER_URL_HARDCODED =
-  (import.meta.env.VITE_AVATAR_SERVER_URL as string | undefined)?.trim() ||
-  'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact';
-const AVATAR_API_KEY_HARDCODED = 'edd0a5f6b5dc07c433756fedfb59887c';
-const AVATAR_API_SECRET_HARDCODED = 'NmRmZTY4YzMyNDM0NDI5ZWYzZWQyNzQ5';
-let avatarSdkInstance: { destroy?: () => void; stop?: () => void } | null =
-  null;
-let avatarPlayerInstance: { resume?: () => void; resize?: () => void } | null = null;
-let avatarSdkModuleCtor: unknown = null;
-let avatarResizeListenerBound = false;
-
-type AvatarActionProfile = {
-  welcomeAction: string;
-  introAction: string;
-  broadcastActions: string[];
-  endAction: string;
-  backgroundResKey: string;
-  scale: number;
-  moveH: number;
-  moveV: number;
-};
-
-const AVATAR_ACTION_PROFILE_MAP: Record<string, AvatarActionProfile> = {
-  '110592026': {
-    welcomeAction: 'A_RLH_welcome_O',
-    introAction: 'A_RH_emphasize2_O',
-    broadcastActions: ['A_RH_please1_O', 'A_RH_introduced_O', 'A_RLH_emphasize_O'],
-    endAction: 'A_RH_hello_O',
-    backgroundResKey:
-      '22SLM2teIw+aqR6Xsm2JbH6Ng310kDam2NiCY/RQ9n6s3nYJXloZWW1l64/g32vrn7d2lJQR7m9xD5EHYkVs18Y74/35US00ASu/dvXBo5xoFQhCg+Z4XHXrdwzhN6gnJmGgGWmirqUlLuqGp3KQfvAbqk8urB8AT+kCC0jG8+NJepXXSWl/a9LLXpqrCMUVDa3F3X1HJ1vZ7uhCjo4XPIzfIbVw4PNY61fiUrcTPpwMNxh6lhmD9O5H+ssSSaWaGMhqq8Y3rxC8kL+HTwxus3UwyhFbqF1tH8ytZOzOZht3I/FDK+3XmzDBlftj2HCRf940W/aJcQq28pyAUtWW3/+8AwjIWCnHX/EZCqCIeQ4=',
-    scale: 1,
-    moveH: 0,
-    moveV: -120,
-  },
-  '110592043': {
-    welcomeAction: 'A_RLH_welcome_O',
-    introAction: 'A_LRH_emphasize2_O',
-    broadcastActions: ['A_RH_click1_O', 'A_RH_emphasize2_O', 'A_LH_Show_left_O'],
-    endAction: 'A_U_hello_O',
-    backgroundResKey:
-      '22SLM2teIw+aqR6Xsm2JbH6Ng310kDam2NiCY/RQ9n6s3nYJXloZWW1l64/g32vrn7d2lJQR7m9xD5EHYkVs1yYyJbvMGG4AhTSEGmRgH0BfGzRC+sm2+UHYdwoya5AdrRKVLCIFN9qm60KSOIBK4AtZyLNTCw3ZoAA22TZU8z9Xd/gZXzDYqZ5NzOUkR1QfmzS5Z2KCR22Teil7iGY9Xa1CLFQRETyH+fF263Jxx6rIi54fAoGG4Yrln916Z4mfkCYl0Hrb0iy0BYeR8KCf7Yaa/DTYIfuq/rl2dOmXTiUUSm5LwWo7a4fUbRROhjO64cNUoxfPGZwUxkPoOzoBEY0KnI8cVF1789FtN9FnxPQ=',
-    scale: 1,
-    moveH: 0,
-    moveV: 60,
-  },
-  '111204004': {
-    welcomeAction: 'A_RLH_welcome_O',
-    introAction: 'A_RH_introduced2_O_1',
-    broadcastActions: ['A_RH_sit_emphasize_O', 'A_RH_emphasize_rightup_O', 'A_RH_Show_right_O'],
-    endAction: 'A_U_hello_O',
-    backgroundResKey:
-      '22SLM2teIw+aqR6Xsm2JbH6Ng310kDam2NiCY/RQ9n6s3nYJXloZWW1l64/g32vrn7d2lJQR7m9xD5EHYkVs19Uh0W6CW0bv8znw6H/RXDsbecQSoOQgKsjSDdm2wM8qoRGxVmsmbld947MlzhunRAnf8pPvHvjsbitdnMrVGwnNIOwiWHoZaEMBex92BWHLXbYTRKIcUvHB9Aog1sKIPXB4KWrtTczG+zkQ8ZpA+3Pvc2+8i9B84huZn8nL64mXLs262fhzu3MuJZmlVFcv9hfXoe1LuwbMG/oX/15Kp3csu0c06ZgFC2YBZf53LjSFHTWRJnTL4GMfeOsVCZZQJbk03bLLxlrgtYplgudMbTU=',
-    scale: 1,
-    moveH: 0,
-    moveV: 0,
-  },
-};
-
-const avatarActionProfile = computed<AvatarActionProfile>(
-  () => AVATAR_ACTION_PROFILE_MAP[selectedAvatarId.value] || AVATAR_ACTION_PROFILE_MAP['110592026']
-);
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -499,9 +351,6 @@ const streaming = ref(false);
 const streamingText = ref('');
 /** 开场 NDJSON 是否已下发 question_chunk（避免最终 question 再整段口播/逐字动画重复） */
 const hadQuestionStreamChunks = ref(false);
-/** 虚拟人面试首屏：双进度条 */
-const avatarInitBootLoading = ref(false);
-const questionPrepBootLoading = ref(false);
 const chatPanelRef = ref<HTMLElement | null>(null);
 const showChatScrollToBottomFab = ref(false);
 /** 距底部小于该像素视为「在底部」，隐藏回到底部按钮 */
@@ -569,7 +418,7 @@ const lastStreamQuestionRound = ref<number | null>(null);
 let flowIdSeq = 0;
 
 function flowEnabled() {
-  return !isAvatarInterview.value;
+  return true;
 }
 
 function truncateFlowTitle(s: string, n = 22): string {
@@ -654,7 +503,7 @@ function flowStartAiThinking(label: string, meta?: FlowMetaInput) {
   flowActiveThinkingId.value = newId;
   flowNodes.value.push({
     id: newId,
-    side: 'ai ',
+    side: 'ai',
     title: text,
     status: 'thinking',
     messageIndex: null,
@@ -941,14 +790,12 @@ const flowDockRef = ref<{ flowDockBodyRef: HTMLElement | null } | null>(null);
 
 /** 文本面试：右侧「资料 · 助手」浮层（与流程侧栏形态一致）；移动端默认收起 */
 const materialsPanelOpen = ref(!isMobile.value);
-const showMaterialsDock = computed(() => canRenderInterview.value && !isAvatarInterview.value);
+const showMaterialsDock = computed(() => canRenderInterview.value);
 
-/** 桌面端：左右 fixed dock 展开时为中间会话区预留宽度，避免遮挡 */
+/** 桌面端：始终为左右 dock 预留宽度，避免折叠/展开导致会话区位移 */
 const mainWrapDockClass = computed(() => ({
-  'interview-main-wrap--reserve-left':
-    !isMobile.value && !isAvatarInterview.value && showFlowDock.value && flowPanelOpen.value,
-  'interview-main-wrap--reserve-right':
-    !isMobile.value && !isAvatarInterview.value && showMaterialsDock.value && materialsPanelOpen.value,
+  'interview-main-wrap--reserve-left': !isMobile.value && showFlowDock.value,
+  'interview-main-wrap--reserve-right': !isMobile.value && showMaterialsDock.value,
 }));
 
 const sessionResumePdfSrc = ref('');
@@ -1383,13 +1230,6 @@ function startAudioMeter(stream: MediaStream) {
 }
 
 onBeforeUnmount(() => {
-  try {
-    avatarSdkInstance?.stop?.();
-    avatarSdkInstance?.destroy?.();
-  } catch {
-    /* ignore */
-  }
-  avatarSdkInstance = null;
   stopPcmRecorder();
   pcmChunks = [];
   isRecording.value = false;
@@ -1457,295 +1297,6 @@ async function refreshSessionEndedState() {
     /* 会话已删或网络错误时忽略 */
   }
 }
-
-async function ensureAvatarSdkLoaded() {
-  if (!AVATAR_SDK_SCRIPT_URL) {
-    throw new Error('未配置 VITE_AVATAR_SDK_SCRIPT_URL');
-  }
-  if (avatarSdkModuleCtor) return;
-  const win = window as unknown as Record<string, unknown>;
-  const ctorFromGlobal =
-    (win.AvatarPlatform as unknown) ||
-    (win.XnrptAvatarSDK as unknown) ||
-    (win.VirtualHumanSDK as unknown) ||
-    (win.xnrptAvatarSDK as unknown);
-  if (ctorFromGlobal) {
-    avatarSdkModuleCtor = ctorFromGlobal;
-    return;
-  }
-
-  // 1) ESM 方式：用 module 脚本导入并挂到 window，避免 “Cannot use import statement outside a module”
-  const key = encodeURIComponent(AVATAR_SDK_SCRIPT_URL);
-  const doneEvent = `__avatar_sdk_es_loaded__${key}`;
-  const failEvent = `__avatar_sdk_es_failed__${key}`;
-  const existingEs = document.querySelector(`script[data-avatar-sdk-es="${AVATAR_SDK_SCRIPT_URL}"]`);
-  if (!existingEs) {
-    const ms = document.createElement('script');
-    ms.type = 'module';
-    ms.dataset.avatarSdkEs = AVATAR_SDK_SCRIPT_URL;
-    ms.textContent = `
-      import AvatarCtor, * as AvatarNs from '${AVATAR_SDK_SCRIPT_URL}';
-      window.__avatarSdkCtor = AvatarCtor || AvatarNs?.AvatarPlatform || AvatarNs?.default || AvatarNs;
-      window.dispatchEvent(new CustomEvent('${doneEvent}'));
-    `;
-    ms.onerror = () => {
-      window.dispatchEvent(new CustomEvent(failEvent));
-    };
-    document.head.appendChild(ms);
-  }
-  const esmLoaded = await new Promise<boolean>((resolve) => {
-    const onDone = () => {
-      window.removeEventListener(doneEvent, onDone as EventListener);
-      window.removeEventListener(failEvent, onFail as EventListener);
-      resolve(true);
-    };
-    const onFail = () => {
-      window.removeEventListener(doneEvent, onDone as EventListener);
-      window.removeEventListener(failEvent, onFail as EventListener);
-      resolve(false);
-    };
-    window.addEventListener(doneEvent, onDone as EventListener, { once: true });
-    window.addEventListener(failEvent, onFail as EventListener, { once: true });
-    // 已经加载成功的情况，立即返回
-    if ((window as unknown as Record<string, unknown>).__avatarSdkCtor) onDone();
-  });
-  if (esmLoaded) {
-    avatarSdkModuleCtor = (window as unknown as Record<string, unknown>).__avatarSdkCtor as unknown;
-    if (avatarSdkModuleCtor) return;
-  }
-
-  // 2) 回退：全局 script 注入（UMD 版本）
-  if (win.AvatarPlatform || win.XnrptAvatarSDK || win.VirtualHumanSDK || win.xnrptAvatarSDK) return;
-  await new Promise<void>((resolve, reject) => {
-    const exists = document.querySelector(`script[data-avatar-sdk="${AVATAR_SDK_SCRIPT_URL}"]`);
-    if (exists) {
-      exists.addEventListener('load', () => resolve(), { once: true });
-      exists.addEventListener('error', () => reject(new Error('虚拟人SDK脚本加载失败')), { once: true });
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = AVATAR_SDK_SCRIPT_URL;
-    s.async = true;
-    s.dataset.avatarSdk = AVATAR_SDK_SCRIPT_URL;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('虚拟人SDK脚本加载失败'));
-    document.head.appendChild(s);
-  });
-}
-
-function toMultipleOf4(n: number) {
-  return Math.max(4, Math.floor(n / 4) * 4);
-}
-
-async function resolveAvatarStageSize(el: HTMLElement): Promise<{ width: number; height: number }> {
-  for (let i = 0; i < 10; i += 1) {
-    const rect = el.getBoundingClientRect();
-    const w = Math.round(rect.width);
-    const h = Math.round(rect.height);
-    if (w >= 120 && h >= 120) {
-      return { width: w, height: h };
-    }
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-  }
-  return { width: 1080, height: 1920 };
-}
-
-function bindAvatarResizeListener() {
-  if (avatarResizeListenerBound) return;
-  avatarResizeListenerBound = true;
-  window.addEventListener('resize', () => {
-    avatarPlayerInstance?.resize?.();
-  });
-}
-
-async function initAvatarSdk() {
-  if (!avatarStageRef.value) throw new Error('虚拟人容器未就绪');
-  if (!selectedAvatarVcn.value) {
-    throw new Error('缺少虚拟人发音人参数：avatarVcn（请在面试设置中选择面试官）');
-  }
-  await ensureAvatarSdkLoaded();
-  const win = window as unknown as Record<string, unknown>;
-  const sdk =
-    (avatarSdkModuleCtor as Record<string, unknown> | undefined) ||
-    (win.AvatarPlatform as Record<string, unknown> | undefined) ||
-    (win.XnrptAvatarSDK as Record<string, unknown> | undefined) ||
-    (win.VirtualHumanSDK as Record<string, unknown> | undefined) ||
-    (win.xnrptAvatarSDK as Record<string, unknown> | undefined);
-  if (!sdk) throw new Error('未找到虚拟人SDK全局对象');
-  const mountEl = avatarStageRef.value;
-  const stageSize = await resolveAvatarStageSize(mountEl);
-  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-  const widthByCard = toMultipleOf4(Math.round(stageSize.width * dpr));
-  const heightByCard = toMultipleOf4(Math.round(stageSize.height * dpr));
-  mountEl.innerHTML = '';
-  // 文档标准流程：创建实例 -> setApiInfo -> setGlobalParams -> start
-  if (typeof sdk === 'function') {
-    avatarSdkInstance = new (sdk as new (opt?: unknown) => {
-      setApiInfo?: (p: unknown) => void;
-      setGlobalParams?: (p: unknown) => void;
-      start?: (p: unknown) => Promise<unknown>;
-      writeText?: (text: string, ext?: unknown) => Promise<unknown>;
-      on?: (evt: string, cb: (...args: unknown[]) => void) => void;
-      player?: { resume?: () => void };
-      destroy?: () => void;
-      stop?: () => void;
-      updateToken?: (token: string) => void;
-    })({ useInlinePlayer: true });
-  } else if (typeof (sdk.create as unknown) === 'function') {
-    avatarSdkInstance = (await (sdk.create as (opt: unknown) => Promise<unknown> | unknown)({
-      useInlinePlayer: true,
-    })) as {
-      setApiInfo?: (p: unknown) => void;
-      setGlobalParams?: (p: unknown) => void;
-      start?: (p: unknown) => Promise<unknown>;
-      writeText?: (text: string, ext?: unknown) => Promise<unknown>;
-      on?: (evt: string, cb: (...args: unknown[]) => void) => void;
-      player?: { resume?: () => void };
-      destroy?: () => void;
-      stop?: () => void;
-      updateToken?: (token: string) => void;
-    };
-  } else {
-    throw new Error('SDK缺少实例创建方法，请按文档适配');
-  }
-  if (typeof (avatarSdkInstance as { setApiInfo?: (p: unknown) => void }).setApiInfo === 'function') {
-    (avatarSdkInstance as { setApiInfo: (p: unknown) => void }).setApiInfo({
-      appId: AVATAR_APP_ID_HARDCODED,
-      apiKey: AVATAR_API_KEY_HARDCODED,
-      apiSecret: AVATAR_API_SECRET_HARDCODED,
-      sceneId: AVATAR_SCENE_ID_HARDCODED,
-      serverUrl: AVATAR_SERVER_URL_HARDCODED,
-      signedUrl: undefined,
-    });
-  }
-  if (
-    typeof (avatarSdkInstance as { setGlobalParams?: (p: unknown) => void }).setGlobalParams ===
-    'function'
-  ) {
-    (avatarSdkInstance as { setGlobalParams: (p: unknown) => void }).setGlobalParams({
-      stream: {
-        protocol: 'xrtc',
-        alpha: 1,
-        bitrate: 1_000_000,
-        fps: 25,
-      },
-      avatar: {
-        avatar_id: selectedAvatarId.value,
-        width: widthByCard,
-        height: heightByCard,
-        scale: avatarActionProfile.value.scale,
-        move_h: avatarActionProfile.value.moveH,
-        move_v: avatarActionProfile.value.moveV,
-        audio_format: 1,
-      },
-      tts: {
-        vcn: selectedAvatarVcn.value,
-        speed: 50,
-        pitch: 50,
-        volume: 100,
-      },
-      avatar_dispatch: {
-        interactive_mode: 1,
-        content_analysis: 0,
-      },
-      background: {
-        type: 'res_key',
-        data: avatarActionProfile.value.backgroundResKey,
-      },
-    });
-  }
-  if (typeof (avatarSdkInstance as { on?: (evt: string, cb: (...args: unknown[]) => void) => void }).on === 'function') {
-    (avatarSdkInstance as { on: (evt: string, cb: (...args: unknown[]) => void) => void }).on('playNotAllowed', () => {
-      avatarStatusText.value = '浏览器拦截自动播放，请点击页面后继续';
-    });
-  }
-  if (typeof (avatarSdkInstance as { start?: (p: unknown) => Promise<unknown> }).start === 'function') {
-    await (avatarSdkInstance as { start: (p: unknown) => Promise<unknown> }).start({ wrapper: mountEl });
-  }
-  avatarPlayerInstance =
-    ((avatarSdkInstance as { player?: { resume?: () => void; resize?: () => void } }).player as
-      | { resume?: () => void; resize?: () => void }
-      | undefined) ||
-    null;
-  avatarPlayerInstance?.resize?.();
-  bindAvatarResizeListener();
-  avatarMountedBySdk.value = true;
-}
-
-function speakByAvatarSdk(text: string, interrupt = true) {
-  if (!avatarSdkInstance || !text.trim()) return;
-  avatarPlayerInstance?.resume?.();
-  if (typeof (avatarSdkInstance as { writeText?: (t: string, ext?: unknown) => Promise<unknown> }).writeText !== 'function') return;
-  void (avatarSdkInstance as { writeText: (t: string, ext?: unknown) => Promise<unknown> })
-    .writeText(text, { nlp: false, interrupt })
-    .catch((e) => {
-      avatarStatusText.value = `虚拟人口播失败：${(e as Error)?.message || '未知错误'}`;
-    });
-}
-
-async function speakByAvatarSdkAsync(text: string, interrupt = true): Promise<void> {
-  if (!avatarSdkInstance || !String(text).trim()) return;
-  avatarPlayerInstance?.resume?.();
-  const inst = avatarSdkInstance as { writeText?: (t: string, ext?: unknown) => Promise<unknown> };
-  if (typeof inst.writeText !== 'function') return;
-  try {
-    await inst.writeText(String(text), { nlp: false, interrupt });
-  } catch (e: unknown) {
-    avatarStatusText.value = `虚拟人口播失败：${(e as Error)?.message || '未知错误'}`;
-  }
-}
-
-async function runAvatarAction(actionId: string): Promise<void> {
-  const action = String(actionId || '').trim();
-  if (!action || !avatarSdkInstance) return;
-  const inst = avatarSdkInstance as { writeCmd?: (type: string, value: string) => Promise<unknown> };
-  if (typeof inst.writeCmd !== 'function') return;
-  try {
-    await inst.writeCmd('action', action);
-  } catch {
-    // 动作失败不阻断主链路
-  }
-}
-
-function pickRandomAvatarBroadcastAction(): string {
-  const pool = avatarActionProfile.value.broadcastActions;
-  if (!Array.isArray(pool) || pool.length === 0) return '';
-  const idx = Math.floor(Math.random() * pool.length);
-  return String(pool[idx] || '');
-}
-
-async function playAvatarBroadcastAction() {
-  const action = pickRandomAvatarBroadcastAction();
-  if (!action) return;
-  await runAvatarAction(action);
-}
-
-function interruptAvatarSpeech() {
-  const inst = avatarSdkInstance as { interrupt?: () => Promise<void> } | null;
-  if (!inst || typeof inst.interrupt !== 'function') return;
-  void inst.interrupt().catch(() => {});
-}
-
-/** 虚拟人首屏固定欢迎词（与岗位名组合，便于候选人听清场景） */
-function buildAvatarWelcomeScript(positionLabel: string): string {
-  const pos = String(positionLabel || '').trim() || '本次岗位';
-  return `您好，欢迎参加${pos}的模拟面试。我是您的 AI 面试官，接下来将结合您的简历进行提问，请您听清题目后作答，如果您准备好了，请点击聊天框里的开始面试按钮。`;
-}
-
-async function renderWelcomeStreamingText(text: string) {
-  const full = String(text || '');
-  streaming.value = true;
-  streamingText.value = '';
-  if (!full) return;
-  for (let i = 0; i < full.length; i += 1) {
-    if (avatarWelcomeStreamAbort.value) break;
-    streamingText.value += full.slice(i, i + 1);
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 15));
-  }
-}
-
 async function createInterviewSessionFromPending(payload: PendingInterviewStart): Promise<string | null> {
   try {
     const startBody: StartInterviewBody = {
@@ -1764,68 +1315,18 @@ async function createInterviewSessionFromPending(payload: PendingInterviewStart)
     effectiveSessionId.value = sid;
     sessionStorage.removeItem('pendingInterviewStart');
     hasPendingStart.value = false;
-    avatarPendingStartPayload.value = null;
     await router.replace({
       query: {
         ...route.query,
         sessionId: sid,
         jobName: payload.position,
         interviewMode: payload.interview_mode || route.query.interviewMode || 'text',
-        avatarId: payload.avatar_id || route.query.avatarId || '110592024',
-        avatarVcn: payload.avatar_vcn || route.query.avatarVcn || undefined,
       },
     });
     return sid;
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || '创建面试会话失败');
     return null;
-  }
-}
-
-async function speakAvatarWelcomeBeforeStart() {
-  if (!isAvatarInterview.value) return;
-  const fullWelcome = buildAvatarWelcomeScript(jobName.value || pageInterviewTopic.value);
-  if (!avatarReady.value) return;
-  avatarWelcoming.value = true;
-  avatarWelcomeStreamAbort.value = false;
-  avatarStatusText.value = '正在播报欢迎语…';
-  try {
-    await runAvatarAction(avatarActionProfile.value.welcomeAction);
-    await Promise.all([speakByAvatarSdkAsync(fullWelcome, true), renderWelcomeStreamingText(fullWelcome)]);
-    if (!avatarWelcomeStreamAbort.value) {
-      messages.value.push({ role: 'assistant', content: fullWelcome, kind: 'text' });
-      scrollToBottom();
-    }
-    await runAvatarAction(avatarActionProfile.value.introAction);
-  } finally {
-    avatarWelcoming.value = false;
-    streaming.value = false;
-    streamingText.value = '';
-    avatarStatusText.value = '';
-  }
-}
-
-async function initAvatarSession() {
-  if (!isAvatarInterview.value) return;
-  try {
-    avatarStatusText.value = '正在连接虚拟人平台...';
-    avatarMountedBySdk.value = false;
-    // 虚拟人模式下页面可能先更新状态再渲染容器，这里等待一帧确保 ref 就绪
-    if (!avatarStageRef.value) {
-      await nextTick();
-    }
-    if (!avatarStageRef.value) {
-      await new Promise((r) => setTimeout(r, 16));
-      await nextTick();
-    }
-    await initAvatarSdk();
-    avatarReady.value = true;
-    avatarStatusText.value = '虚拟人SDK初始化完成（前端直连）';
-  } catch (e: unknown) {
-    avatarReady.value = false;
-    avatarMountedBySdk.value = false;
-    avatarStatusText.value = `虚拟人初始化失败：${(e as Error).message || '未知错误'}`;
-    ElMessage.warning(avatarStatusText.value);
   }
 }
 
@@ -1862,88 +1363,8 @@ function updateVoiceTranscriptAt(index: number | null, transcript: string) {
   msg.transcript = transcript;
 }
 
-/** 虚拟人首进：播报首题（不依赖 opening-stream） */
-async function runAvatarOpeningSequence(initialQuestion: string) {
-  if (!isAvatarInterview.value || interviewEnded.value) {
-    questionPrepBootLoading.value = false;
-    return;
-  }
-  questionPrepBootLoading.value = true;
-  streaming.value = true;
-  streamingText.value = '';
-  try {
-    if (interviewEnded.value) return;
-    avatarStatusText.value = '正在加载首题…';
-    const q = String(initialQuestion || '').trim();
-    if (q) {
-      if (avatarReady.value) {
-        await playAvatarBroadcastAction();
-        await speakByAvatarSdkAsync(q, true);
-      }
-      await renderStreamingText(q);
-      messages.value.push({ role: 'assistant', content: q, kind: 'text' });
-      flowSettleAiThinking('第 1 轮提问', messages.value.length - 1, {
-        flowRound: 1,
-      });
-    }
-  } catch (e: unknown) {
-    ElMessage.error((e as Error).message || '加载首题失败');
-  } finally {
-    streaming.value = false;
-    streamingText.value = '';
-    questionPrepBootLoading.value = false;
-    if (avatarReady.value) {
-      avatarStatusText.value = '';
-    }
-  }
-}
-
-async function onClickAvatarStartInterview() {
-  if (avatarStartSubmitting.value) return;
-  const payload = avatarPendingStartPayload.value;
-  if (!payload) return;
-  // 点击后立即隐藏按钮，并进入思考态
-  avatarPendingStartPayload.value = null;
-  avatarStartSubmitting.value = true;
-  streaming.value = true;
-  streamingText.value = '';
-  try {
-    if (avatarWelcoming.value) {
-      avatarWelcomeStreamAbort.value = true;
-      interruptAvatarSpeech();
-      avatarWelcoming.value = false;
-    }
-    const sid = await createInterviewSessionFromPending(payload);
-    if (!sid) {
-      // 失败时恢复“开始面试”按钮，允许重试
-      avatarPendingStartPayload.value = payload;
-      return;
-    }
-    const info = await getInterviewSessionApi(sid);
-    mergeSessionFocusTopic(info.current_topic);
-    const hist = info.history || [];
-    if (hist.length > 0) {
-      hist.forEach((h) => {
-        messages.value.push({ role: 'assistant', content: h.question, kind: 'text' });
-        messages.value.push({ role: 'user', content: h.answer, kind: 'text' });
-      });
-      if (info.current_question) messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
-      rebuildFlowFromMessages();
-    } else {
-      await runAvatarOpeningSequence(String(info.current_question || ''));
-    }
-    resumeInterviewDurationFromSession(info);
-    await refreshSessionEndedState();
-  } finally {
-    if (!streamingText.value) {
-      streaming.value = false;
-    }
-    avatarStartSubmitting.value = false;
-  }
-}
 
 onMounted(async () => {
-  avatarEndActionPlayed.value = false;
   hasPendingStart.value = !!sessionStorage.getItem('pendingInterviewStart');
   let sid = effectiveSessionId.value;
   if (!sid) {
@@ -1957,17 +1378,6 @@ onMounted(async () => {
     }
     // 简历 id/正文均在 pending 里，与 startInterview / 首题无关，提前加载侧栏预览
     void loadResumeFromSessionCacheEntry(buildCacheFromPending(payload));
-    if (isAvatarInterview.value) {
-      avatarPendingStartPayload.value = payload;
-      avatarInitBootLoading.value = true;
-      try {
-        await initAvatarSession();
-        await speakAvatarWelcomeBeforeStart();
-      } finally {
-        avatarInitBootLoading.value = false;
-      }
-      return;
-    }
     const createdSid = await createInterviewSessionFromPending(payload);
     if (!createdSid) {
       disposeInterviewResumeLocalCache();
@@ -1976,14 +1386,7 @@ onMounted(async () => {
     sid = createdSid;
   }
 
-  const isAv = isAvatarInterview.value;
   let loadedSessionInfo: InterviewSessionInfo | null = null;
-  let skipAvatarOpening = false;
-
-  if (isAv && sid) {
-    avatarInitBootLoading.value = true;
-    questionPrepBootLoading.value = true;
-  }
 
   try {
     const loadSession = async (): Promise<InterviewSessionInfo> => {
@@ -1995,7 +1398,6 @@ onMounted(async () => {
         mergeSessionFocusTopic(hist[hist.length - 1]?.topic);
       }
       if (hist.length > 0) {
-        skipAvatarOpening = true;
         hist.forEach((h) => {
           messages.value.push({ role: 'assistant', content: h.question, kind: 'text' });
           messages.value.push({ role: 'user', content: h.answer, kind: 'text' });
@@ -2003,39 +1405,16 @@ onMounted(async () => {
         if (info.current_question) {
           messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
         }
-      } else if (!isAv) {
-        if (info.current_question) {
-          messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
-        }
+      } else if (info.current_question) {
+        messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
       }
       rebuildFlowFromMessages();
       return info;
     };
 
-    const avatarBoot =
-      isAv && sid
-        ? initAvatarSession().finally(() => {
-            avatarInitBootLoading.value = false;
-          })
-        : Promise.resolve();
-
-    await Promise.all([loadSession(), avatarBoot]);
+    await loadSession();
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || '恢复会话失败');
-    if (isAv) {
-      avatarInitBootLoading.value = false;
-      questionPrepBootLoading.value = false;
-    }
-  }
-
-  if (isAv && sid && skipAvatarOpening) {
-    questionPrepBootLoading.value = false;
-  }
-
-  if (isAv && sid && !skipAvatarOpening && !interviewEnded.value) {
-    await runAvatarOpeningSequence(String(loadedSessionInfo?.current_question || ''));
-  } else if (isAv) {
-    questionPrepBootLoading.value = false;
   }
 
   await refreshSessionEndedState();
@@ -2064,10 +1443,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (!interviewEnded.value) {
         interviewEnded.value = true;
         showReportInvite.value = true;
-        if (isAvatarInterview.value && avatarReady.value && !avatarEndActionPlayed.value) {
-          avatarEndActionPlayed.value = true;
-          void runAvatarAction(avatarActionProfile.value.endAction);
-        }
         streaming.value = false;
         streamingText.value = '';
         const hint = String(evt.data.message || '').trim() || '面试已结束，可查看评估报告。';
@@ -2101,10 +1476,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       const analysisDepth = Number.isFinite(depthRaw) ? depthRaw : null;
       const analysisTs = evt.timestamp;
       if (feedback) {
-        if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
-          void playAvatarBroadcastAction();
-          speakByAvatarSdk(feedback, false);
-        }
         uiChain = uiChain.then(async () => {
           if (interviewEnded.value) return;
           await renderStreamingText(feedback);
@@ -2151,9 +1522,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (!ch || interviewEnded.value) return;
       hadQuestionStreamChunks.value = true;
       streamingText.value += ch;
-      if (isAvatarInterview.value && avatarReady.value) {
-        speakByAvatarSdk(ch, false);
-      }
       scrollToBottom();
     } else if (evt.type === 'followup') {
       const topicLine = String(evt.data.topic || '')
@@ -2162,14 +1530,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       mergeSessionFocusTopic(topicLine);
       const msg = String(evt.data.message || '').trim();
       if (msg) {
-        const shouldSpeakFollowup =
-          msg.replace(/\s+/g, '') !== '回答不够深入，准备追问...'.replace(/\s+/g, '');
-        if (isAvatarInterview.value && effectiveSessionId.value && avatarReady.value) {
-          if (shouldSpeakFollowup) {
-            void playAvatarBroadcastAction();
-            speakByAvatarSdk(msg, false);
-          }
-        }
         uiChain = uiChain.then(async () => {
           if (interviewEnded.value) return;
           await renderStreamingText(msg);
@@ -2202,15 +1562,6 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       if (msg) {
         const chunkMode = hadQuestionStreamChunks.value;
         hadQuestionStreamChunks.value = false;
-        if (
-          isAvatarInterview.value &&
-          effectiveSessionId.value &&
-          avatarReady.value &&
-          !chunkMode
-        ) {
-          void playAvatarBroadcastAction();
-          speakByAvatarSdk(msg, true);
-        }
         uiChain = uiChain.then(async () => {
           if (interviewEnded.value) return;
           if (!chunkMode) {
@@ -2366,7 +1717,6 @@ function toggleVoiceRecord() {
 async function onLeavePage() {
   const sid = effectiveSessionId.value;
   try {
-    avatarPlayerInstance?.resume?.();
     await ElMessageBox.confirm('是否保存当前面试进度后离开？', '离开面试', {
       confirmButtonText: '保存并离开',
       cancelButtonText: '不保存并离开',
@@ -2374,19 +1724,12 @@ async function onLeavePage() {
       type: 'warning',
       closeOnClickModal: false,
     });
-    // 保存并离开：保留会话，直接返回设置页
-    if (sid && isAvatarInterview.value) {
-      avatarSdkInstance?.stop?.();
-    }
     backToSettings();
   } catch (e) {
     // 点击“取消”分支按“不保存并离开”处理；关闭弹窗则不做操作
     if (e !== 'cancel') return;
     if (sid) {
       try {
-        if (isAvatarInterview.value) {
-          avatarSdkInstance?.stop?.();
-        }
         await endInterviewSessionApi(sid);
       } catch (_err) {
         // 删除失败不阻断离开
@@ -3087,12 +2430,6 @@ async function onLeavePage() {
   white-space: nowrap;
   max-width: 100%;
 }
-.gpt-mode-tag {
-  flex-shrink: 0;
-  border-color: #d9d9e0 !important;
-  color: #565869 !important;
-  background: #f7f7f8 !important;
-}
 /* macOS 风格三色圆点：仅红色可点，结束面试 */
 .window-traffic-lights {
   display: flex;
@@ -3173,7 +2510,7 @@ async function onLeavePage() {
   min-height: 0;
 }
 
-.session-workspace:not(.conference-layout) {
+.session-workspace {
   border-top: 1px solid #ececec;
 }
 
@@ -3304,24 +2641,6 @@ async function onLeavePage() {
   color: #7c3aed;
 }
 
-.conference-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: 0;
-  align-items: stretch;
-  flex: 1;
-  min-height: 0;
-  border-top: 1px solid #ececec;
-  height: min(76vh, 820px);
-}
-.conference-left {
-  display: block;
-  position: relative;
-  border-right: 1px solid #ececec;
-  background: #f7f7f8;
-  padding: 0;
-  min-height: 0;
-}
 .conference-right {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -3397,114 +2716,6 @@ async function onLeavePage() {
   transform: translateY(6px);
 }
 
-.avatar-panel {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  box-sizing: border-box;
-  padding: 10px;
-  border: 1px solid #e3e3e8;
-  border-radius: 0;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-}
-.avatar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  color: #202123;
-  font-weight: 600;
-  font-size: 13px;
-}
-.avatar-boot-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #4b5563;
-  letter-spacing: 0.02em;
-}
-.avatar-stage {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 260px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #ececf1;
-  border: 1px solid #e3e3e8;
-}
-.avatar-sdk-mount {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-}
-.avatar-loading-center {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(236, 236, 241, 0.9);
-}
-.avatar-loading-inner {
-  width: min(420px, 88%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-}
-.avatar-loading-text {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #6b7280;
-}
-.avatar-interrupt-btn {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 7;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-}
-.avatar-sdk-mount :deep(video),
-.avatar-sdk-mount :deep(canvas) {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-  object-position: center top;
-  transform: scale(1.18);
-  transform-origin: center top;
-}
-/* 面试官C：背景在该资源上需要更强一点缩放，避免边缘留白 */
-.conference-left.avatar-fit-c .avatar-sdk-mount :deep(video),
-.conference-left.avatar-fit-c .avatar-sdk-mount :deep(canvas) {
-  transform: scale(1.3);
-}
-.avatar-placeholder {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8e8ea0;
-  font-size: 13px;
-}
-.avatar-tip {
-  margin-top: 6px;
-  color: #8e8ea0;
-  font-size: 12px;
-}
 
 .chat-panel {
   flex: 1;
@@ -3576,26 +2787,6 @@ async function onLeavePage() {
   color: #8e8ea0;
 }
 
-.avatar-start-card {
-  margin: 10px 0 14px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #dbeafe;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.avatar-start-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1e3a8a;
-}
-.avatar-start-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #475569;
-}
 
 .msg {
   margin-bottom: 16px;
@@ -3834,19 +3025,6 @@ async function onLeavePage() {
   .interview-session--gpt.theme-page-shell {
     max-width: 100%;
     padding: 0;
-  }
-  .conference-layout {
-    grid-template-columns: 1fr;
-  }
-  .conference-left {
-    border-right: none;
-    border-bottom: 1px solid #ececec;
-    padding: 8px;
-  }
-  .participant-card--overlay {
-    right: 12px;
-    top: 12px;
-    width: 120px;
   }
 }
 </style>

@@ -9,11 +9,14 @@ const MIN_STREAM_EVENT_DELAY_MS = 20;
  */
 
 export interface StartInterviewBody {
-  resume_id: number;
+  /** 与后端 `/interview/start` 一致：简历正文（设置页 pending 走此字段） */
+  resume?: string;
+  resume_id?: number;
   position: string;
   collection_name: string;
   user_id?: string | number;
   difficulty?: 'easy' | 'medium' | 'hard' | string;
+  interview_mode?: 'text' | 'voice' | 'avatar' | string;
 }
 
 export interface StartInterviewRes {
@@ -132,6 +135,7 @@ export interface InterviewAnswerStreamEvent {
     | 'completeness_result'
     | 'topic_completed'
     | 'followup'
+    /** 开场流：逐字题干（与右侧流式展示、虚拟人口播同步） */
     | 'question_chunk'
     | 'question'
     | 'interview_complete'

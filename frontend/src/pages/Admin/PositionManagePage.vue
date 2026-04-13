@@ -1,5 +1,5 @@
 <template>
-  <!-- 岗位管理页：支持新增、编辑、删除岗位 -->
+  <!-- 岗位管理：GET /positions/page 分页；POST /positions + /admin/positions/info 新建；PUT /admin/positions/info 更新；DELETE /admin/positions/:id -->
   <div class="page">
     <el-card>
       <template #header>
@@ -9,11 +9,21 @@
         </div>
       </template>
 
-      <!-- 岗位表格 -->
+      <div class="toolbar">
+        <el-input
+          v-model="searchName"
+          clearable
+          placeholder="按岗位名称模糊搜索"
+          class="search-input"
+          @keyup.enter="onSearch"
+        />
+        <el-button type="primary" @click="onSearch">查询</el-button>
+      </div>
+
       <el-table v-loading="loading" :data="list" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="岗位名称" min-width="120" />
-        <el-table-column prop="sortOrder" label="排序" width="80" />
+        <el-table-column prop="name" label="岗位名称" min-width="140" />
+        <el-table-column prop="sortOrder" label="排序" width="88" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="goDetail(row)">详情</el-button>
@@ -22,10 +32,21 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pager-wrap">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @current-change="fetchList"
+          @size-change="onPageSizeChange"
+        />
+      </div>
     </el-card>
 
-    <!-- 新增 / 编辑岗位对话框
-         关闭行为：不允许点击遮罩或按 ESC 关闭，只能通过“取消”或“确定”按钮关闭 -->
     <el-dialog
       v-model="dialogVisible"
       :title="editId ? '编辑岗位' : '新增岗位'"
@@ -39,72 +60,40 @@
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
+        label-width="120px"
       >
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="如：Java后端" />
+        <el-form-item label="岗位名称" prop="name">
+          <el-input v-model="form.name" placeholder="如：数据库架构师" />
         </el-form-item>
         <el-form-item label="排序" prop="sortOrder">
           <el-input-number v-model="form.sortOrder" :min="0" />
         </el-form-item>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="城市" prop="city">
-              <el-input v-model="form.city" placeholder="如：北京 / 上海" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="工作经验" prop="workExperience">
-              <el-input v-model="form.workExperience" placeholder="如：3-5 年" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="学历要求" prop="education">
-              <el-input v-model="form.education" placeholder="如：本科及以上" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="薪资范围" required>
-              <div class="salary-range">
-                <el-input-number
-                  v-model="form.salaryMin"
-                  :min="0"
-                  :step="1000"
-                  placeholder="最小"
-                />
-                <span class="salary-sep">-</span>
-                <el-input-number
-                  v-model="form.salaryMax"
-                  :min="0"
-                  :step="1000"
-                  placeholder="最大"
-                />
-              </div>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="职位标签" prop="tags">
+        <el-form-item label="岗位职责" prop="responsibility">
           <el-input
-            v-model="form.tags"
-            placeholder="逗号分隔，如：前端, 高薪, 面试"
-          />
-        </el-form-item>
-        <el-form-item label="职责描述" prop="responsibilities">
-          <el-input
-            v-model="form.responsibilities"
+            v-model="form.responsibility"
             type="textarea"
             :rows="3"
-            placeholder="岗位主要职责，可多条，以 1. 2. 形式列出image.png"
+            placeholder="如：负责数据库架构设计与优化"
           />
         </el-form-item>
-        <el-form-item label="任职要求" prop="requirements">
+        <el-form-item label="薪资（初级）" prop="salaryJunior">
+          <el-input v-model="form.salaryJunior" placeholder="如：15k-20k" />
+        </el-form-item>
+        <el-form-item label="薪资（中级）" prop="salaryMid">
+          <el-input v-model="form.salaryMid" placeholder="如：20k-30k" />
+        </el-form-item>
+        <el-form-item label="薪资（高级）" prop="salarySenior">
+          <el-input v-model="form.salarySenior" placeholder="如：30k-40k" />
+        </el-form-item>
+        <el-form-item label="薪资（专家）" prop="salaryExpert">
+          <el-input v-model="form.salaryExpert" placeholder="如：40k+" />
+        </el-form-item>
+        <el-form-item label="技能要求" prop="skillRequirements">
           <el-input
-            v-model="form.requirements"
+            v-model="form.skillRequirements"
             type="textarea"
-            :rows="3"
-            placeholder="候选人需要具备的技能与经验"
+            :rows="4"
+            placeholder="任职要求、技能栈等"
           />
         </el-form-item>
       </el-form>
@@ -122,203 +111,223 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
-  getPositionListApi,
-  createPositionApi,
-  updatePositionApi,
+  getPositionPageApi,
+  createPositionBasicApi,
+  createPositionInfoApi,
+  updatePositionInfoApi,
   deletePositionApi,
   getPositionDetailApi,
-  type AdminPositionItem,
+  parseCreatedPositionId,
+  type AdminPositionRow,
+  type AdminPositionInfoPayload,
 } from '@/api/admin';
 
-// 路由实例，用于跳转详情页
 const router = useRouter();
-// 加载状态与岗位数据
-const loading = ref(false);
-const list = ref<AdminPositionItem[]>([]);
 
-// 对话框与表单相关状态
+const loading = ref(false);
+const list = ref<AdminPositionRow[]>([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = ref(10);
+const searchName = ref('');
+const queryName = ref('');
+
 const dialogVisible = ref(false);
 const editId = ref<number | null>(null);
 const submitLoading = ref(false);
 const formRef = ref<FormInstance>();
-// 编辑弹窗内的加载状态（用于从后端拉取岗位详情时）
 const dialogLoading = ref(false);
 
-// 表单数据模型
 const form = reactive({
   name: '',
   sortOrder: 0,
-  city: '',
-  workExperience: '',
-  education: '',
-  salaryMin: 20000,
-  salaryMax: 40000,
-  responsibilities: '',
-  requirements: '',
-  tags: '',
+  responsibility: '',
+  salaryJunior: '',
+  salaryMid: '',
+  salarySenior: '',
+  salaryExpert: '',
+  skillRequirements: '',
 });
 
-// 表单校验规则
 const rules: FormRules = {
   name: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
 };
 
-/** 拉取岗位列表 */
+function strField(d: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = d[k];
+    if (v != null && String(v).trim()) return String(v);
+  }
+  return '';
+}
+
+function applyDetailToForm(d: Record<string, unknown>) {
+  form.name = strField(d, 'name');
+  form.sortOrder = pickSortOrder(d);
+  form.responsibility = strField(d, 'responsibility', 'responsibilities');
+  form.salaryJunior = strField(d, 'salary_junior', 'salaryJunior');
+  form.salaryMid = strField(d, 'salary_mid', 'salaryMid');
+  form.salarySenior = strField(d, 'salary_senior', 'salarySenior');
+  form.salaryExpert = strField(d, 'salary_expert', 'salaryExpert');
+  form.skillRequirements = strField(d, 'skill_requirements', 'requirements', 'skillRequirements');
+}
+
+function pickSortOrder(d: Record<string, unknown>): number {
+  const v = d.sort_order ?? d.sortOrder;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function buildInfoPayload(id: number): AdminPositionInfoPayload {
+  return {
+    id,
+    name: form.name.trim(),
+    responsibility: form.responsibility.trim(),
+    salary_junior: form.salaryJunior.trim(),
+    salary_mid: form.salaryMid.trim(),
+    salary_senior: form.salarySenior.trim(),
+    salary_expert: form.salaryExpert.trim(),
+    skill_requirements: form.skillRequirements.trim(),
+  };
+}
+
 async function fetchList() {
   loading.value = true;
   try {
-    list.value = await getPositionListApi();
+    const res = await getPositionPageApi({
+      name: queryName.value || undefined,
+      page: page.value,
+      pageSize: pageSize.value,
+    });
+    list.value = res.list;
+    total.value = res.total;
+  } catch (e) {
+    ElMessage.error((e as Error).message || '加载列表失败');
   } finally {
     loading.value = false;
   }
 }
 
-/** 打开新增 / 编辑对话框
- *  新增时使用默认表单值；
- *  编辑时从后端拉取最新岗位详情并填入表单，保证表单字段与接口完全一致。
- */
-async function openDialog(row?: AdminPositionItem) {
+function onSearch() {
+  queryName.value = searchName.value.trim();
+  page.value = 1;
+  void fetchList();
+}
+
+function onPageSizeChange() {
+  page.value = 1;
+  void fetchList();
+}
+
+function resetForm() {
+  form.name = '';
+  form.sortOrder = 0;
+  form.responsibility = '';
+  form.salaryJunior = '';
+  form.salaryMid = '';
+  form.salarySenior = '';
+  form.salaryExpert = '';
+  form.skillRequirements = '';
+  formRef.value?.resetFields();
+}
+
+async function openDialog(row?: AdminPositionRow) {
   if (!row) {
-    // 新增岗位：重置表单为默认值
     editId.value = null;
     resetForm();
     dialogVisible.value = true;
     return;
   }
 
-  // 编辑岗位：先打开弹窗并展示 loading，再根据 id 拉详情
   editId.value = row.id;
   dialogVisible.value = true;
   dialogLoading.value = true;
   try {
-    const detail = await getPositionDetailApi(row.id);
-    form.name = detail.name || '';
-    form.sortOrder = detail.sortOrder ?? 0;
-    form.city = (detail.city as string) || '';
-    form.workExperience = (detail.workExperience as string) || '';
-    form.education = (detail.education as string) || '';
-    form.salaryMin = (detail.salaryMin as number) ?? 20000;
-    form.salaryMax = (detail.salaryMax as number) ?? 40000;
-    form.responsibilities = (detail.responsibilities as string) || '';
-    form.requirements = (detail.requirements as string) || '';
-    const tagField = detail.tags;
-    form.tags = Array.isArray(tagField) ? tagField.join(',') : (tagField as string) || '';
+    const detail = (await getPositionDetailApi(row.id)) as Record<string, unknown>;
+    applyDetailToForm(detail);
   } catch (e) {
     ElMessage.error((e as Error).message || '获取岗位详情失败');
+    form.name = row.name;
+    form.sortOrder = row.sortOrder;
   } finally {
     dialogLoading.value = false;
   }
 }
 
-/** 关闭弹窗时重置表单 */
-function resetForm() {
-  form.name = '';
-  form.sortOrder = 0;
-  form.city = '';
-  form.workExperience = '';
-  form.education = '';
-  form.salaryMin = 20000;
-  form.salaryMax = 40000;
-  form.responsibilities = '';
-  form.requirements = '';
-  form.tags = '';
-  formRef.value?.resetFields();
-}
-
-/** 提交表单：根据是否有 editId 决定新增或更新 */
 async function onSubmit() {
   await formRef.value?.validate(async (valid) => {
     if (!valid) return;
     submitLoading.value = true;
     try {
-      if (editId.value) {
-        await updatePositionApi(editId.value, {
-          name: form.name,
-          sortOrder: form.sortOrder,
-          city: form.city || undefined,
-          workExperience: form.workExperience || undefined,
-          education: form.education || undefined,
-          salaryMin: form.salaryMin || undefined,
-          salaryMax: form.salaryMax || undefined,
-          responsibilities: form.responsibilities || undefined,
-          requirements: form.requirements || undefined,
-          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-        });
+      if (editId.value != null) {
+        await updatePositionInfoApi(buildInfoPayload(editId.value));
         ElMessage.success('更新成功');
       } else {
-        await createPositionApi({
-          name: form.name,
-          sortOrder: form.sortOrder,
-          city: form.city || undefined,
-          workExperience: form.workExperience || undefined,
-          education: form.education || undefined,
-          salaryMin: form.salaryMin || undefined,
-          salaryMax: form.salaryMax || undefined,
-          responsibilities: form.responsibilities || undefined,
-          requirements: form.requirements || undefined,
-          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+        const created = await createPositionBasicApi({
+          name: form.name.trim(),
+          sort_order: form.sortOrder,
         });
+        const newId = parseCreatedPositionId(created);
+        if (!Number.isFinite(newId)) {
+          throw new Error('创建岗位成功但未返回有效 ID，无法写入详情');
+        }
+        await createPositionInfoApi(buildInfoPayload(newId));
         ElMessage.success('新增成功');
       }
       dialogVisible.value = false;
-      fetchList();
+      await fetchList();
+    } catch (e) {
+      ElMessage.error((e as Error).message || '提交失败');
     } finally {
       submitLoading.value = false;
     }
   });
 }
 
-/** 删除单条岗位数据 */
-async function onDelete(row: AdminPositionItem) {
+async function onDelete(row: AdminPositionRow) {
   await ElMessageBox.confirm(`确定删除岗位「${row.name}」吗？`, '提示', {
     type: 'warning',
   });
   await deletePositionApi(row.id);
   ElMessage.success('删除成功');
-  fetchList();
+  await fetchList();
 }
 
-/** 跳转到岗位详情页，展示更完整的岗位信息结构 */
-function goDetail(row: AdminPositionItem) {
+function goDetail(row: AdminPositionRow) {
   router.push({ name: 'AdminPositionDetail', params: { id: row.id } });
 }
 
-// 页面加载时获取岗位列表
-onMounted(fetchList);
+onMounted(() => {
+  void fetchList();
+});
 </script>
 
 <style scoped>
+.page {
+  padding: 0;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.salary-range {
+.toolbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
   align-items: center;
-  gap: 8px;
-  width: 100%;
 }
 
-.salary-sep {
-  padding: 0 4px;
+.search-input {
+  width: min(100%, 280px);
 }
 
-/* 让两个数字输入框按比例平分可用宽度，总体与上方输入框对齐 */
-.salary-range :deep(.el-input-number) {
-  flex: 1 1 0;
-  max-width: 100%;
-}
-
-/* 隐藏薪资范围输入框左右的加减按钮，仅保留数字输入区域 */
-.salary-range :deep(.el-input-number__decrease),
-.salary-range :deep(.el-input-number__increase) {
-  display: none;
-}
-
-.salary-range :deep(.el-input__inner) {
-  text-align: left;
+.pager-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
-
