@@ -222,6 +222,83 @@ class RAGService:
         }}
         """)
 
+        # 岗位自动映射器
+        self.category_mapping_prompt = ChatPromptTemplate.from_template("""
+        你是一个专业的技术猎头。请根据候选人的简历内容，从给定的岗位类别列表中选择一个最匹配的。
+        注意：如果简历内容与所有类别都不太匹配，请选择最接近的一个。
+
+        可用岗位类别：{available_categories}
+
+        简历内容：{resume_text}
+
+        请只输出岗位类别的名称（例如：backend_engineer），不要有任何其他文字说明或标点符号。
+        """)
+
+        # 简历评估器（用于动态分配 10 道题的难度）
+        self.resume_evaluation_prompt = ChatPromptTemplate.from_template("""
+        你是一个资深技术总监。请根据候选人的简历（申请岗位：{position}），评估其技术水平，并为接下来的面试分配恰好 10 道题的难度比例。
+        
+        分配要求：
+        - 总题数必须刚好是 10 道。
+        - 难度分为：简单（easy）、中等（normal）、困难（hard）。
+        - 初中级候选人：更多分配 easy 和 normal。
+        - 高级/资深候选人：更多分配 normal 和 hard。
+        
+        简历内容：
+        {resume_text}
+        
+        请只输出 JSON 格式，不要包含 Markdown 标记或其他多余字符，格式如下：
+        {{
+            "easy": 4,
+            "normal": 4,
+            "hard": 2
+        }}
+        """)
+
+        # 押题生成器 (10道题，专为流式设计，动态难度分配)
+        self.streaming_predict_questions_prompt = ChatPromptTemplate.from_template("""
+        你是一个资深面试专家。请根据候选人的简历、指定的岗位、岗位知识库和历史问题，为候选人生成 10 道面试“押题”。
+        
+        本次面试的难度分配已决定如下：
+        - 简单题：{easy_count} 道（侧重基础概念、语法和核心工具的使用）
+        - 中等题：{normal_count} 道（侧重实际场景应用、常见框架原理和组件封装）
+        - 困难题：{hard_count} 道（侧重底层源码分析、系统架构设计、性能优化和复杂并发问题）
+        
+        要求：
+        1. 题目分三个梯度递进，必须严格按此顺序输出：简单题 -> 中等题 -> 困难题，共 10 道。
+        2. 题目必须紧扣简历中的技术点和指定的岗位需求。
+        
+        【重要格式要求】
+        为了方便系统实时解析，请务必严格按照以下标记格式输出每一道题。每道题独立成块，题目之间留空行。
+        绝不要输出任何 JSON 或者 Markdown 代码块（如 ```json等），只需纯文本。
+        
+        【内容长度限制】
+        由于系统限制，每一题必须极度精简！
+        - [题目]：一句话概括。
+        - [要点]：仅列出2-3个核心关键词。
+        - [答案]：控制在 50-80 字以内，点到即止，切忌长篇大论。
+        
+        格式模板：
+        [题目] 具体的题目内容
+        [要点] 关键词1, 关键词2
+        [答案] 简明扼要的答案，50字左右
+        [难度] 简单/中等/困难
+
+        参考知识：
+        {kb_context}
+
+        参考历史题：
+        {qb_context}
+
+        指定岗位：
+        {position}
+
+        候选人简历：
+        {resume_text}
+        
+        请直接开始输出第一道题，不要寒暄。
+        """)
+
     def initialize_database(self, collection_name: str):
         """初始化数据库连接"""
         if self.collection_name != collection_name:
@@ -548,3 +625,153 @@ class RAGService:
         }
         
         return comprehensive_result
+
+    async def match_resume_to_collection(self, resume_text: str) -> str:
+        """根据简历内容自动匹配现有的向量库集合"""
+        # 后续可以改为从 chroma_db 目录动态读取，目前先手动指定可用岗位
+        available_categories = ["backend_engineer", "android_engineer"]
+        
+        chain = self.category_mapping_prompt | DeepSeek_LLM | StrOutputParser()
+        result = await chain.ainvoke({
+            "available_categories": ", ".join(available_categories),
+            "resume_text": resume_text[:2000]  # 防止简历过长
+        })
+        
+        # 简单清理结果
+        mapped_category = result.strip().lower()
+        if mapped_category not in available_categories:
+            # 如果没匹配上，默认返回第一个
+            return available_categories[0]
+            
+        return mapped_category
+
+    async def stream_predict_interview_questions(self, resume_text: str, position: str):
+        """流式生成 10 道预测题 (动态评估难度)"""
+        # 0. 评估简历，获取难度分配
+        eval_chain = self.resume_evaluation_prompt | DeepSeek_LLM | StrOutputParser()
+        eval_result = await eval_chain.ainvoke({
+            "position": position,
+            "resume_text": resume_text[:2000] # 截断避免超长
+        })
+        
+        easy_count, normal_count, hard_count = 4, 4, 2 # 默认值
+        try:
+            # 清理可能的 markdown
+            import re
+            json_str = eval_result
+            json_match = re.search(r'\{.*\}', eval_result, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+            distribution = json.loads(json_str)
+            easy_count = int(distribution.get("easy", 4))
+            normal_count = int(distribution.get("normal", 4))
+            hard_count = int(distribution.get("hard", 2))
+            
+            # 确保总和为 10
+            total = easy_count + normal_count + hard_count
+            if total != 10:
+                easy_count, normal_count, hard_count = 4, 4, 2
+        except Exception as e:
+            print(f"Error parsing resume evaluation: {e}, Raw: {eval_result}")
+        
+        # 1. 检索相关背景知识
+        kb_context = self.retrieve_knowledge(resume_text[:500], k=10)
+        # 2. 检索历史题目参考
+        qb_context = self.retrieve_questions(resume_text[:500], k=10)
+        
+        # 3. 准备流式调用链
+        chain = self.streaming_predict_questions_prompt | DeepSeek_LLM | StrOutputParser()
+        
+        # 用于缓存流式文本，便于按块截断解析
+        buffer = ""
+        question_count = 0
+        
+        # 4. 执行流式生成
+        async for chunk in chain.astream({
+            "easy_count": easy_count,
+            "normal_count": normal_count,
+            "hard_count": hard_count,
+            "kb_context": kb_context,
+            "qb_context": qb_context,
+            "position": position,
+            "resume_text": resume_text
+        }):
+            buffer += chunk
+            
+            # 简单的基于关键字的状态机解析
+            # 寻找一个完整的区块：包含 [题目], [要点], [答案], [难度]，并且已经遇到了下一个 [题目] 或到达终点（这比较难流式判断）
+            # 改进策略：尝试匹配单个块。如果能在 buffer 中解析出一个完整的块信息，提取后清空那部分 buffer。
+            
+            while "[题目]" in buffer and "[要点]" in buffer and "[答案]" in buffer and "[难度]" in buffer:
+                # 定位当前块的起点和终点要素
+                q_idx = buffer.find("[题目]")
+                p_idx = buffer.find("[要点]", q_idx)
+                a_idx = buffer.find("[答案]", p_idx)
+                d_idx = buffer.find("[难度]", a_idx)
+                
+                # 寻找下一个题目的起点作为当前题目的终点界限
+                next_q_idx = buffer.find("[题目]", d_idx)
+                
+                # 如果没找到下一个 [题目]，说明当前这个题目的 [难度] 部分不一定输出完了（大模型还在生成字符）
+                # 只有当找到了下一个 [题目]，或者虽然没找到 [题目] 但是 buffer 长效没变化（通常最后一块不好靠这个判断），我们才安全提取。
+                # 为了流式顺畅，我们只要 [难度] 后面出现了换行符，就认为这一题结束了。
+                
+                end_idx = -1
+                if next_q_idx != -1:
+                    end_idx = next_q_idx
+                else:
+                    # 尝试寻找 [难度] 行的末尾
+                    newline_after_d = buffer.find("\n", d_idx)
+                    if newline_after_d != -1 and len(buffer) > newline_after_d + 1:
+                        # 给点缓冲区确保确实写完了
+                        end_idx = newline_after_d + 1
+                        
+                if end_idx != -1:
+                    # 提取区块
+                    block = buffer[q_idx:end_idx]
+                    
+                    # 截断 Buffer
+                    buffer = buffer[end_idx:]
+                    
+                    # 提取具体字段
+                    question_count += 1
+                    
+                    q_text = block[block.find("[题目]")+4 : block.find("[要点]")].strip()
+                    p_text = block[block.find("[要点]")+4 : block.find("[答案]")].strip()
+                    a_text = block[block.find("[答案]")+4 : block.find("[难度]")].strip()
+                    d_text = block[block.find("[难度]")+4 :].strip()
+                    
+                    # 清理可能携带的多余换行
+                    d_text = d_text.split('\n')[0].strip()
+                    
+                    yield {
+                        "id": question_count,
+                        "question": q_text,
+                        "key_points": p_text,
+                        "answer": a_text,
+                        "difficulty": d_text
+                    }
+                else:
+                    break # 当前块还不完整，等下一批 chunk
+
+        # 处理最后一个残留在 buffer 中的题目 (如果正常没被 flush 掉的话)
+        if "[题目]" in buffer and "[要点]" in buffer and "[答案]" in buffer and "[难度]" in buffer:
+            q_idx = buffer.find("[题目]")
+            p_idx = buffer.find("[要点]")
+            a_idx = buffer.find("[答案]")
+            d_idx = buffer.find("[难度]")
+            
+            question_count += 1
+            
+            q_text = buffer[q_idx+4 : p_idx].strip()
+            p_text = buffer[p_idx+4 : a_idx].strip()
+            a_text = buffer[a_idx+4 : d_idx].strip()
+            d_text = buffer[d_idx+4 :].strip()
+            
+            yield {
+                "id": question_count,
+                "question": q_text,
+                "key_points": p_text,
+                "answer": a_text,
+                "difficulty": d_text
+            }

@@ -15,9 +15,8 @@ class InterviewAnswerRequest(BaseModel):
     session_id: str
     answer: str
 
-
 class PredictQuestionsRequest(BaseModel):
-    """面试押题：按简历与岗位方向流式生成题目"""
+    """流式押题请求"""
     resume_id: int
     position: str
 

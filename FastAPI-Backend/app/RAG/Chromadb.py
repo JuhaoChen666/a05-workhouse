@@ -22,12 +22,12 @@ def get_Chroma_db(embeddings, collection_name):
 
 
 if __name__ == "__main__":
-    documents = process_markdown("D:/a05-workhouse/后端开发工程师_问题库.md")
+    documents = process_markdown("D:/a05-workhouse/运维工程师_DevOps_问题库.md")
     embeddings = get_embedding()
-    db = get_Chroma_db(embeddings, collection_name="backend_engineer_qb")
+    db = get_Chroma_db(embeddings, collection_name="devops_engineer_qb")
     ids = db.add_documents(documents)
     print(ids)
     print('-' * 100)
     print("Import Collection Success")
-    db = get_Chroma_db(embeddings, collection_name="backend_engineer_qb")
+    db = get_Chroma_db(embeddings, collection_name="devops_engineer_qb")
     print(db._collection_name)

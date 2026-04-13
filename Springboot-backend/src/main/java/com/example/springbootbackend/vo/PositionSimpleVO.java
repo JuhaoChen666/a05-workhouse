@@ -6,4 +6,6 @@ import lombok.Data;
 public class PositionSimpleVO {
     private Integer id;
     private String name;
+    private String englishName;
+    private String responsibility;
 }
