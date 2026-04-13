@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request, Depends
 from fastapi.responses import StreamingResponse
-from app.models.interview_models import InterviewStartRequest, InterviewAnswerRequest
+from app.models.interview_models import InterviewStartRequest, InterviewAnswerRequest, PredictQuestionsRequest, StreamEvent
 from app.RAG.interview_service import InterviewService
 
 router = APIRouter(prefix="/api/interview", tags=["面试"])
@@ -345,3 +345,38 @@ async def get_session_history_paginated(
             } for r in history
         ]
     }
+
+
+
+@router.post("/predict-questions/stream")
+async def stream_predict_interview_questions(
+    request: PredictQuestionsRequest,
+    interview_service: InterviewService = Depends(get_interview_service)
+):
+    """流式根据简历押题 (生成 20 道预测面试题)"""
+    
+    async def generate():
+        try:
+            async for event in interview_service.stream_predict_questions(request.resume_id, request.position):
+                yield json.dumps(event.dict(), ensure_ascii=False) + "\n"
+            
+            # 发送占位符顶出数据帧
+            yield "      \n\n"
+            await asyncio.sleep(0.5)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield json.dumps({
+                "type": "error",
+                "data": {"message": f"系统内部错误: {str(e)}"},
+                "timestamp": datetime.now().isoformat()
+            }, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )

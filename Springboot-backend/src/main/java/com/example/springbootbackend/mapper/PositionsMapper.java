@@ -30,11 +30,11 @@ public interface PositionsMapper {
     int addPosition(Positions position);
 
     // 简单分页查询(只返回id和name,按sort_order排序)
-    @Select("SELECT id, name FROM positions ORDER BY sort_order ASC LIMIT #{offset}, #{pageSize}")
+    @Select("SELECT p.id, p.name, p.english_name as englishName, LEFT(pi.responsibilities, 20) as responsibility FROM positions p LEFT JOIN positions_info pi ON p.id = pi.id ORDER BY p.sort_order ASC LIMIT #{offset}, #{pageSize}")
     List<PositionSimpleVO> getSimplePositionsByPage(@Param("offset") int offset, @Param("pageSize") int pageSize);
         
     // 简单分页查询+模糊查询(只返回id和name,按sort_order排序)
-    @Select("<script>SELECT id, name FROM positions <where><if test='name != null and name != \"\"'>AND name LIKE CONCAT('%', #{name}, '%')</if></where> ORDER BY sort_order ASC LIMIT #{offset}, #{pageSize}</script>")
+    @Select("<script>SELECT p.id, p.name, p.english_name as englishName, LEFT(pi.responsibilities, 20) as responsibility FROM positions p LEFT JOIN positions_info pi ON p.id = pi.id <where><if test='name != null and name != \"\"'>AND p.name LIKE CONCAT('%', #{name}, '%')</if></where> ORDER BY p.sort_order ASC LIMIT #{offset}, #{pageSize}</script>")
     List<PositionSimpleVO> getSimplePositionsByPageWithName(@Param("name") String name, @Param("offset") int offset, @Param("pageSize") int pageSize);
         
     // 计算总数

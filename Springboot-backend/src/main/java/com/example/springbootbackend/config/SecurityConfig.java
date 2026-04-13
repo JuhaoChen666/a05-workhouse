@@ -33,7 +33,9 @@ public class SecurityConfig {
                         .requestMatchers("/jobs/**").permitAll()
                         .requestMatchers("/positions/**").permitAll()
                         // 静态资源
-                        .requestMatchers("/admin/**", "/static/**", "/assets/**").permitAll()
+                        .requestMatchers("/static/**", "/assets/**").permitAll()
+                        // 管理员接口 - 需要认证（在 Controller 中检查角色）
+                        .requestMatchers("/admin/**").authenticated()
                         // 用户管理接口 - 需要认证（后续可在 Controller 中检查角色）
                         .requestMatchers("/users/**").authenticated()
                         // 其他所有请求需要认证

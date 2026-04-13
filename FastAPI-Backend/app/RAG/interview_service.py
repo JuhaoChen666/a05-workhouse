@@ -141,3 +141,37 @@ class InterviewService:
         await SessionMapper.insert_evaluation(session_id, evaluation, user_id=session_model.user_id)
         
         return evaluation
+
+    async def stream_predict_questions(self, resume_id: int, position: str) -> AsyncGenerator[StreamEvent, None]:
+        """流式为特定简历和指定岗位生成 20 道预测押题"""
+        # 1. 获取简历
+        resume_record = await SessionMapper.get_resume_by_id(resume_id)
+        if not resume_record:
+            yield StreamEvent(type="error", data={"message": f"简历 ID {resume_id} 不存在"}, timestamp=datetime.now().isoformat())
+            return
+        
+        resume_text = resume_record.content_text
+        if not resume_text:
+            yield StreamEvent(type="error", data={"message": f"简历 ID {resume_id} 内容为空"}, timestamp=datetime.now().isoformat())
+            return
+
+        # 2. 根据前端传入的 position 初始化数据库连接
+        # 前端传入的 position 就是 vector collection 的标识
+        self.initialize_database(position)
+        
+        # 3. 流式生成 20 道题
+        try:
+            async for p_item in self.rag_service.stream_predict_interview_questions(resume_text, position):
+                yield StreamEvent(
+                    type="prediction_item",
+                    data=p_item,
+                    timestamp=datetime.now().isoformat()
+                )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield StreamEvent(
+                type="error",
+                data={"message": f"流式解析过程中发生错误: {str(e)}"},
+                timestamp=datetime.now().isoformat()
+            )

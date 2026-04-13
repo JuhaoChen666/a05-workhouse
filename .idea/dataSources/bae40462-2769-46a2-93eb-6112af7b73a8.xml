@@ -1013,7 +1013,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
     <schema id="293" parent="1" name="emo2vec_agent">
       <AutoIntrospectionLevel>3</AutoIntrospectionLevel>
       <LastIntrospectionLevel>3</LastIntrospectionLevel>
-      <LastIntrospectionLocalTimestamp>2026-04-11.08:29:22</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2026-04-13.06:16:35</LastIntrospectionLocalTimestamp>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
     <user id="294" parent="1" name="mysql.infoschema">
@@ -1084,7 +1084,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
     <column id="308" parent="298" name="id">
-      <AutoIncrement>135</AutoIncrement>
+      <AutoIncrement>184</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
@@ -1141,7 +1141,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
     <column id="320" parent="299" name="id">
-      <AutoIncrement>12</AutoIncrement>
+      <AutoIncrement>14</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
@@ -1336,237 +1336,241 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
       <Position>3</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <index id="360" parent="302" name="PRIMARY">
+    <column id="360" parent="302" name="english_name">
+      <Position>4</Position>
+      <StoredType>varchar(255)|0s</StoredType>
+    </column>
+    <index id="361" parent="302" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="361" parent="302" name="PRIMARY">
+    <key id="362" parent="302" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="362" parent="303" name="id">
+    <column id="363" parent="303" name="id">
       <AutoIncrement>11</AutoIncrement>
       <Comment>主键ID</Comment>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="363" parent="303" name="name">
+    <column id="364" parent="303" name="name">
       <Comment>岗位名称</Comment>
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="364" parent="303" name="responsibilities">
+    <column id="365" parent="303" name="responsibilities">
       <Comment>岗位职责</Comment>
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="365" parent="303" name="salary_junior">
+    <column id="366" parent="303" name="salary_junior">
       <Comment>初级薪资区间</Comment>
       <Position>4</Position>
       <StoredType>varchar(20)|0s</StoredType>
     </column>
-    <column id="366" parent="303" name="salary_mid">
+    <column id="367" parent="303" name="salary_mid">
       <Comment>中级薪资区间</Comment>
       <Position>5</Position>
       <StoredType>varchar(20)|0s</StoredType>
     </column>
-    <column id="367" parent="303" name="salary_senior">
+    <column id="368" parent="303" name="salary_senior">
       <Comment>高级薪资区间</Comment>
       <Position>6</Position>
       <StoredType>varchar(20)|0s</StoredType>
     </column>
-    <column id="368" parent="303" name="salary_expert">
+    <column id="369" parent="303" name="salary_expert">
       <Comment>资深/架构师薪资区间</Comment>
       <Position>7</Position>
       <StoredType>varchar(20)|0s</StoredType>
     </column>
-    <column id="369" parent="303" name="skill_requirements">
+    <column id="370" parent="303" name="skill_requirements">
       <Comment>岗位技能要求</Comment>
       <NotNull>1</NotNull>
       <Position>8</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="370" parent="303" name="create_time">
+    <column id="371" parent="303" name="create_time">
       <Comment>创建时间</Comment>
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <Position>9</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="371" parent="303" name="update_time">
+    <column id="372" parent="303" name="update_time">
       <Comment>更新时间</Comment>
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
       <Position>10</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <index id="372" parent="303" name="PRIMARY">
+    <index id="373" parent="303" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="373" parent="303" name="PRIMARY">
+    <key id="374" parent="303" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="374" parent="304" name="session_id">
+    <column id="375" parent="304" name="session_id">
       <Comment>当前简历优化会话UUID</Comment>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>varchar(36)|0s</StoredType>
     </column>
-    <column id="375" parent="304" name="user_id">
+    <column id="376" parent="304" name="user_id">
       <Comment>所属用户的ID</Comment>
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="376" parent="304" name="original_text">
+    <column id="377" parent="304" name="original_text">
       <Comment>利用解析工具从原本简历抽取出的粗原文本</Comment>
       <Position>3</Position>
       <StoredType>longtext|0s</StoredType>
     </column>
-    <column id="377" parent="304" name="optimized_text">
+    <column id="378" parent="304" name="optimized_text">
       <Comment>经大模型深度加工优化的Markdown排版结果</Comment>
       <Position>4</Position>
       <StoredType>longtext|0s</StoredType>
     </column>
-    <column id="378" parent="304" name="progress">
+    <column id="379" parent="304" name="progress">
       <Comment>优化进度，取值区间 0-100</Comment>
       <DefaultExpression>0</DefaultExpression>
       <Position>5</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="379" parent="304" name="status">
+    <column id="380" parent="304" name="status">
       <Comment>当前处理状态 (pending, processing, completed, failed)</Comment>
       <DefaultExpression>&apos;pending&apos;</DefaultExpression>
       <Position>6</Position>
       <StoredType>varchar(20)|0s</StoredType>
     </column>
-    <column id="380" parent="304" name="created_at">
+    <column id="381" parent="304" name="created_at">
       <Comment>任务创建时间</Comment>
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <Position>7</Position>
       <StoredType>timestamp|0s</StoredType>
     </column>
-    <column id="381" parent="304" name="updated_at">
+    <column id="382" parent="304" name="updated_at">
       <Comment>任务最新更新时间</Comment>
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
       <Position>8</Position>
       <StoredType>timestamp|0s</StoredType>
     </column>
-    <index id="382" parent="304" name="PRIMARY">
+    <index id="383" parent="304" name="PRIMARY">
       <ColNames>session_id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="383" parent="304" name="idx_user_id">
+    <index id="384" parent="304" name="idx_user_id">
       <ColNames>user_id</ColNames>
       <Type>btree</Type>
     </index>
-    <key id="384" parent="304" name="PRIMARY">
+    <key id="385" parent="304" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="385" parent="305" name="id">
-      <AutoIncrement>9</AutoIncrement>
+    <column id="386" parent="305" name="id">
+      <AutoIncrement>11</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="386" parent="305" name="filename">
+    <column id="387" parent="305" name="filename">
       <Comment>文件名</Comment>
       <Position>2</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="387" parent="305" name="local_path">
+    <column id="388" parent="305" name="local_path">
       <Comment>文件路径</Comment>
       <Position>3</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="388" parent="305" name="content_text">
+    <column id="389" parent="305" name="content_text">
       <Comment>文件文本内容</Comment>
       <Position>4</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="389" parent="305" name="uploaded_at">
+    <column id="390" parent="305" name="uploaded_at">
       <Comment>上传时间</Comment>
       <Position>5</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="390" parent="305" name="user_id">
+    <column id="391" parent="305" name="user_id">
       <Comment>用户id</Comment>
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <index id="391" parent="305" name="PRIMARY">
+    <index id="392" parent="305" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="392" parent="305" name="PRIMARY">
+    <key id="393" parent="305" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="393" parent="306" name="id">
+    <column id="394" parent="306" name="id">
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="394" parent="306" name="name">
+    <column id="395" parent="306" name="name">
       <Position>2</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <index id="395" parent="306" name="PRIMARY">
+    <index id="396" parent="306" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="396" parent="306" name="PRIMARY">
+    <key id="397" parent="306" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="397" parent="307" name="id">
+    <column id="398" parent="307" name="id">
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="398" parent="307" name="username">
+    <column id="399" parent="307" name="username">
       <Position>2</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="399" parent="307" name="password">
+    <column id="400" parent="307" name="password">
       <Position>3</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="400" parent="307" name="email">
+    <column id="401" parent="307" name="email">
       <Position>4</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="401" parent="307" name="avatar">
+    <column id="402" parent="307" name="avatar">
       <Position>5</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="402" parent="307" name="role_id">
+    <column id="403" parent="307" name="role_id">
       <Position>6</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <index id="403" parent="307" name="PRIMARY">
+    <index id="404" parent="307" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="404" parent="307" name="PRIMARY">
+    <key id="405" parent="307" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
