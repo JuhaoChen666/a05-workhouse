@@ -18,9 +18,9 @@ public class AdminPositionsController {
     private PositionsService positionsService;
 
     @GetMapping("/page")
-    public Result getPositionsByPage(@RequestParam("name") String name, 
-                                    @RequestParam("page") int page, 
-                                    @RequestParam("pageSize") int pageSize) {
+    public Result getPositionsByPage(@RequestParam(required = false, defaultValue = "") String name, 
+                                    @RequestParam(defaultValue = "1") int page, 
+                                    @RequestParam(defaultValue = "10") int pageSize) {
         try {
             // 验证管理员权限（新创建的接口）
             PermissionUtil.requireAdmin();

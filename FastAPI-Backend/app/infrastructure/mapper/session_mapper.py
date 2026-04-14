@@ -83,20 +83,38 @@ class SessionMapper:
 
     @staticmethod
     async def insert_evaluation(session_id: str, evaluation_data: Dict[str, Any], user_id: Optional[int] = None) -> None:
-        """保存面试评价到数据库"""
+        """保存面试评价到数据库（如果已存在则更新）"""
         async with AsyncSessionLocal() as db:
-            evaluation = InterviewEvaluationModel(
-                session_id=session_id,
-                user_id=user_id,
-                overall_score=evaluation_data.get("overall_score", 0.0),
-                technical_competency=evaluation_data.get("technical_competency", 0.0),
-                communication_skill=evaluation_data.get("communication_skill", 0.0),
-                problem_solving=evaluation_data.get("problem_solving", 0.0),
-                depth_of_knowledge=evaluation_data.get("depth_of_knowledge", 0.0),
-                evaluation_json=evaluation_data,
-                created_at=datetime.now()
+            # 先检查是否已存在
+            existing = await db.execute(
+                select(InterviewEvaluationModel).filter(InterviewEvaluationModel.session_id == session_id)
             )
-            db.add(evaluation)
+            evaluation = existing.scalar_one_or_none()
+            
+            if evaluation:
+                # 如果存在，更新数据
+                evaluation.overall_score = evaluation_data.get("overall_score", 0.0)
+                evaluation.technical_competency = evaluation_data.get("technical_competency", 0.0)
+                evaluation.communication_skill = evaluation_data.get("communication_skill", 0.0)
+                evaluation.problem_solving = evaluation_data.get("problem_solving", 0.0)
+                evaluation.depth_of_knowledge = evaluation_data.get("depth_of_knowledge", 0.0)
+                evaluation.evaluation_json = evaluation_data
+                evaluation.created_at = datetime.now()
+            else:
+                # 如果不存在，创建新记录
+                evaluation = InterviewEvaluationModel(
+                    session_id=session_id,
+                    user_id=user_id,
+                    overall_score=evaluation_data.get("overall_score", 0.0),
+                    technical_competency = evaluation_data.get("technical_competency", 0.0),
+                    communication_skill = evaluation_data.get("communication_skill", 0.0),
+                    problem_solving = evaluation_data.get("problem_solving", 0.0),
+                    depth_of_knowledge = evaluation_data.get("depth_of_knowledge", 0.0),
+                    evaluation_json = evaluation_data,
+                    created_at = datetime.now()
+                )
+                db.add(evaluation)
+            
             await db.commit()
 
     @staticmethod

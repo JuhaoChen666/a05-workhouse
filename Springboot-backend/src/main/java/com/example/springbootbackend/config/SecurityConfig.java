@@ -32,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers("/test", "/test-redis", "/roles").permitAll()
                         .requestMatchers("/jobs/**").permitAll()
                         .requestMatchers("/positions/**").permitAll()
+                        // 调试接口（临时）
+                        .requestMatchers("/debug/**").permitAll()
                         // 静态资源
                         .requestMatchers("/static/**", "/assets/**").permitAll()
                         // 管理员接口 - 需要认证（在 Controller 中检查角色）
@@ -48,10 +50,18 @@ public class SecurityConfig {
     @Bean
     public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*")); // 允许所有来源，生产环境应该设置具体的前端域名
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // 修复：当 allowCredentials=true 时，不能使用 "*" 通配符
+        // 使用 setAllowedOrigins 并指定具体域名，或使用 setAllowedOriginPatterns
+        configuration.setAllowedOriginPatterns(Arrays.asList("*")); // 使用 patterns 允许所有
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("*"));
+        // 关键修复：如果要使用 credentials，originPatterns 不能用 "*"
+        // 方案1：关闭 credentials（推荐用于 API）
+        configuration.setAllowCredentials(false);
+        // 方案2：或者使用具体的域名列表（如果需要 credentials）
+        // configuration.setAllowCredentials(true);
+        // configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://192.168.1.100:5173"));
         configuration.setMaxAge(3600L); // 预检请求的缓存时间
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
