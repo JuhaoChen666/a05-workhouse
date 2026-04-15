@@ -1,5 +1,5 @@
 <template>
-  <!-- 岗位管理：GET /positions/page 分页；POST /positions + /admin/positions/info 新建；PUT /admin/positions/info 更新；DELETE /admin/positions/:id -->
+  <!-- 岗位管理：GET /admin/positions/page 分页；POST /admin/positions + /admin/positions/info 新建；PUT /admin/positions/info 更新；DELETE /admin/positions/:id -->
   <div class="page">
     <el-card>
       <template #header>

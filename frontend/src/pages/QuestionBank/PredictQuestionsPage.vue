@@ -74,7 +74,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { ArrowLeft, Loading } from '@element-plus/icons-vue';
-import { streamPredictQuestions, type PredictQuestionStreamEvent } from '@/api/interviewAi';
+import { streamPredictQuestions } from '@/api/interviewAi';
 
 const route = useRoute();
 const router = useRouter();

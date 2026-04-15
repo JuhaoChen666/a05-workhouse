@@ -465,7 +465,7 @@ const AVATAR_ACTION_PROFILE_MAP: Record<string, AvatarActionProfile> = {
 };
 
 const avatarActionProfile = computed<AvatarActionProfile>(
-  () => AVATAR_ACTION_PROFILE_MAP[selectedAvatarId.value] || AVATAR_ACTION_PROFILE_MAP['110592026']
+  () => AVATAR_ACTION_PROFILE_MAP[selectedAvatarId.value] ?? AVATAR_ACTION_PROFILE_MAP['110592026']!
 );
 
 type ChatMessage = {
@@ -1297,7 +1297,7 @@ function encodeWavFromPcm16(pcm16: Int16Array, sampleRate: number): Blob {
   view.setUint32(40, dataSize, true);
   let offset = 44;
   for (let i = 0; i < pcm16.length; i += 1) {
-    view.setInt16(offset, pcm16[i], true);
+    view.setInt16(offset, pcm16[i] ?? 0, true);
     offset += 2;
   }
   return new Blob([buffer], { type: 'audio/wav' });
@@ -1541,8 +1541,23 @@ function bindAvatarResizeListener() {
   });
 }
 
+function getMediaDevicesUnavailableReason(): string | null {
+  if (typeof window === 'undefined') return '当前环境不支持浏览器媒体能力';
+  if (!window.isSecureContext) {
+    return '当前页面不是安全上下文，请使用 https 或 localhost 访问';
+  }
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    return '浏览器不支持 mediaDevices，请更换新版 Chrome/Edge';
+  }
+  return null;
+}
+
 async function initAvatarSdk() {
   if (!avatarStageRef.value) throw new Error('虚拟人容器未就绪');
+  const mediaDevicesReason = getMediaDevicesUnavailableReason();
+  if (mediaDevicesReason) {
+    throw new Error(`当前环境无法启动虚拟人：${mediaDevicesReason}`);
+  }
   if (!selectedAvatarVcn.value) {
     throw new Error('缺少虚拟人发音人参数：avatarVcn（请在面试设置中选择面试官）');
   }
@@ -1790,6 +1805,10 @@ async function initAvatarSession() {
   try {
     avatarStatusText.value = '正在连接虚拟人平台...';
     avatarMountedBySdk.value = false;
+    const mediaDevicesReason = getMediaDevicesUnavailableReason();
+    if (mediaDevicesReason) {
+      throw new Error(mediaDevicesReason);
+    }
     // 虚拟人模式下页面可能先更新状态再渲染容器，这里等待一帧确保 ref 就绪
     if (!avatarStageRef.value) {
       await nextTick();
@@ -1998,7 +2017,8 @@ onMounted(async () => {
   }
 
   if (sid && !skipAvatarOpening && !interviewEnded.value) {
-    await runAvatarOpeningSequence(String(loadedSessionInfo?.current_question || ''));
+    const openingQuestion = String((loadedSessionInfo as InterviewSessionInfo | null)?.current_question || '');
+    await runAvatarOpeningSequence(openingQuestion);
   } else {
     questionPrepBootLoading.value = false;
   }
@@ -2269,6 +2289,11 @@ async function startVoiceRecord() {
     ElMessage.warning('会话尚未就绪，无法开始录音');
     return;
   }
+  const mediaDevicesReason = getMediaDevicesUnavailableReason();
+  if (mediaDevicesReason) {
+    ElMessage.error(`无法使用麦克风：${mediaDevicesReason}`);
+    return;
+  }
   if (interviewEnded.value) return;
   if (streaming.value) return;
   try {
@@ -2328,20 +2353,35 @@ async function onLeavePage() {
   try {
     avatarPlayerInstance?.resume?.();
     await ElMessageBox.confirm('是否保存当前面试进度后离开？', '离开面试', {
-      confirmButtonText: '保存并离开',
-      cancelButtonText: '不保存并离开',
+      confirmButtonText: '确定',
+      cancelButtonText: '结束面试',
       distinguishCancelAndClose: true,
       type: 'warning',
       closeOnClickModal: false,
+      customClass: 'interview-leave-msgbox',
+      confirmButtonClass: 'interview-leave-confirm-btn',
+      cancelButtonClass: 'interview-leave-cancel-btn',
     });
-    // 保存并离开：保留会话，直接返回设置页
+    // 保留会话并离开
     if (sid) {
       avatarSdkInstance?.stop?.();
     }
     backToSettings();
   } catch (e) {
-    // 点击“取消”分支按“不保存并离开”处理；关闭弹窗则不做操作
     if (e !== 'cancel') return;
+    try {
+      await ElMessageBox.confirm('结束后将关闭当前会话，且不可继续作答。确认结束面试吗？', '确认结束面试', {
+        confirmButtonText: '确认结束',
+        cancelButtonText: '返回',
+        distinguishCancelAndClose: true,
+        type: 'error',
+        closeOnClickModal: false,
+        customClass: 'interview-leave-msgbox interview-leave-msgbox--danger',
+        confirmButtonClass: 'interview-leave-end-confirm-btn',
+      });
+    } catch {
+      return;
+    }
     if (sid) {
       try {
         avatarSdkInstance?.stop?.();
@@ -2356,6 +2396,45 @@ async function onLeavePage() {
 </script>
 
 <style scoped>
+:global(.interview-leave-msgbox) {
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
+  box-shadow: 0 16px 30px -18px rgba(59, 130, 246, 0.22);
+}
+
+:global(.interview-leave-msgbox .el-message-box__header) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+:global(.interview-leave-msgbox .el-message-box__title) {
+  color: #111827;
+  font-weight: 700;
+}
+
+:global(.interview-leave-msgbox .el-message-box__content) {
+  color: #4b5563;
+  line-height: 1.65;
+}
+
+:global(.interview-leave-msgbox .interview-leave-cancel-btn),
+:global(.interview-leave-msgbox .interview-leave-end-confirm-btn) {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #fff !important;
+}
+
+:global(.interview-leave-msgbox .interview-leave-cancel-btn:hover),
+:global(.interview-leave-msgbox .interview-leave-end-confirm-btn:hover) {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+
+:global(.interview-leave-msgbox--danger) {
+  border-color: #fecaca;
+  box-shadow: 0 16px 30px -18px rgba(239, 68, 68, 0.28);
+}
+
 /* 根容器（流程面板为 fixed 浮层，不挤压聊天卡片） */
 .interview-session-root {
   width: 100%;

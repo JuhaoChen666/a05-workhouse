@@ -1162,7 +1162,7 @@ function encodeWavFromPcm16(pcm16: Int16Array, sampleRate: number): Blob {
   view.setUint32(40, dataSize, true);
   let offset = 44;
   for (let i = 0; i < pcm16.length; i += 1) {
-    view.setInt16(offset, pcm16[i], true);
+    view.setInt16(offset, pcm16[i] ?? 0, true);
     offset += 2;
   }
   return new Blob([buffer], { type: 'audio/wav' });

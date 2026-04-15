@@ -2,7 +2,7 @@ import request, { adminRequest } from './request';
 
 /**
  * 后台管理 - 岗位、题库、学习资源、用户等接口封装。
- * - 用户、角色、**岗位**：真实后端挂在 **`/admin`** 下（`adminRequest` / `VITE_ADMIN_API_PREFIX`）
+ * - 用户、角色、**岗位**：统一走 **`/admin`**（`adminRequest` / `VITE_ADMIN_API_PREFIX`）
  * - 题库、学习资源：仍走默认 **`/api`**
  */
 
@@ -265,7 +265,7 @@ export function deleteAdminSessionApi(sessionId: string) {
 }
 
 /**
- * 分页模糊查询岗位 — `GET {apiOrigin}/positions/page`
+ * 分页模糊查询岗位 — `GET {origin}/admin/positions/page`
  * Query: name, page, pageSize
  */
 export async function getPositionPageApi(params: {
@@ -273,7 +273,7 @@ export async function getPositionPageApi(params: {
   page?: number;
   pageSize?: number;
 }): Promise<PositionPageResult> {
-  const raw = await request.get<unknown>('/positions/page', {
+  const raw = await adminRequest.get<unknown>('/positions/page', {
     params: {
       name: params.name?.trim() || undefined,
       page: params.page ?? 1,
@@ -299,11 +299,11 @@ export function getPositionDetailApi(id: number) {
 }
 
 /**
- * 新建岗位（仅名称与排序）— `POST {apiOrigin}/positions`
+ * 新建岗位（仅名称与排序）— `POST {origin}/admin/positions`
  * Body: { name, sort_order }
  */
 export function createPositionBasicApi(body: { name: string; sort_order: number }) {
-  return request.post<Record<string, unknown>>('/positions', body);
+  return adminRequest.post<Record<string, unknown>>('/positions', body);
 }
 
 /** 新建岗位详情 — `POST {origin}/admin/positions/info` */
@@ -331,7 +331,7 @@ export function parseCreatedPositionId(raw: unknown): number {
 }
 
 /**
- * @deprecated 旧版直连 admin POST /positions；请改用 createPositionBasicApi + createPositionInfoApi
+ * @deprecated 旧版兼容入口；请改用 createPositionBasicApi + createPositionInfoApi
  */
 export async function createPositionApi(data: { name: string; sortOrder?: number }) {
   const raw = await createPositionBasicApi({

@@ -8,10 +8,17 @@
     <!-- 用户资料卡片：头像 + 基本信息 -->
     <el-card class="section-card profile-card theme-card fade-in-up delay-1" shadow="hover">
       <template #header>
-        <span>用户资料</span>
-        <el-button type="primary" link style="float: right;" @click="goAccountSettings">
-          账号与安全设置
-        </el-button>
+        <div class="profile-card-header">
+          <span>用户资料</span>
+          <div class="profile-card-actions">
+            <el-button v-if="userStore.isAdmin" type="primary" link @click="goAdminPanel">
+              后台管理系统
+            </el-button>
+            <el-button type="primary" link @click="goAccountSettings">
+              账号与安全设置
+            </el-button>
+          </div>
+        </div>
       </template>
       <div class="profile-header">
         <div class="avatar-area">
@@ -21,9 +28,9 @@
         </div>
         <div class="profile-form" v-if="profile">
           <el-form label-width="80px">
-            <el-form-item label="用户名">{{ profile.username }}</el-form-item>
-            <el-form-item label="邮箱">{{ profile.email || '未绑定' }}</el-form-item>
-            <el-form-item label="角色">{{ profile.roleName ?? '普通用户' }}</el-form-item>
+            <el-form-item label="用户名">{{ displayUsername }}</el-form-item>
+            <el-form-item label="邮箱">{{ displayEmail }}</el-form-item>
+            <el-form-item v-if="userStore.isAdmin" label="角色">{{ profile.roleName ?? '管理员' }}</el-form-item>
           </el-form>
         </div>
       </div>
@@ -89,7 +96,6 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as echarts from 'echarts';
-import { getProfileApi } from '@/api/auth';
 import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 import {
   getUserEvaluationTrendApi,
@@ -119,6 +125,20 @@ const avatarFullUrl = computed(() => {
   return apiOrigin + url;
 });
 
+const displayUsername = computed(() => {
+  const fromProfile = String(profile.value?.username || '').trim();
+  if (fromProfile) return fromProfile;
+  const fromStore = String(userStore.userInfo?.username || '').trim();
+  return fromStore || '--';
+});
+
+const displayEmail = computed(() => {
+  const fromProfile = String(profile.value?.email || '').trim();
+  if (fromProfile) return fromProfile;
+  const fromStore = String(userStore.userInfo?.email || '').trim();
+  return fromStore || '未绑定';
+});
+
 function formatDateTime(iso: string) {
   if (!iso) return '--';
   const d = new Date(iso);
@@ -132,15 +152,19 @@ function formatDateTime(iso: string) {
 
 async function loadProfile() {
   try {
-    const res = await getProfileApi();
-    profile.value = res;
-    if (res?.avatarUrl) userStore.setUserInfo({ ...userStore.userInfo!, avatarUrl: res.avatarUrl });
+    // 当前后端无 /auth/profile，资料页优先使用登录态缓存信息
+    if (userStore.userInfo) {
+      profile.value = {
+        ...(profile.value || {}),
+        ...userStore.userInfo,
+      } as UserInfo;
+    }
     await syncUserAvatarFromAdminApi();
     if (userStore.userInfo?.avatarUrl) {
       profile.value = { ...profile.value!, avatarUrl: userStore.userInfo.avatarUrl };
     }
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取用户信息失败');
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '获取用户信息失败');
   }
 }
 
@@ -160,6 +184,10 @@ async function fetchRecentRecords() {
 
 function goAccountSettings() {
   router.push({ name: 'ProfileEdit' });
+}
+
+function goAdminPanel() {
+  router.push({ name: 'AdminUsers' });
 }
 
 function goAllRecords() {
@@ -305,6 +333,8 @@ onMounted(() => {
 <style scoped>
 .profile-page { max-width: 1200px; }
 .page-title { margin-top: 0; margin-bottom: 16px; }
+.profile-card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.profile-card-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .profile-card .profile-header { display: flex; gap: 24px; align-items: flex-start; }
 .avatar-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .avatar-upload { margin-top: 4px; }

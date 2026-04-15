@@ -269,7 +269,7 @@ async function loadJobPositionsPage(mode: 'replace' | 'append') {
     const list = Array.isArray(res?.list) ? res.list : [];
     const mapped = mapSimplePositionList(list);
     const totalNum = Number(res?.total);
-    if (res?.total != null && res?.total !== '' && Number.isFinite(totalNum)) {
+    if (Number.isFinite(totalNum)) {
       jobTotal.value = Math.max(0, totalNum);
     } else if (mode === 'replace') {
       jobTotal.value = mapped.length;
@@ -356,7 +356,7 @@ async function fetchPositionDetail(job: HotJobItem) {
   selectedJobDetail.value = null;
   try {
     const raw = await getPositionDetailApi(job.id);
-    const detail = raw as Record<string, unknown>;
+    const detail = raw as unknown as Record<string, unknown>;
     const name = String(detail.name ?? job.name ?? '');
     const type = String(detail.type ?? '');
     const content = String(detail.jobContent ?? detail.content ?? detail.description ?? '');

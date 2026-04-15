@@ -113,7 +113,6 @@ import * as echarts from 'echarts';
 import { useUserStore } from '@/store/user';
 import { getUserEvaluationTrendApi } from '@/api/interviewAi';
 import { getHotJobsApi, getJobDetailApi, formatSalaryRange } from '@/api/jobs';
-import type { HotJobItem } from '@/api/jobs';
 
 const chartARef = ref<HTMLElement | null>(null);
 let chartA: echarts.ECharts | null = null;
@@ -181,7 +180,7 @@ const modes = [
   { key: 'ai', title: 'AI面试', desc: '智能追问与结构化反馈' },
   { key: 'avatar', title: '虚拟人面试', desc: '更接近真实面试场景' },
   { key: 'resume', title: '简历优化', desc: 'AI 诊断简历并给出优化建议' },
-  { key: 'question', title: '面试押题', desc: '按岗位方向生成高频面试题' },
+  { key: 'question', title: 'AI押题', desc: '按岗位方向生成高频面试题' },
 ];
 
 function initCharts() {

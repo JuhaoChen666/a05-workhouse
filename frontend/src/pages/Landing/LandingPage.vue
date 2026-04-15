@@ -17,8 +17,20 @@
         <!-- Textured Nav Links -->
         <nav class="nav-links-container">
           <div class="nav-links">
-            <a href="#home" class="active">首页</a>
-            <a href="#features">核心功能</a>
+            <a
+              href="#home"
+              :class="{ active: activeNav === 'home' }"
+              @click.prevent="scrollToSection('home')"
+            >
+              首页
+            </a>
+            <a
+              href="#features"
+              :class="{ active: activeNav === 'features' }"
+              @click.prevent="scrollToSection('features')"
+            >
+              核心功能
+            </a>
           </div>
         </nav>
       </div>
@@ -32,7 +44,7 @@
     <!-- Main Content -->
     <main class="landing-main">
       <!-- Hero Section -->
-      <section id="home" class="hero">
+      <section id="home" ref="homeSectionRef" class="hero">
         <div class="hero-content">
           <h1 class="title">
             掌控面试节奏<br />
@@ -92,7 +104,7 @@
       </section>
 
       <!-- Features Section -->
-      <section id="features" class="features">
+      <section id="features" ref="featuresSectionRef" class="features">
         <h2 class="section-title">核心功能特性</h2>
         <div class="feature-grid">
           <div class="feature-card" v-for="(feature, index) in features" :key="index">
@@ -120,12 +132,17 @@
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  Platform, DocumentChecked, DataLine, Microphone, Aim, Medal, DataAnalysis, ChatDotRound
+  Platform, DocumentChecked, Microphone, Aim, Medal, DataAnalysis, ChatDotRound
 } from '@element-plus/icons-vue';
 
 const router = useRouter();
+const activeNav = ref<'home' | 'features'>('home');
+const homeSectionRef = ref<HTMLElement | null>(null);
+const featuresSectionRef = ref<HTMLElement | null>(null);
+let ticking = false;
 
 const goLogin = () => {
   router.push({ name: 'Login' });
@@ -167,6 +184,40 @@ const features = [
     desc: '记录历次面试表现，生成成长曲线，见证你的每一次进步与突破。'
   }
 ];
+
+function syncActiveNavByScroll() {
+  const homeTop = homeSectionRef.value?.offsetTop ?? 0;
+  const featuresTop = featuresSectionRef.value?.offsetTop ?? Number.POSITIVE_INFINITY;
+  const marker = window.scrollY + 120;
+  activeNav.value = marker >= featuresTop - 40 ? 'features' : 'home';
+  if (marker < homeTop) activeNav.value = 'home';
+}
+
+function onWindowScroll() {
+  if (ticking) return;
+  ticking = true;
+  requestAnimationFrame(() => {
+    syncActiveNavByScroll();
+    ticking = false;
+  });
+}
+
+function scrollToSection(section: 'home' | 'features') {
+  const target = section === 'home' ? homeSectionRef.value : featuresSectionRef.value;
+  if (!target) return;
+  const top = Math.max(0, target.offsetTop - 86);
+  window.scrollTo({ top, behavior: 'smooth' });
+  activeNav.value = section;
+}
+
+onMounted(() => {
+  syncActiveNavByScroll();
+  window.addEventListener('scroll', onWindowScroll, { passive: true });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onWindowScroll);
+});
 </script>
 
 <style scoped>

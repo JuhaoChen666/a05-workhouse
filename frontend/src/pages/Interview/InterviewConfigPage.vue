@@ -41,7 +41,9 @@
               :class="{ active: selectedInterviewerId === item.avatarId }"
               @click="selectedInterviewerId = item.avatarId"
             >
-              <el-avatar :size="50" class="interviewer-avatar">{{ item.name.slice(-1) }}</el-avatar>
+              <el-avatar :size="56" fit="cover" :src="item.coverSrc" class="interviewer-avatar">
+                {{ item.name.slice(-1) }}
+              </el-avatar>
               <div class="interviewer-meta">
                 <h4>{{ item.name }}</h4>
               </div>
@@ -62,8 +64,8 @@
                 <Mute v-else />
               </el-icon>
             </el-button>
-            <el-button class="mic-test" @click="toggleMicTest" :disabled="!micEnabled">
-              {{ testing ? '停止测试' : '测试麦克风' }}
+            <el-button class="mic-test" @click="toggleMicTest">
+              {{ testing ? '停止测试' : micEnabled ? '测试麦克风' : '请求权限并测试' }}
             </el-button>
             <span v-if="permissionTip" class="permission-tip">{{ permissionTip }}</span>
           </div>
@@ -98,20 +100,28 @@ type InterviewerOption = {
   name: string;
   avatarId: string;
   vcn: string;
+  /** 设置页展示用头像（Vite 下 public 资源） */
+  coverSrc: string;
 };
 
 const INTERVIEWER_OPTIONS: InterviewerOption[] = [
-  { name: '面试官A', avatarId: '110592026', vcn: 'x4_chaoge' },
-  { name: '面试官B', avatarId: '110592043', vcn: 'x4_lingfeiyi_oral' },
-  { name: '面试官C', avatarId: '111204004', vcn: 'x4_yezi' },
+  { name: '面试官A', avatarId: '110592026', vcn: 'x4_chaoge', coverSrc: '/img/InterviewerA.png' },
+  { name: '面试官B', avatarId: '110592043', vcn: 'x4_lingfeiyi_oral', coverSrc: '/img/InterviewerB.png' },
+  { name: '面试官C', avatarId: '111204004', vcn: 'x4_yezi', coverSrc: '/img/InterviewerC.png' },
 ];
+const DEFAULT_INTERVIEWER: InterviewerOption = INTERVIEWER_OPTIONS[0] ?? {
+  name: '面试官A',
+  avatarId: '110592026',
+  vcn: 'x4_chaoge',
+  coverSrc: '/img/InterviewerA.png',
+};
 
 const difficulty = ref<InterviewDifficulty>(draft.difficulty);
 const isAvatarMode = computed(() => draft.mode === 'avatar');
 const selectedInterviewerId = ref(
   INTERVIEWER_OPTIONS.some((it) => it.avatarId === draft.avatarId)
     ? String(draft.avatarId)
-    : INTERVIEWER_OPTIONS[0].avatarId
+    : DEFAULT_INTERVIEWER.avatarId
 );
 const micEnabled = ref(false);
 const testing = ref(false);
@@ -128,6 +138,12 @@ function goPrev() {
 }
 
 async function requestMicPermission() {
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    micEnabled.value = false;
+    permissionTip.value = '当前浏览器不支持麦克风采集（请使用新版 Chrome/Edge）';
+    ElMessage.warning(permissionTip.value);
+    return false;
+  }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micEnabled.value = true;
@@ -177,7 +193,8 @@ function runMeter() {
     analyser.getByteTimeDomainData(data);
     let peak = 0;
     for (let i = 0; i < data.length; i += 1) {
-      const v = Math.abs(data[i] - 128) / 128;
+      const sample = data[i] ?? 128;
+      const v = Math.abs(sample - 128) / 128;
       if (v > peak) peak = v;
     }
     level.value = Math.min(100, Math.round(peak * 170));
@@ -192,7 +209,7 @@ async function toggleMicTest() {
     stopMeter();
     return;
   }
-  if (!micEnabled.value) {
+  if (!micEnabled.value || !stream) {
     const ok = await requestMicPermission();
     if (!ok) return;
   }
@@ -226,7 +243,7 @@ function startInterview() {
 
   const selectedInterviewer =
     INTERVIEWER_OPTIONS.find((it) => it.avatarId === selectedInterviewerId.value) ||
-    INTERVIEWER_OPTIONS[0];
+    DEFAULT_INTERVIEWER;
   const collectionNameFromPosition = String(latest.positionEnglishName || '').trim();
 
   const payload = {
@@ -294,9 +311,15 @@ function startInterview() {
 .interviewer-card:hover { border-color: #c4b5fd; background: #faf5ff; }
 .interviewer-card.active { border-color: #8b5cf6; background: #f5f3ff; }
 .interviewer-avatar {
+  flex-shrink: 0;
+  border: 2px solid #e5e7eb;
   background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
   color: #fff;
   font-weight: 700;
+  transition: border-color 0.2s ease;
+}
+.interviewer-card.active .interviewer-avatar {
+  border-color: #8b5cf6;
 }
 .interviewer-meta h4 {
   margin: 0 0 4px;

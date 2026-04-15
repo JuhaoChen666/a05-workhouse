@@ -69,6 +69,7 @@ import {
   Fold,
   HomeFilled,
   Notebook,
+  Opportunity,
 } from "@element-plus/icons-vue";
 import { useUserStore } from "@/store/user";
 import { loadInterviewSetupDraft } from "@/pages/Interview/setupState";
@@ -104,7 +105,7 @@ function onCollapseTriggerClick() {
 const menuItems = [
   { name: "Home", label: "首页", icon: HomeFilled },
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
-  { name: "HomeQuestion", label: "AI押题", icon: ChatDotRound },
+  { name: "HomeQuestion", label: "AI押题", icon: Opportunity },
   { name: "HomeResume", label: "简历管理", icon: Document },
   { name: "HomeDoc", label: "帮助文档", icon: Notebook },
 ];
@@ -122,7 +123,7 @@ const titleMap: Record<string, string> = {
   HomeInterviewPosition: "面试设置",
   HomeInterviewConfig: "面试设置",
   HomeInterview: "面试设置",
-  HomeQuestion: "面试押题",
+  HomeQuestion: "AI押题",
   HomePredictQuestions: "面试押题",
   HomeResume: "简历管理",
   HomeResumeOptimize: "简历优化",
@@ -154,8 +155,7 @@ const currentPageTitle = computed(
 );
 const greetingText = computed(() => {
   const hour = new Date().getHours();
-  const username =
-    userStore.userInfo?.username || userStore.userInfo?.name || "同学";
+  const username = userStore.userInfo?.username || "同学";
   if (hour < 11) return `早上好，${username}`;
   if (hour < 14) return `中午好，${username}`;
   if (hour < 19) return `下午好，${username}`;

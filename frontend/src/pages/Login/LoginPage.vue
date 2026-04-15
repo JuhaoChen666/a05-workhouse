@@ -84,7 +84,7 @@ import { reactive, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
-import { loginApi, getProfileApi } from '@/api/auth';
+import { loginApi } from '@/api/auth';
 import { syncUserAvatarFromAdminApi } from '@/utils/syncUserAvatar';
 import { useUserStore } from '@/store/user';
 import { throttle } from '@/utils/throttle';
@@ -121,13 +121,6 @@ const doSubmit = () => {
       userStore.setToken(res.token);
       if (res.user) {
         userStore.setUserInfo(res.user);
-      } else {
-        try {
-          const profile = await getProfileApi();
-          userStore.setUserInfo(profile);
-        } catch {
-          /* 仅有 token 时也允许进入首页 */
-        }
       }
       await syncUserAvatarFromAdminApi();
       ElMessage.success('登录成功');

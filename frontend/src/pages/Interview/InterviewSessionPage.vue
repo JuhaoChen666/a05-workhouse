@@ -481,7 +481,7 @@ const AVATAR_ACTION_PROFILE_MAP: Record<string, AvatarActionProfile> = {
 };
 
 const avatarActionProfile = computed<AvatarActionProfile>(
-  () => AVATAR_ACTION_PROFILE_MAP[selectedAvatarId.value] || AVATAR_ACTION_PROFILE_MAP['110592026']
+  () => AVATAR_ACTION_PROFILE_MAP[selectedAvatarId.value] ?? AVATAR_ACTION_PROFILE_MAP['110592026']!
 );
 
 type ChatMessage = {
@@ -654,7 +654,7 @@ function flowStartAiThinking(label: string, meta?: FlowMetaInput) {
   flowActiveThinkingId.value = newId;
   flowNodes.value.push({
     id: newId,
-    side: 'ai ',
+    side: 'ai',
     title: text,
     status: 'thinking',
     messageIndex: null,
@@ -1315,7 +1315,7 @@ function encodeWavFromPcm16(pcm16: Int16Array, sampleRate: number): Blob {
   view.setUint32(40, dataSize, true);
   let offset = 44;
   for (let i = 0; i < pcm16.length; i += 1) {
-    view.setInt16(offset, pcm16[i], true);
+    view.setInt16(offset, pcm16[i] ?? 0, true);
     offset += 2;
   }
   return new Blob([buffer], { type: 'audio/wav' });
@@ -2033,7 +2033,8 @@ onMounted(async () => {
   }
 
   if (isAv && sid && !skipAvatarOpening && !interviewEnded.value) {
-    await runAvatarOpeningSequence(String(loadedSessionInfo?.current_question || ''));
+    const openingQuestion = String((loadedSessionInfo as InterviewSessionInfo | null)?.current_question || '');
+    await runAvatarOpeningSequence(openingQuestion);
   } else if (isAv) {
     questionPrepBootLoading.value = false;
   }
@@ -2368,20 +2369,35 @@ async function onLeavePage() {
   try {
     avatarPlayerInstance?.resume?.();
     await ElMessageBox.confirm('是否保存当前面试进度后离开？', '离开面试', {
-      confirmButtonText: '保存并离开',
-      cancelButtonText: '不保存并离开',
+      confirmButtonText: '确定',
+      cancelButtonText: '结束面试',
       distinguishCancelAndClose: true,
       type: 'warning',
       closeOnClickModal: false,
+      customClass: 'interview-leave-msgbox',
+      confirmButtonClass: 'interview-leave-confirm-btn',
+      cancelButtonClass: 'interview-leave-cancel-btn',
     });
-    // 保存并离开：保留会话，直接返回设置页
+    // 保留会话并离开
     if (sid && isAvatarInterview.value) {
       avatarSdkInstance?.stop?.();
     }
     backToSettings();
   } catch (e) {
-    // 点击“取消”分支按“不保存并离开”处理；关闭弹窗则不做操作
     if (e !== 'cancel') return;
+    try {
+      await ElMessageBox.confirm('结束后将关闭当前会话，且不可继续作答。确认结束面试吗？', '确认结束面试', {
+        confirmButtonText: '确认结束',
+        cancelButtonText: '返回',
+        distinguishCancelAndClose: true,
+        type: 'error',
+        closeOnClickModal: false,
+        customClass: 'interview-leave-msgbox interview-leave-msgbox--danger',
+        confirmButtonClass: 'interview-leave-end-confirm-btn',
+      });
+    } catch {
+      return;
+    }
     if (sid) {
       try {
         if (isAvatarInterview.value) {
@@ -2398,6 +2414,45 @@ async function onLeavePage() {
 </script>
 
 <style scoped>
+:global(.interview-leave-msgbox) {
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
+  box-shadow: 0 16px 30px -18px rgba(59, 130, 246, 0.22);
+}
+
+:global(.interview-leave-msgbox .el-message-box__header) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+:global(.interview-leave-msgbox .el-message-box__title) {
+  color: #111827;
+  font-weight: 700;
+}
+
+:global(.interview-leave-msgbox .el-message-box__content) {
+  color: #4b5563;
+  line-height: 1.65;
+}
+
+:global(.interview-leave-msgbox .interview-leave-cancel-btn),
+:global(.interview-leave-msgbox .interview-leave-end-confirm-btn) {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #fff !important;
+}
+
+:global(.interview-leave-msgbox .interview-leave-cancel-btn:hover),
+:global(.interview-leave-msgbox .interview-leave-end-confirm-btn:hover) {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+
+:global(.interview-leave-msgbox--danger) {
+  border-color: #fecaca;
+  box-shadow: 0 16px 30px -18px rgba(239, 68, 68, 0.28);
+}
+
 /* 根容器（流程面板为 fixed 浮层，不挤压聊天卡片） */
 .interview-session-root {
   width: 100%;

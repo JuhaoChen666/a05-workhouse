@@ -13,15 +13,15 @@
 
     <p v-if="errorMsg" class="error-banner theme-card">{{ errorMsg }}</p>
 
-    <div v-if="textPreview" class="block theme-card">
-      <h4>解析预览</h4>
-      <div class="preview-text">{{ textPreview }}</div>
-    </div>
-
     <div v-if="showProgress" class="block theme-card">
       <h4>优化进度</h4>
       <el-progress :percentage="Math.min(100, Math.max(0, progress))" :status="progressStatus" />
       <p class="status-line">{{ statusHint }}</p>
+    </div>
+
+    <div v-if="showTextPreviewCard" class="block theme-card">
+      <h4>解析预览</h4>
+      <div class="preview-text">{{ textPreview }}</div>
     </div>
 
     <div v-if="resultMarkdown" class="block theme-card result-block">
@@ -74,6 +74,10 @@ const pipelineStarted = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const showProgress = computed(() => busy.value || (pollStatus.value && !resultMarkdown.value && !errorMsg.value));
+const optimizeFinished = computed(
+  () => (pollStatus.value === 'completed' && progress.value >= 100) || Boolean(resultMarkdown.value)
+);
+const showTextPreviewCard = computed(() => Boolean(textPreview.value) && !optimizeFinished.value);
 const statusHint = computed(() => {
   if (pollStatus.value === 'completed') return '优化已完成';
   if (pollStatus.value === 'failed' || pollStatus.value === 'error') return '优化失败';

@@ -4,6 +4,9 @@
       <h2 class="theme-section-title">账号与安全设置 <span>Account</span></h2>
       <div class="theme-section-decoration"></div>
     </div>
+    <div class="top-actions">
+      <el-button @click="goBack">返回个人中心</el-button>
+    </div>
 
     <!-- 头像设置（独立于 profile 请求，可直接上传） -->
     <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
@@ -72,7 +75,6 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="pwdLoading" @click="onSubmitPassword">确认修改</el-button>
-          <el-button @click="goBack">返回个人中心</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -85,8 +87,6 @@ import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import {
-  getProfileAvatarApi,
-  getProfileInfoApi,
   uploadAvatarApi,
   changePasswordApi,
   sendCodeApi,
@@ -154,10 +154,18 @@ const pwdRules: FormRules = {
 async function loadProfileInfo() {
   profileLoading.value = true;
   try {
-    const res = await getProfileInfoApi();
-    profileInfo.value = res;
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取基本信息失败');
+    if (userStore.userInfo) {
+      profileInfo.value = {
+        id: userStore.userInfo.id,
+        username: userStore.userInfo.username,
+        email: userStore.userInfo.email,
+      };
+    } else {
+      profileInfo.value = null;
+      ElMessage.warning('未获取到登录用户信息，请重新登录后再试');
+    }
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '获取基本信息失败');
   } finally {
     profileLoading.value = false;
   }
@@ -168,7 +176,7 @@ async function loadAvatarProfile() {
   try {
     const synced = await syncUserAvatarFromAdminApi();
     const u = userStore.userInfo;
-    if (synced && u?.avatarUrl) {
+    if ((synced || u) && u?.avatarUrl) {
       avatarProfile.value = {
         id: u.id,
         username: u.username,
@@ -176,13 +184,17 @@ async function loadAvatarProfile() {
       };
       return;
     }
-    const res = await getProfileAvatarApi();
-    avatarProfile.value = res;
-    if (res?.avatarUrl && userStore.userInfo) {
-      userStore.setUserInfo({ ...userStore.userInfo, avatarUrl: res.avatarUrl });
+    if (u) {
+      avatarProfile.value = {
+        id: u.id,
+        username: u.username,
+        avatarUrl: u.avatarUrl,
+      };
+    } else {
+      avatarProfile.value = null;
     }
-  } catch (e: any) {
-    ElMessage.error(e.message || '获取头像信息失败');
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '获取头像信息失败');
   } finally {
     avatarLoading.value = false;
   }
@@ -294,6 +306,11 @@ watch(
 
 <style scoped>
 .profile-edit-page { max-width: 1000px; }
+.top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
 .section-card {
   margin-bottom: 16px;
 }

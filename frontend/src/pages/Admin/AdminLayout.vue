@@ -119,9 +119,15 @@ watch(
   }
 );
 
-function onLogout() {
+async function onLogout() {
   userStore.logout();
-  router.push({ name: 'Login' });
+  drawerVisible.value = false;
+  try {
+    await router.replace({ name: 'Login' });
+  } catch {
+    // 极端情况下路由切换失败，直接回退到登录页避免白屏
+    window.location.href = '/login';
+  }
 }
 </script>
 

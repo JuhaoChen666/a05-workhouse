@@ -107,8 +107,7 @@ const routes: RouteRecordRaw[] = [
             path: 'doc',
             name: 'HomeDoc',
             meta: { title: '帮助文档' },
-            component: () => import('../pages/Common/PlaceholderPage.vue'),
-            props: { title: '文档', desc: '文档模块正在建设中，后续会提供使用说明与常见问题。' },
+            component: () => import('../pages/Home/HomeDocPage.vue'),
           },
           {
             path: 'profile',
