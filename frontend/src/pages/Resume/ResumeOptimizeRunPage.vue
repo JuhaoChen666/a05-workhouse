@@ -3,7 +3,7 @@
     <div class="toolbar theme-card">
       <div class="toolbar-text">
         <h3>简历优化</h3>
-        <p>正在基于「{{ draft.originalFilename || '简历' }}」进行 AI 优化，请等待进度完成。</p>
+        <p>{{ toolbarSubtitle }}</p>
       </div>
       <div class="toolbar-actions">
         <el-button class="back-btn" @click="goPreview">返回预览</el-button>
@@ -76,6 +76,11 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 const showProgress = computed(() => busy.value || (pollStatus.value && !resultMarkdown.value && !errorMsg.value));
 const optimizeFinished = computed(
   () => (pollStatus.value === 'completed' && progress.value >= 100) || Boolean(resultMarkdown.value)
+);
+const toolbarSubtitle = computed(() =>
+  optimizeFinished.value
+    ? '简历优化完成，请在下方预览或下载'
+    : `正在基于「${draft.originalFilename || '简历'}」进行 AI 优化，请等待进度完成。`
 );
 const showTextPreviewCard = computed(() => Boolean(textPreview.value) && !optimizeFinished.value);
 const statusHint = computed(() => {

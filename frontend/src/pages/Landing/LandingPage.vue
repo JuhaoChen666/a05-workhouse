@@ -11,9 +11,6 @@
           <el-icon class="logo-icon"><Platform /></el-icon>
           <span class="logo-text">面智通途</span>
         </div>
-        <div class="picture-logo">
-          <img src="@/assets/logo1.png" alt="Logo" style="width: 50px; height: 50px;" />
-        </div>
         <!-- Textured Nav Links -->
         <nav class="nav-links-container">
           <div class="nav-links">
@@ -293,16 +290,6 @@ onBeforeUnmount(() => {
 .logo-icon {
   color: #111827;
   font-size: 24px;
-}
-
-.picture-logo {
-  position: absolute;
-  left: 230px;
-}
-@media (max-width: 1024px) {
-  .picture-logo {
-    display: none;
-  }
 }
 
 /* --- Redesigned Nav Links --- */

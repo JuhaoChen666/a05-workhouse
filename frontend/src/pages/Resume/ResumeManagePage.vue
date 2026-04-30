@@ -82,7 +82,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { deleteResumeApi, getResumeItemApi, getResumeListApi, uploadResumeApi } from '@/api/resume';
-import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
+import { buildResumeFilePublicUrl } from '@/config/resumeAssets';
 import { useUserStore } from '@/store/user';
 import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
 import ResumeOptimizeUploadDialog from '@/components/ResumeOptimizeUploadDialog.vue';
@@ -269,7 +269,11 @@ async function viewResume(row: ResumeItem) {
       previewError.value = '未获取到简历文件名，无法预览';
       return;
     }
-    previewSrc.value = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(fileKey)}`;
+    previewSrc.value = buildResumeFilePublicUrl(fileKey);
+    if (!previewSrc.value) {
+      previewError.value = '简历文件路径无效，无法预览';
+      return;
+    }
   } catch (e: unknown) {
     previewError.value = (e as Error).message || '获取简历详情失败';
   } finally {

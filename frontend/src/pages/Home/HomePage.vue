@@ -102,7 +102,7 @@ function onCollapseTriggerClick() {
   if (!isMobile.value) return;
   sidebarMobileCollapsed.value = !sidebarMobileCollapsed.value;
 }
-const menuItems = [
+const menuItems =   [
   { name: "Home", label: "首页", icon: HomeFilled },
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
   { name: "HomeQuestion", label: "AI押题", icon: Opportunity },

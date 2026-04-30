@@ -70,7 +70,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { getAdminResumePageApi, deleteAdminResumeApi, type AdminResumeItem } from '@/api/admin';
 import { getResumeItemApi } from '@/api/resume';
 import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
-import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
+import { buildResumeFilePublicUrl } from '@/config/resumeAssets';
 
 const loading = ref(false);
 const list = ref<AdminResumeItem[]>([]);
@@ -151,7 +151,11 @@ async function onView(row: AdminResumeItem) {
       previewError.value = '未获取到简历唯一文件名，无法预览';
       return;
     }
-    previewSrc.value = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(uniqueFilename)}`;
+    previewSrc.value = buildResumeFilePublicUrl(uniqueFilename);
+    if (!previewSrc.value) {
+      previewError.value = '简历文件路径无效，无法预览';
+      return;
+    }
   } catch (e) {
     previewError.value = (e as Error).message || '获取简历详情失败';
   } finally {

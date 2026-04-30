@@ -1,15 +1,11 @@
 <template>
   <div class="profile-page theme-page-shell">
-    <div class="theme-section-header fade-in-up">
-      <h2 class="theme-section-title">个人信息</h2>
-      <div class="theme-section-decoration"></div>
-    </div>
-
+    <div class="profile-body">
     <!-- 用户资料卡片：头像 + 基本信息 -->
     <el-card class="section-card profile-card theme-card fade-in-up delay-1" shadow="hover">
       <template #header>
         <div class="profile-card-header">
-          <span>用户资料</span>
+          <span class="card-header-text">用户资料</span>
           <div class="profile-card-actions">
             <el-button v-if="userStore.isAdmin" type="primary" link @click="goAdminPanel">
               后台管理系统
@@ -27,7 +23,7 @@
           </el-avatar>
         </div>
         <div class="profile-form" v-if="profile">
-          <el-form label-width="80px">
+          <el-form class="profile-el-form" label-width="88px" label-position="left">
             <el-form-item label="用户名">{{ displayUsername }}</el-form-item>
             <el-form-item label="邮箱">{{ displayEmail }}</el-form-item>
             <el-form-item v-if="userStore.isAdmin" label="角色">{{ profile.roleName ?? '管理员' }}</el-form-item>
@@ -36,32 +32,33 @@
       </div>
     </el-card>
 
-    <el-row :gutter="16">
+    <el-row :gutter="16" class="profile-charts-row">
       <!-- 用户评分趋势图 -->
-      <el-col :span="12">
+      <el-col :xs="24" :sm="24" :md="12">
         <el-card class="section-card theme-card fade-in-up delay-1" shadow="hover">
-          <template #header><span>用户评分趋势</span></template>
+          <template #header><span class="card-header-text">用户评分趋势</span></template>
           <div ref="lineChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
       </el-col>
 
       <!-- 能力雷达图 -->
-      <el-col :span="12">
+      <el-col :xs="24" :sm="24" :md="12">
         <el-card class="section-card theme-card fade-in-up delay-2" shadow="hover">
-          <template #header><span>能力雷达图</span></template>
+          <template #header><span class="card-header-text">能力雷达图</span></template>
           <div ref="radarChartRef" class="chart" style="height: 220px;"></div>
         </el-card>
       </el-col>
     </el-row>
 
     <!-- 最近面试记录 + 链接查看全部 -->
-    <el-card class="section-card theme-card fade-in-up delay-2" shadow="hover">
+    <el-card class="section-card records-card theme-card fade-in-up delay-2" shadow="hover">
       <template #header>
-        <span>最近面试记录</span>
-        <el-button type="primary" link style="float: right;" @click="goAllRecords">查看全部面试记录</el-button>
+        <div class="records-card-header">
+          <span class="card-header-text">最近面试记录</span>
+          <el-button type="primary" link class="records-all-btn" @click="goAllRecords">查看全部面试记录</el-button>
+        </div>
       </template>
-      <el-table v-loading="listLoading" :data="recentRecords" stripe max-height="320">
-        <el-table-column prop="session_id" label="会话ID" min-width="240" show-overflow-tooltip />
+      <el-table v-loading="listLoading" :data="recentRecords" stripe max-height="320" class="profile-records-table">
         <el-table-column label="岗位" min-width="140">
           <template #default="{ row }">{{ row.position_name || row.position || '--' }}</template>
         </el-table-column>
@@ -87,6 +84,7 @@
         </el-table-column>
       </el-table>
     </el-card>
+    </div>
 
   </div>
 </template>
@@ -331,14 +329,176 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.profile-page { max-width: 1200px; }
-.page-title { margin-top: 0; margin-bottom: 16px; }
-.profile-card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.profile-card-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.profile-card .profile-header { display: flex; gap: 24px; align-items: flex-start; }
-.avatar-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.avatar-upload { margin-top: 4px; }
-.profile-form { flex: 1; }
-.section-card { margin-bottom: 16px; }
-.chart { width: 100%; }
+.profile-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-bottom: 28px;
+  color: #1f2937;
+}
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.card-header-text {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #111827;
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+}
+
+.profile-card :deep(.el-card__header) {
+  padding: 12px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.profile-card :deep(.el-card__body) {
+  padding: 20px 18px 22px;
+}
+
+.profile-card .profile-header {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.avatar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px #e9d5ff, 0 8px 24px -8px rgba(99, 102, 241, 0.35);
+}
+
+.profile-form {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-el-form :deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+
+.profile-el-form :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.profile-el-form :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.profile-el-form :deep(.el-form-item__content) {
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.section-card {
+  border-radius: 16px !important;
+}
+
+.section-card :deep(.el-card__header) {
+  padding: 12px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.section-card :deep(.el-card__body) {
+  padding: 16px 18px 18px;
+}
+
+.profile-charts-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.chart {
+  width: 100%;
+  min-height: 220px;
+}
+
+.records-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.records-all-btn {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.profile-records-table :deep(.el-table) {
+  --el-table-border-color: #f1f5f9;
+  --el-table-header-bg-color: #f8fafc;
+}
+
+.profile-records-table :deep(.el-table th.el-table__cell) {
+  font-weight: 700;
+  font-size: 12px;
+  color: #475569;
+}
+
+.profile-records-table :deep(.el-table td.el-table__cell) {
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .profile-card .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-form {
+    width: 100%;
+  }
+
+  .profile-el-form :deep(.el-form-item) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile-el-form :deep(.el-form-item__label) {
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
+
+  .profile-charts-row :deep(.el-col) {
+    margin-bottom: 14px;
+  }
+
+  .profile-charts-row :deep(.el-col:last-child) {
+    margin-bottom: 0;
+  }
+}
 </style>

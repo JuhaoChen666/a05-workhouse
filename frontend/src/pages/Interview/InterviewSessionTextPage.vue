@@ -21,6 +21,7 @@
       :session-resume-pdf-src="sessionResumePdfSrc"
       :session-resume-plain-text="sessionResumePlainText"
       :session-resume-title="sessionResumeTitle"
+      :current-question="currentInterviewQuestion"
       :resume-thumb-zoom-percent="resumeThumbZoomPercent"
       :resume-thumb-dragging="resumeThumbDragging"
       :resume-thumb-pan-x="resumeThumbPanX"
@@ -51,6 +52,7 @@
                 class="window-traffic-slot window-traffic-btn window-traffic-btn--close"
                 title="结束面试"
                 aria-label="结束面试"
+                :disabled="interviewEnded"
                 @click="onLeavePage"
               >
                 <span class="window-traffic-dot window-traffic-dot--close" aria-hidden="true" />
@@ -95,25 +97,46 @@
                   <el-avatar class="msg-avatar" :size="30" :src="m.role === 'user' ? userAvatar : aiAvatarSrc">
                     {{ m.role === 'user' ? '我' : 'AI' }}
                   </el-avatar>
-                  <div>
-                    <div class="msg-label">{{ m.role === 'user' ? '我' : m.tone === 'error' ? '提示' : '面试官' }}</div>
-                    <div
-                      class="msg-bubble"
-                      :class="{
-                        'msg-bubble-error': m.role === 'assistant' && m.tone === 'error',
-                        'msg-bubble-voice': m.role === 'user' && m.kind === 'voice',
-                      }"
-                    >
-                      <template v-if="m.kind === 'voice'">
-                        <div class="voice-topline">
-                          <span class="voice-icon">🔊</span>
-                          <span class="voice-duration">{{ formatVoiceDuration(m.voiceDurationSec) }}</span>
-                        </div>
-                        <div v-if="m.transcript" class="msg-transcript">{{ m.transcript }}</div>
-                      </template>
-                      <template v-else>
-                        {{ m.content }}
-                      </template>
+                  <div class="msg-body">
+                    <div class="msg-label">
+                      <template v-if="m.role === 'user'">我</template>
+                      <template v-else-if="m.tone === 'error'">提示</template>
+                      <template v-else-if="m.is_followup_hint">面试官</template>
+                      <template v-else-if="m.is_followup_question">追问</template>
+                      <template v-else>面试官</template>
+                    </div>
+                    <div class="msg-bubble-wrap">
+                      <div
+                        class="msg-bubble"
+                        :class="{
+                          'msg-bubble-error': m.role === 'assistant' && m.tone === 'error',
+                          'msg-bubble-voice': m.role === 'user' && m.kind === 'voice',
+                          'msg-bubble-followup-hint': m.role === 'assistant' && m.is_followup_hint,
+                        }"
+                      >
+                        <template v-if="m.kind === 'voice'">
+                          <div class="voice-topline">
+                            <span class="voice-icon">🔊</span>
+                            <span class="voice-duration">{{ formatVoiceDuration(m.voiceDurationSec) }}</span>
+                          </div>
+                          <div v-if="m.transcript" class="msg-transcript">{{ m.transcript }}</div>
+                        </template>
+                        <template v-else>
+                          {{ m.content }}
+                        </template>
+                      </div>
+                      <el-button
+                        v-if="getCopyTextForMessage(m)"
+                        type="default"
+                        text
+                        circle
+                        class="msg-copy-btn"
+                        title="复制"
+                        aria-label="复制本条消息"
+                        @click.stop="copyMessageBubble(m)"
+                      >
+                        <el-icon><DocumentCopy /></el-icon>
+                      </el-button>
                     </div>
                   </div>
                 </div>
@@ -138,12 +161,37 @@
               <div v-if="streaming" class="msg msg-ai">
                 <div class="msg-row">
                   <el-avatar class="msg-avatar" :size="30" :src="aiAvatarSrc">AI</el-avatar>
-                  <div>
-                    <div class="msg-label">面试官</div>
-                    <div class="msg-bubble streaming">
-                      <span v-if="showThinkingHint" class="thinking-hint">面试官思考中...</span>
-                      <br v-if="showThinkingHint" />
-                      {{ streamingText }}<span class="cursor">▍</span>
+                  <div class="msg-body">
+                    <div class="msg-label">
+                      {{
+                        streamingFollowupHint
+                          ? '面试官'
+                          : streamingFollowupQuestion
+                            ? '追问'
+                            : '面试官'
+                      }}
+                    </div>
+                    <div class="msg-bubble-wrap">
+                      <div
+                        class="msg-bubble streaming"
+                        :class="{ 'msg-bubble-followup-hint': streamingFollowupHint }"
+                      >
+                        <span v-if="showThinkingHint" class="thinking-hint">面试官思考中...</span>
+                        <br v-if="showThinkingHint" />
+                        {{ streamingText }}<span class="cursor">▍</span>
+                      </div>
+                      <el-button
+                        v-if="streamingText.trim() && !streamingFollowupHint"
+                        type="default"
+                        text
+                        circle
+                        class="msg-copy-btn"
+                        title="复制当前内容"
+                        aria-label="复制流式内容"
+                        @click.stop="copyStreamingBubble"
+                      >
+                        <el-icon><DocumentCopy /></el-icon>
+                      </el-button>
                     </div>
                   </div>
                 </div>
@@ -191,6 +239,7 @@
                   <el-button
                     circle
                     type="danger"
+                    :disabled="interviewEnded"
                     class="composer-tool-btn composer-hangup-btn"
                     title="结束面试"
                     aria-label="结束面试"
@@ -241,7 +290,10 @@ import {
   ArrowDown,
   ArrowRight,
   PhoneFilled,
+  DocumentCopy,
 } from '@element-plus/icons-vue';
+import { copyPlainText } from '@/utils/copyPlainText';
+import { isFollowupProgressPlaceholderMessage } from '@/utils/interviewChatFilters';
 import {
   startInterviewApi,
   streamInterviewAnswer,
@@ -255,12 +307,12 @@ import {
 import { useUserStore } from '@/store/user';
 import { apiOrigin } from '@/api/request';
 import { getResumeItemApi } from '@/api/resume';
-import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
+import { buildResumeFilePublicUrl } from '@/config/resumeAssets';
 import InterviewFlowDock from '@/pages/Home/components/InterviewFlowDock.vue';
 import InterviewMaterialsDock from '@/pages/Home/components/InterviewMaterialsDock.vue';
 
 /** 文字作答最大字数（与输入框 maxlength 一致） */
-const INTERVIEW_ANSWER_MAX_LEN = 400;
+const INTERVIEW_ANSWER_MAX_LEN = 1000;
 
 const SESSION_RESUME_STORAGE_PREFIX = 'interviewSessionResumeMeta:';
 
@@ -343,12 +395,48 @@ type ChatMessage = {
   kind?: 'text' | 'voice';
   transcript?: string;
   voiceDurationSec?: number;
+  /** type=followup 下发的过渡提示（如「准备追问…」），无复制按钮 */
+  is_followup_hint?: boolean;
+  /** type=question 且 is_followup：追问题目，有复制按钮 */
+  is_followup_question?: boolean;
 };
+
+function getCopyTextForMessage(m: ChatMessage): string {
+  if (m.is_followup_hint) return '';
+  if (m.kind === 'voice') return String(m.transcript || '').trim();
+  return String(m.content || '').trim();
+}
+
+async function copyMessageBubble(m: ChatMessage) {
+  const text = getCopyTextForMessage(m);
+  if (!text) {
+    ElMessage.warning('暂无可复制内容');
+    return;
+  }
+  const ok = await copyPlainText(text);
+  if (ok) ElMessage.success('已复制');
+  else ElMessage.error('复制失败');
+}
+
+async function copyStreamingBubble() {
+  const text = String(streamingText.value || '').trim();
+  if (!text) {
+    ElMessage.warning('暂无可复制内容');
+    return;
+  }
+  const ok = await copyPlainText(text);
+  if (ok) ElMessage.success('已复制');
+  else ElMessage.error('复制失败');
+}
 
 const messages = ref<ChatMessage[]>([]);
 const userInput = ref('');
 const streaming = ref(false);
 const streamingText = ref('');
+/** 流式展示 followup 过渡提示时隐藏复制 */
+const streamingFollowupHint = ref(false);
+/** 流式展示追问题干时标签为「追问」（仍可有复制） */
+const streamingFollowupQuestion = ref(false);
 /** 开场 NDJSON 是否已下发 question_chunk（避免最终 question 再整段口播/逐字动画重复） */
 const hadQuestionStreamChunks = ref(false);
 const chatPanelRef = ref<HTMLElement | null>(null);
@@ -389,6 +477,17 @@ watchEffect((onCleanup) => {
 });
 
 const showThinkingHint = computed(() => streaming.value && !streamingText.value);
+const currentInterviewQuestion = computed(() => {
+  if (streaming.value && streamingText.value.trim()) return streamingText.value.trim();
+  for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+    const msg = messages.value[i];
+    if (msg?.role === 'assistant' && msg.kind !== 'voice' && !msg.is_followup_hint) {
+      const t = String(msg.content || '').trim();
+      if (t) return t;
+    }
+  }
+  return '';
+});
 
 /** 文本面试左侧流程（虚拟人模式不展示） */
 type InterviewFlowNode = {
@@ -592,7 +691,7 @@ function rebuildFlowFromMessages() {
         status: 'done',
         messageIndex: idx,
         ...metaFields({
-          flowRound: lastQRound != null && lastQRound > 0 ? lastQRound : null,
+          flowRound: lastQRound != null && lastQRound > 0 ? lastQRound : undefined,
         }),
       });
       return;
@@ -608,17 +707,35 @@ function rebuildFlowFromMessages() {
         });
         return;
       }
-      round += 1;
-      lastQRound = round;
+      if (m.is_followup_hint) {
+        const topicHint = shortTopicFromQuestionContent(m.content);
+        flowNodes.value.push({
+          id: `hf-${flowIdSeq++}`,
+          side: 'ai',
+          title: '追问提示',
+          status: 'done',
+          messageIndex: idx,
+          flowRound: lastQRound != null && lastQRound > 0 ? lastQRound : undefined,
+          ...(topicHint ? { flowTopic: topicHint } : {}),
+        });
+        return;
+      }
+      const isFuQ = Boolean(m.is_followup_question);
+      if (!isFuQ) {
+        round += 1;
+        lastQRound = round;
+      }
       const trailing = idx === list.length - 1;
       const topicHint = shortTopicFromQuestionContent(m.content);
+      const title = isFuQ ? '追问' : trailing ? '当前提问' : `第 ${round} 轮提问`;
+      const flowRound = isFuQ ? (lastQRound ?? round) : round;
       flowNodes.value.push({
         id: `hf-${flowIdSeq++}`,
         side: 'ai',
-        title: trailing ? '当前提问' : `第 ${round} 轮提问`,
+        title,
         status: 'done',
         messageIndex: idx,
-        flowRound: round,
+        flowRound,
         ...(topicHint ? { flowTopic: topicHint } : {}),
       });
     }
@@ -645,6 +762,9 @@ function onFlowStepActivate(node: InterviewFlowNode) {
 /** 面试已结束：展示报告分享卡片并禁用作答 */
 const interviewEnded = ref(false);
 const showReportInvite = ref(false);
+const endingFinalizeRunning = ref(false);
+const endingFinalized = ref(false);
+const ENDED_REPORT_HINT_TEXT = '该场面试已结束，请点击上方卡片查看评估报告。';
 
 /** 侧栏「当前焦点」：考察主题（与后端 topic / current_topic 同步） */
 const sessionFocusTopic = ref('');
@@ -751,7 +871,7 @@ function resumeInterviewDurationFromSession(info: InterviewSessionInfo) {
   const startMs = pickInterviewStartMs(info) ?? Date.now();
   interviewEpochMs.value = startMs;
 
-  if (info.status === 'ended') {
+  if (info.status === 'completed' || info.status === 'ended') {
     const endMs = pickLatestHistoryTimestampMs(info);
     if (endMs != null && endMs >= startMs) {
       interviewFrozenElapsedMs.value = endMs - startMs;
@@ -985,7 +1105,11 @@ async function loadResumeFromSessionCacheEntry(cached: SessionResumeCache) {
       sessionResumeError.value = '未获取到简历文件名，无法预览';
       return;
     }
-    const remoteUrl = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(fileKey)}`;
+    const remoteUrl = buildResumeFilePublicUrl(fileKey);
+    if (!remoteUrl) {
+      sessionResumeError.value = '简历文件路径无效，无法预览';
+      return;
+    }
     await loadSessionPdfIntoLocalCache(remoteUrl);
     if (item?.filename) sessionResumeTitle.value = String(item.filename);
     resumeLoadFingerprint.value = fp;
@@ -1284,14 +1408,49 @@ function goEvaluationReport() {
   });
 }
 
+async function finalizeInterviewAndJumpReport() {
+  const sid = effectiveSessionId.value;
+  if (!sid || endingFinalizeRunning.value || endingFinalized.value) return;
+  endingFinalizeRunning.value = true;
+  try {
+    try {
+      await endInterviewSessionApi(sid);
+    } catch {
+      // 后端可能已结束，保持前端自动跳转
+    }
+    endingFinalized.value = true;
+    interviewEnded.value = true;
+    showReportInvite.value = true;
+    await router.push({
+      name: 'InterviewEvaluation',
+      params: { sessionId: sid },
+      query: { jobName: jobName.value || undefined },
+    });
+  } finally {
+    endingFinalizeRunning.value = false;
+  }
+}
+
+function appendEndedReportHintIfNeeded() {
+  const exists = messages.value.some(
+    (m) => m.role === 'assistant' && m.kind !== 'voice' && String(m.content || '').trim() === ENDED_REPORT_HINT_TEXT
+  );
+  if (exists) return;
+  messages.value.push({ role: 'assistant', content: ENDED_REPORT_HINT_TEXT, kind: 'text' });
+  scrollToBottom();
+}
+
 async function refreshSessionEndedState() {
   const sid = effectiveSessionId.value;
   if (!sid) return;
   try {
     const info = await getInterviewSessionApi(sid);
-    if (info.status === 'ended') {
+    if (info.status === 'completed' || info.status === 'ended') {
       interviewEnded.value = true;
       showReportInvite.value = true;
+      streaming.value = false;
+      streamingText.value = '';
+      appendEndedReportHintIfNeeded();
     }
   } catch {
     /* 会话已删或网络错误时忽略 */
@@ -1367,6 +1526,7 @@ function updateVoiceTranscriptAt(index: number | null, transcript: string) {
 onMounted(async () => {
   hasPendingStart.value = !!sessionStorage.getItem('pendingInterviewStart');
   let sid = effectiveSessionId.value;
+  let showStartThinkingBubble = false;
   if (!sid) {
     const pending = sessionStorage.getItem('pendingInterviewStart');
     if (!pending) return;
@@ -1378,8 +1538,16 @@ onMounted(async () => {
     }
     // 简历 id/正文均在 pending 里，与 startInterview / 首题无关，提前加载侧栏预览
     void loadResumeFromSessionCacheEntry(buildCacheFromPending(payload));
+    // 首次开始面试时，在首题返回前展示「面试官思考中...」气泡
+    showStartThinkingBubble = true;
+    streaming.value = true;
+    streamingText.value = '';
     const createdSid = await createInterviewSessionFromPending(payload);
     if (!createdSid) {
+      if (showStartThinkingBubble) {
+        streaming.value = false;
+        streamingText.value = '';
+      }
       disposeInterviewResumeLocalCache();
       return;
     }
@@ -1392,6 +1560,10 @@ onMounted(async () => {
     const loadSession = async (): Promise<InterviewSessionInfo> => {
       const info = await getInterviewSessionApi(sid);
       loadedSessionInfo = info;
+      if (info.status === 'completed' || info.status === 'ended') {
+        interviewEnded.value = true;
+        showReportInvite.value = true;
+      }
       mergeSessionFocusTopic(info.current_topic);
       const hist = info.history || [];
       if (!sessionFocusTopic.value.trim() && hist.length) {
@@ -1399,7 +1571,12 @@ onMounted(async () => {
       }
       if (hist.length > 0) {
         hist.forEach((h) => {
-          messages.value.push({ role: 'assistant', content: h.question, kind: 'text' });
+          messages.value.push({
+            role: 'assistant',
+            content: h.question,
+            kind: 'text',
+            is_followup_question: Boolean(h.is_followup),
+          });
           messages.value.push({ role: 'user', content: h.answer, kind: 'text' });
         });
         if (info.current_question) {
@@ -1409,6 +1586,9 @@ onMounted(async () => {
         messages.value.push({ role: 'assistant', content: info.current_question, kind: 'text' });
       }
       rebuildFlowFromMessages();
+      if (info.status === 'completed' || info.status === 'ended') {
+        appendEndedReportHintIfNeeded();
+      }
       return info;
     };
 
@@ -1421,13 +1601,17 @@ onMounted(async () => {
   resumeInterviewDurationFromSession(
     loadedSessionInfo ?? {
       session_id: sid,
-      status: interviewEnded.value ? 'ended' : 'questioning',
+      status: interviewEnded.value ? 'completed' : 'questioning',
       total_rounds: 0,
       current_topic: '',
       current_question: '',
       history: [],
     }
   );
+  if (showStartThinkingBubble) {
+    streaming.value = false;
+    streamingText.value = '';
+  }
 });
 
 onBeforeUnmount(() => {
@@ -1445,6 +1629,8 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
         showReportInvite.value = true;
         streaming.value = false;
         streamingText.value = '';
+        streamingFollowupHint.value = false;
+        streamingFollowupQuestion.value = false;
         const hint = String(evt.data.message || '').trim() || '面试已结束，可查看评估报告。';
         messages.value.push({ role: 'assistant', content: hint, kind: 'text' });
         flowSettleAiThinking('面试结束', messages.value.length - 1, {
@@ -1452,6 +1638,7 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
           flowRound: lastStreamQuestionRound.value ?? null,
         });
         scrollToBottom();
+        void finalizeInterviewAndJumpReport();
       }
       return;
     }
@@ -1530,21 +1717,26 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       mergeSessionFocusTopic(topicLine);
       const msg = String(evt.data.message || '').trim();
       if (msg) {
+        const r = Number(evt.data.round);
+        const rl = Number.isFinite(r) && r > 0 ? r : lastStreamQuestionRound.value;
+        if (rl != null && rl > 0) lastStreamQuestionRound.value = rl;
         uiChain = uiChain.then(async () => {
-          if (interviewEnded.value) return;
-          await renderStreamingText(msg);
-          if (interviewEnded.value) return;
-          messages.value.push({ role: 'assistant', content: msg });
-          const idx = messages.value.length - 1;
-          const r = Number(evt.data.round);
-          const rl = Number.isFinite(r) && r > 0 ? r : lastStreamQuestionRound.value;
-          if (rl != null && rl > 0) lastStreamQuestionRound.value = rl;
-          flowSettleAiThinking('追问', idx, {
-            flowAt: evt.timestamp,
-            flowRound: rl ?? null,
-            flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
-          });
-          streamingText.value = '';
+          streamingFollowupHint.value = true;
+          try {
+            if (interviewEnded.value) return;
+            await renderStreamingText(msg);
+            if (interviewEnded.value) return;
+            messages.value.push({ role: 'assistant', content: msg, is_followup_hint: true });
+            const idx = messages.value.length - 1;
+            flowSettleAiThinking(isFollowupProgressPlaceholderMessage(msg) ? '准备追问' : '追问提示', idx, {
+              flowAt: evt.timestamp,
+              flowRound: rl ?? null,
+              flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
+            });
+            streamingText.value = '';
+          } finally {
+            streamingFollowupHint.value = false;
+          }
           scrollToBottom();
         });
       }
@@ -1560,28 +1752,35 @@ function attachAnswerStreamHandler(voiceMessageIndex: number | null = null) {
       const qTitle = isFollowup ? '追问' : roundLabel != null ? `第 ${roundLabel} 轮提问` : '提问';
       if (roundLabel != null) lastStreamQuestionRound.value = roundLabel;
       if (msg) {
+        streamingFollowupQuestion.value = isFollowup;
         const chunkMode = hadQuestionStreamChunks.value;
         hadQuestionStreamChunks.value = false;
         uiChain = uiChain.then(async () => {
-          if (interviewEnded.value) return;
-          if (!chunkMode) {
-            await renderStreamingText(msg);
+          try {
+            if (interviewEnded.value) return;
+            if (!chunkMode) {
+              await renderStreamingText(msg);
+            }
+            if (interviewEnded.value) return;
+            messages.value.push({ role: 'assistant', content: msg, is_followup_question: isFollowup });
+            const idx = messages.value.length - 1;
+            flowSettleAiThinking(qTitle, idx, {
+              flowAt: evt.timestamp,
+              flowRound: roundLabel ?? lastStreamQuestionRound.value ?? null,
+              flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
+            });
+            streamingText.value = '';
+          } finally {
+            streamingFollowupQuestion.value = false;
           }
-          if (interviewEnded.value) return;
-          messages.value.push({ role: 'assistant', content: msg });
-          const idx = messages.value.length - 1;
-          flowSettleAiThinking(qTitle, idx, {
-            flowAt: evt.timestamp,
-            flowRound: roundLabel ?? lastStreamQuestionRound.value ?? null,
-            flowTopic: topicLine || shortTopicFromQuestionContent(msg) || undefined,
-          });
-          streamingText.value = '';
           scrollToBottom();
         });
       }
     } else if (evt.type === 'error') {
       const msg = String(evt.data.message || '').trim() || '处理失败';
       streamingText.value = '';
+      streamingFollowupHint.value = false;
+      streamingFollowupQuestion.value = false;
       messages.value.push({ role: 'assistant', content: msg, tone: 'error' });
       flowSettleAiThinking('处理失败', messages.value.length - 1, { flowAt: evt.timestamp });
       ElMessage.error(msg);
@@ -1611,6 +1810,8 @@ async function sendMessage() {
   userInput.value = '';
   streaming.value = true;
   streamingText.value = '';
+  streamingFollowupHint.value = false;
+  streamingFollowupQuestion.value = false;
 
   try {
     const { onEvent, drain } = attachAnswerStreamHandler();
@@ -1621,6 +1822,8 @@ async function sendMessage() {
   } finally {
     streaming.value = false;
     streamingText.value = '';
+    streamingFollowupHint.value = false;
+    streamingFollowupQuestion.value = false;
     await refreshSessionEndedState();
     scrollToBottom();
   }
@@ -1640,6 +1843,8 @@ async function sendVoiceFile(file: File, voiceDurationSec?: number) {
   flowPushUserNode('语音作答', voiceMsgIndex);
   streaming.value = true;
   streamingText.value = '';
+  streamingFollowupHint.value = false;
+  streamingFollowupQuestion.value = false;
 
   try {
     const { onEvent, drain } = attachAnswerStreamHandler(voiceMsgIndex);
@@ -1650,6 +1855,8 @@ async function sendVoiceFile(file: File, voiceDurationSec?: number) {
   } finally {
     streaming.value = false;
     streamingText.value = '';
+    streamingFollowupHint.value = false;
+    streamingFollowupQuestion.value = false;
     await refreshSessionEndedState();
     scrollToBottom();
   }
@@ -1715,6 +1922,11 @@ function toggleVoiceRecord() {
 }
 
 async function onLeavePage() {
+  if (interviewEnded.value) {
+    disposeInterviewResumeLocalCache();
+    router.back();
+    return;
+  }
   const sid = effectiveSessionId.value;
   try {
     await ElMessageBox.confirm('是否保存当前面试进度后离开？', '离开面试', {
@@ -2792,15 +3004,56 @@ async function onLeavePage() {
   margin-bottom: 16px;
 }
 .msg-row {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: flex-start;
   gap: 10px;
+}
+.msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: calc(100% - 40px);
+}
+.msg-ai .msg-body {
+  align-items: flex-start;
+}
+.msg-user .msg-body {
+  align-items: flex-end;
+}
+.msg-bubble-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: min(85%, 720px);
+  vertical-align: top;
+}
+.msg-copy-btn {
+  flex-shrink: 0;
+  align-self: flex-end;
+  width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: #64748b !important;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.msg-bubble-wrap:hover .msg-copy-btn {
+  opacity: 1;
+}
+.msg-copy-btn:hover {
+  color: #4338ca !important;
 }
 .msg-user {
   text-align: right;
 }
 .msg-user .msg-row {
   flex-direction: row-reverse;
+  justify-content: flex-start;
 }
 /* 用户消息：纯色灰气泡 */
 .msg-user .msg-bubble {
@@ -2856,6 +3109,12 @@ async function onLeavePage() {
   color: #b42318;
   box-shadow: 0 1px 3px rgba(180, 35, 24, 0.08);
   border-radius: 18px 18px 18px 5px;
+}
+.msg-ai .msg-bubble.msg-bubble-followup-hint {
+  background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: rgba(100, 116, 139, 0.28);
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 .msg-label {
   font-size: 11px;

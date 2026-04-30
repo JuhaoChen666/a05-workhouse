@@ -21,7 +21,7 @@ export interface StartInterviewBody {
 
 export interface StartInterviewRes {
   session_id: string;
-  status: 'questioning' | 'ended';
+  status: 'questioning' | 'ended' | 'completed';
   total_rounds: number;
   current_topic: string;
   current_question: string;
@@ -34,11 +34,13 @@ export interface InterviewSessionHistoryItem {
   answer: string;
   topic: string;
   timestamp: string;
+  /** 该条中的 question 是否为追问题目（非 followup 过渡提示；聊天区「追问」标签与复制仍可用） */
+  is_followup?: boolean;
 }
 
 export interface InterviewSessionInfo {
   session_id: string;
-  status: 'questioning' | 'ended';
+  status: 'questioning' | 'ended' | 'completed';
   total_rounds: number;
   current_topic: string;
   current_question: string;
@@ -50,15 +52,75 @@ export interface InterviewSessionInfo {
 }
 
 /** GET /interview/session/:sessionId/evaluation（8000 等服务端） */
+export interface InterviewRoundEvaluationItem {
+  round: number;
+  topic?: string;
+  comment?: string;
+}
+
+/** 技术缺点卡片内的「技术点解析」子项（与后端字段对齐，均可选） */
+export interface InterviewTechnicalPointCard {
+  id?: number;
+  title?: string;
+  brief_description?: string;
+  detailed_explanation?: string;
+  summary?: string;
+  detail?: string;
+}
+
+/**
+ * 技术缺点卡片：外层描述一处短板/待巩固维度；
+ * 「技术点解析」在 `technical_point_cards`（或 `topic_analysis_cards`）内；若无嵌套数组则回退到本卡片上的 brief/detailed。
+ */
+export interface InterviewTechnicalCard {
+  id?: number;
+  title?: string;
+  type?: 'mastered' | 'needs_improvement' | string;
+  brief_description?: string;
+  detailed_explanation?: string;
+  relevance_score?: number;
+  category?: string;
+  /** 缺点卡片内的技术点解析（可多条） */
+  technical_point_cards?: InterviewTechnicalPointCard[];
+  /** 与 technical_point_cards 二选一，兼容别名字段 */
+  topic_analysis_cards?: InterviewTechnicalPointCard[];
+}
+
+/** 技术面汇总（报告页 technical_summary） */
+export interface InterviewTechnicalSummary {
+  total_cards?: number;
+  mastered_count?: number;
+  needs_improvement_count?: number;
+  primary_technology?: string;
+}
+
+/** 面试评估报告 data（与后端返回字段对齐，均可选以兼容旧版） */
 export interface InterviewEvaluationData {
-  session_id: string;
+  session_id?: string;
   strengths?: string[];
   weaknesses?: string[];
+  suggestions?: string[];
+  strong_topics?: string[];
+  weak_topics?: string[];
+  topic_coverage?: string[];
+  round_evaluations?: InterviewRoundEvaluationItem[];
+  total_rounds?: number;
   overall_score?: number;
+  /** 分项维度分（0–10 等，以后端为准） */
+  technical_competency?: number;
+  communication_skill?: number;
+  problem_solving?: number;
+  depth_of_knowledge?: number;
   recommendation?: string;
   overall_comment?: string;
   technical_evaluation?: string;
   communication_evaluation?: string;
+  confidence_level?: string;
+  duration_minutes?: number;
+  /** 新版：技术缺点卡片列表（内含技术点解析） */
+  technical_cards?: InterviewTechnicalCard[];
+  /** 新版：技术面统计摘要 */
+  technical_summary?: InterviewTechnicalSummary;
 }
 
 export interface UserInterviewSessionItem {

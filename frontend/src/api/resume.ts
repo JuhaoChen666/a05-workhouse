@@ -1,4 +1,4 @@
-import { interviewApiJsonBase, interviewRequest } from './request';
+import { interviewRequest } from './request';
 
 export interface ResumeUploadRes {
   id?: number;
@@ -50,7 +50,7 @@ export function getResumeListApi(userId: string | number, page = 1, pageSize = 5
 }
 
 export function deleteResumeApi(body: ResumeDeleteBody) {
-  return interviewRequest.delete<unknown>(`${interviewApiJsonBase}/resumes/delete`, { data: body });
+  return interviewRequest.delete<unknown>('/resumes/delete', { data: body });
 }
 
 export function getResumeItemApi(id: number | string) {

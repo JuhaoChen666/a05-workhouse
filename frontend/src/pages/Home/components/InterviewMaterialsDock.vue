@@ -87,7 +87,20 @@
           </section>
           <section class="material-dock-section material-dock-section--ai">
             <h4 class="material-dock-section-title">面试助手</h4>
-            <div class="ai-assistant-card" />
+            <div class="ai-assistant-card">
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                class="ai-assistant-hint-btn"
+                @click="onGenerateSmartHint"
+              >
+                智能提示
+              </el-button>
+              <p class="ai-assistant-hint-text">
+                {{ smartHintText || '点击“智能提示”获取当前题目的答题思路（演示占位）' }}
+              </p>
+            </div>
           </section>
         </div>
       </aside>
@@ -122,11 +135,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { DArrowLeft, DArrowRight, Plus, Minus } from '@element-plus/icons-vue';
 import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
 
-defineProps<{
+const props = defineProps<{
   visible: boolean;
   open: boolean;
   hasSessionResume: boolean;
@@ -140,6 +153,7 @@ defineProps<{
   resumeThumbPanX: number;
   resumeThumbPanY: number;
   resumeThumbScale: number;
+  currentQuestion?: string;
 }>();
 
 const emit = defineEmits<{
@@ -154,6 +168,13 @@ const emit = defineEmits<{
 }>();
 
 const resumeZoomOpen = ref(false);
+const smartHintText = ref('');
+const currentQuestionText = computed(() => String(props.currentQuestion || '').trim());
+
+function onGenerateSmartHint() {
+  const q = currentQuestionText.value || '请先阅读当前题目';
+  smartHintText.value = `【演示占位】可先用 1 句话定义核心概念，再用 2-3 点结合项目经历展开，并补充一个落地案例。当前题目：${q}`;
+}
 </script>
 
 <style scoped>
@@ -189,6 +210,8 @@ const resumeZoomOpen = ref(false);
 .material-resume-text { max-height:240px;overflow:auto;margin:0;padding:10px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;color:#1f2937;font-family:inherit; }
 .material-dock-section--ai { padding-top:4px;border-top:1px dashed #e5e7eb; }
 .ai-assistant-card { padding:10px;border-radius:12px;background:linear-gradient(145deg,#f8fafc 0%,#f1f5f9 100%);border:1px solid #e2e8f0;min-height:44px; }
+.ai-assistant-hint-btn { margin-bottom: 8px; }
+.ai-assistant-hint-text { margin: 0; font-size: 12px; line-height: 1.6; color: #475569; white-space: pre-wrap; word-break: break-word; }
 .material-dock-tab { position:fixed;right:0;top:50%;z-index:2001;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:26px;min-height:64px;padding:6px 0;border:1px solid #d8dbe3;border-right:none;border-radius:10px 0 0 10px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);cursor:pointer;color:#374151;line-height:1;transition:right .22s ease,border-color .2s ease,box-shadow .2s ease,color .2s ease,transform .2s ease; }
 .material-dock-tab--panel-open { right:280px; }
 .material-dock-tab-chevron { font-size:16px;color:#2563eb; }

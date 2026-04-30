@@ -77,7 +77,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue';
 import type { UploadFile } from 'element-plus';
 import { getResumeItemApi, getResumeListApi } from '@/api/resume';
-import { RESUME_FILE_PUBLIC_BASE_URL } from '@/config/resumeAssets';
+import { buildResumeFilePublicUrl } from '@/config/resumeAssets';
 import { useResumeOptimizeDraftStore } from '@/store/resumeOptimizeDraft';
 import { useUserStore } from '@/store/user';
 import { plainTextResumeToPdfFile, resumeUploadToPdfFile } from '@/utils/resumeFileToPdf';
@@ -141,7 +141,10 @@ async function fileFromMyResume(resumeId: number): Promise<{ file: File; display
   if (!fileKey) {
     throw new Error('未获取到简历文件路径，无法下载');
   }
-  const url = `${RESUME_FILE_PUBLIC_BASE_URL}${encodeURIComponent(fileKey)}`;
+  const url = buildResumeFilePublicUrl(fileKey);
+  if (!url) {
+    throw new Error('简历文件路径无效，无法下载');
+  }
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`下载简历失败（HTTP ${res.status}）`);
