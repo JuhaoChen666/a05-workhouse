@@ -299,6 +299,49 @@ class RAGService:
         请直接开始输出第一道题，不要寒暄。
         """)
 
+        # 技术点卡片生成器（用于综合评价中的技术点展示）
+        self.technical_cards_prompt = ChatPromptTemplate.from_template("""
+        你是一个资深技术面试官，请基于面试对话历史，提取关键的技术点并生成用于前端展示的技术点卡片数据。
+
+        岗位：{position}
+        面试对话历史：
+        {conversation_history}
+
+        请按照以下要求提取和生成技术点卡片：
+        1. 从对话历史中提取所有涉及的技术点（如编程语言、框架、工具、概念等）
+        2. 将技术点分为两类：
+           - 已掌握的技术点（候选人表现出较好理解的部分）
+           - 待提升的技术点（候选人理解不足或需要加强的部分）
+        3. 为每个技术点生成简要描述和详细解析
+        4. 评估每个技术点的相关度（0.0-1.0，基于对话中提及的频率和深度）
+
+        输出严格的JSON格式：
+        {{
+            "technical_cards": [
+                {{
+                    "id": 1,
+                    "title": "技术点名称",
+                    "type": "mastered" 或 "needs_improvement",
+                    "brief_description": "简短描述（1-2句话）",
+                    "detailed_explanation": "详细解析（3-5句话，包含：定义、重要性、候选人表现、学习建议）",
+                    "relevance_score": 0.0-1.0,
+                    "category": "技术类别（如：后端开发、前端开发、数据库等）"
+                }}
+            ],
+            "technical_summary": {{
+                "total_cards": 总数,
+                "mastered_count": 已掌握数量,
+                "needs_improvement_count": 待提升数量,
+                "primary_technology": "主要技术栈"
+            }}
+        }}
+
+        注意：
+        1. 技术点数量控制在8-15个之间
+        2. 确保技术点具体明确，避免过于宽泛
+        3. 详细解析要实用，能帮助候选人理解该技术点
+        """)
+
     def initialize_database(self, collection_name: str):
         """初始化数据库连接"""
         if self.collection_name != collection_name:
@@ -514,6 +557,51 @@ class RAGService:
 
         return evaluation
 
+    async def generate_technical_cards(self, position: str, conversation_history: List[Dict]) -> dict:
+        """生成技术点卡片数据，用于前端展示"""
+        # 构建对话历史文本
+        full_history = "\n".join([
+            f"第{qa.get('round', i+1)}轮 - 主题：{qa.get('topic', '未知')}\n"
+            f"问：{qa.get('question', '')}\n"
+            f"答：{qa.get('answer', '')}"
+            for i, qa in enumerate(conversation_history)
+        ])
+
+        chain = self.technical_cards_prompt | DeepSeek_LLM | StrOutputParser()
+        result = await chain.ainvoke({
+            "position": position,
+            "conversation_history": full_history
+        })
+
+        # 解析JSON结果
+        try:
+            json_match = re.search(r'\{.*\}', result, re.DOTALL)
+            if json_match:
+                technical_data = json.loads(json_match.group())
+            else:
+                technical_data = {
+                    "technical_cards": [],
+                    "technical_summary": {
+                        "total_cards": 0,
+                        "mastered_count": 0,
+                        "needs_improvement_count": 0,
+                        "primary_technology": "未知"
+                    }
+                }
+        except Exception as e:
+            print(f"解析技术点卡片数据失败: {e}, 原始结果: {result[:200]}")
+            technical_data = {
+                "technical_cards": [],
+                "technical_summary": {
+                    "total_cards": 0,
+                    "mastered_count": 0,
+                    "needs_improvement_count": 0,
+                    "primary_technology": "未知"
+                }
+            }
+
+        return technical_data
+
     async def generate_comprehensive_evaluation(
         self, 
         position: str,
@@ -602,6 +690,22 @@ class RAGService:
         raw_tech_comp = float(llm_evaluation.get("technical_competency", avg_technical))
         technical_competency = raw_tech_comp / 10.0 if raw_tech_comp > 10 else raw_tech_comp
 
+        # 生成技术点卡片数据
+        technical_cards_data = {}
+        try:
+            technical_cards_data = await self.generate_technical_cards(position, conversation_history)
+        except Exception as e:
+            print(f"生成技术点卡片数据失败: {e}")
+            technical_cards_data = {
+                "technical_cards": [],
+                "technical_summary": {
+                    "total_cards": 0,
+                    "mastered_count": 0,
+                    "needs_improvement_count": 0,
+                    "primary_technology": "未知"
+                }
+            }
+
         comprehensive_result = {
             "overall_score": round(overall_score, 1),
             "technical_competency": round(technical_competency, 1),
@@ -621,9 +725,17 @@ class RAGService:
             "confidence_level": llm_evaluation.get("confidence_level", "中"),
             "round_evaluations": llm_evaluation.get("round_evaluations", []),
             "total_rounds": total_rounds,
-            "duration_minutes": round(duration_minutes, 1)
+            "duration_minutes": round(duration_minutes, 1),
+            # 合并技术点卡片数据
+            "technical_cards": technical_cards_data.get("technical_cards", []),
+            "technical_summary": technical_cards_data.get("technical_summary", {
+                "total_cards": 0,
+                "mastered_count": 0,
+                "needs_improvement_count": 0,
+                "primary_technology": "未知"
+            })
         }
-        
+
         return comprehensive_result
 
     async def match_resume_to_collection(self, resume_text: str) -> str:
