@@ -18,10 +18,12 @@ public class AvatarUtil {
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "bmp");
     
     // 头像存储目录
-    private static final String AVATAR_DIR = "D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/";
+    private static final String AVATAR_DIR = System.getProperty("os.name").toLowerCase().contains("win")
+            ? "D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/"
+            : "/app/resources/Assets/";
     
     // 默认头像路径
-    private static final String DEFAULT_AVATAR_PATH = "D:/a05-workhouse/Springboot-backend/src/main/resources/Assets/avatar_default.webp";
+    private static final String DEFAULT_AVATAR_PATH = AVATAR_DIR + "avatar_default.webp";
     
     // 头像访问 URL 前缀
     private static final String AVATAR_URL_PREFIX = "/assets/";
@@ -74,73 +76,44 @@ public class AvatarUtil {
      * @throws IOException IO 异常
      */
     public static String convertAndSave(BufferedImage image, String filename) throws IOException {
-        // 确保目录存在
         File dir = new File(AVATAR_DIR);
         if (!dir.exists()) {
-            boolean created = dir.mkdirs();
-            if (!created) {
-                throw new IOException("无法创建头像存储目录: " + AVATAR_DIR);
-            }
+            dir.mkdirs();
         }
-        
-        // 先保存为临时 PNG 文件
+
         File tempPng = new File(AVATAR_DIR + "temp_" + filename.replace(".webp", ".png"));
-        boolean pngSuccess = ImageIO.write(image, "png", tempPng);
-        
-        if (!pngSuccess) {
-            throw new IOException("临时 PNG 文件创建失败");
-        }
-        
-        // 使用 cwebp 命令行转换为 WebP
-        // 使用 cwebp 命令行转换为 WebP
-        // 使用 cwebp.exe 让底层准确识别，并规避 Windows cmd /c 的转义/引号陷阱
+        ImageIO.write(image, "png", tempPng);
+
         File outputFile = new File(AVATAR_DIR + filename);
-        // 使用绝对路径，彻底规避因 IDE 或子进程环境变量没有刷新导致的 CreateProcess error=2 找不到指定文件问题
+
+        // 【修改点 2】动态识别 cwebp 路径
+        String cwebpPath = System.getProperty("os.name").toLowerCase().contains("win")
+                ? "D:/webp/bin/cwebp.exe"
+                : "cwebp"; // Linux 下直接使用命令名
+
         String[] command = {
-            "D:/webp/bin/cwebp.exe",
-            "-q", "80",  // 质量 80%
-            tempPng.getAbsolutePath(),
-            "-o", outputFile.getAbsolutePath()
+                cwebpPath,
+                "-q", "80",
+                tempPng.getAbsolutePath(),
+                "-o", outputFile.getAbsolutePath()
         };
-        
+
         try {
-            Process process = new ProcessBuilder(command)
-                .redirectErrorStream(true)
-                .start();
-            
-            // 读取 cwebp 执行的日志或者错误信息
-            StringBuilder outputMsg = new StringBuilder();
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    outputMsg.append(line).append("\n");
-                }
-            }
-            
+            Process process = new ProcessBuilder(command).start();
             int exitCode = process.waitFor();
-            
-            // 删除临时 PNG 文件
             tempPng.delete();
-            
+
             if (exitCode != 0) {
-                throw new IOException("cwebp 转换失败，退出码: " + exitCode + "，详情错误: " + outputMsg.toString());
+                throw new IOException("cwebp 转换失败，退出码: " + exitCode);
             }
-            
-            if (!outputFile.exists() || outputFile.length() == 0) {
-                throw new IOException("WebP 文件生成失败");
-            }
-            
-            System.out.println("[头像上传] ✅ 使用 cwebp 成功转换为 WebP 格式");
             return outputFile.getAbsolutePath();
-            
         } catch (InterruptedException e) {
-            // 如果 cwebp 不可用，回退到保存为 PNG
             tempPng.delete();
             Thread.currentThread().interrupt();
             throw new IOException("WebP 转换被中断");
         }
     }
-    
+
     /**
      * 读取图片文件
      * @param file 文件对象

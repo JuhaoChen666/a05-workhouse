@@ -11,12 +11,16 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-    
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 配置头像资源访问路径
-        // 访问 /assets/** 时，映射到本地的 Assets 目录
+        String avatarDir = AvatarUtil.getAvatarDir();
+        // 确保路径以 / 结尾
+        if (!avatarDir.endsWith("/")) {
+            avatarDir += "/";
+        }
+
         registry.addResourceHandler("/assets/**")
-                .addResourceLocations("file:" + AvatarUtil.getAvatarDir());
+                .addResourceLocations("file:" + avatarDir);
     }
 }
