@@ -6,49 +6,45 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 try:
-    from faster_whisper import WhisperModel
+    from funasr import AutoModel
 except ImportError:
-    pass
-
-try:
-    from modelscope.pipelines import pipeline
-    from modelscope.utils.constant import Tasks
-except ImportError:
-    pass
+    AutoModel = None
 
 from app.llm.deepseek import DeepSeek_LLM
 
 
 class VoiceRAGService:
-    """语音输入的 RAG 核心服务类"""
+    """语音输入的 RAG 核心服务类 (使用 SenseVoiceSmall 实现 ASR 和情感分析)"""
 
-    def __init__(self, model_size: str = "medium", device: str = "cpu", compute_type: str = "int8"):
+    def __init__(self, device: str = "cpu"):
         """初始化语音服务"""
-        # 初始化情感分析模型 (Emotion2Vec)
-        print("正在加载 emotion2vec_plus_large 模型...")
-        self.emotion_pipeline = pipeline(
-            task=Tasks.emotion_recognition,
-            model="iic/emotion2vec_plus_large"
-        )
-        
-        # 初始化语音识别模型 (Faster-Whisper)
-        print(f"正在加载 Whisper {model_size} 模型...")
-        self.asr_model = WhisperModel(model_size, device=device, compute_type=compute_type)
-        
+        if AutoModel is None:
+            print("警告: 未安装 funasr，语音服务将无法正常工作。")
+            self.model = None
+        else:
+            print("正在加载 SenseVoiceSmall 模型...")
+            # SenseVoiceSmall 同时也包含了 ASR 和 情感分析能力
+            self.model = AutoModel(
+                model="iic/SenseVoiceSmall",
+                trust_remote_code=True,
+                device=device,
+                disable_update=True
+            )
+
         self._initialize_prompts()
 
     def _initialize_prompts(self):
         """初始化语音相关的提示模板"""
-        
+
         # 语音回答分析器
         self.voice_answer_analyzer_prompt = ChatPromptTemplate.from_template("""
         你是一个专业的面试官，正在与候选人进行语音面试。
         你现在收到了候选人的语音回答文本，以及从语音中分析出的情感特征字典。
 
-        候选人回答内容（ASR转写文本）: 
+        候选人回答内容（ASR转写文本）:
         {asr_text}
 
-        候选人语音情感分析结果（Emotion2Vec提供的情感得分字典）: 
+        候选人语音情感分析结果:
         {emotion_dict}
 
         请根据候选人的回答内容，结合其在回答时的情感状态（如紧张、自信、犹豫等），给出你的综合判断，并决定下一步是深入追问还是进入下一个话题。
@@ -66,62 +62,108 @@ class VoiceRAGService:
         }}
         """)
 
-    def analyze_emotion(self, audio_path: str) -> list:
-        """调用 Emotion2Vec 进行情感分析"""
-        print(f"开始进行情感分析: {audio_path}")
-        rec_result = self.emotion_pipeline(audio_path, granularity="utterance")
-        return rec_result
-
-    def transcribe_audio(self, audio_path: str) -> str:
-        """调用 Faster-Whisper 进行语音转文字"""
-        print(f"开始进行语音识别: {audio_path}")
-        segments, info = self.asr_model.transcribe(audio_path, beam_size=5, language="zh")
+    def _parse_sense_voice_result(self, res: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """解析 SenseVoiceSmall 的输出结果，分离标签和文本"""
+        if not res:
+            return {"asr_text": "", "emotions": []}
         
         full_text = ""
-        for segment in segments:
-            full_text += segment.text + " "
+        emotions = set()
+        
+        # SenseVoice 的已知非情感标签
+        known_non_emotion_tags = {
+            'zh', 'en', 'yue', 'ja', 'ko', 'nospeech', 
+            'Speech', 'withitn', 'itn', 'woitn',
+            'BGM', 'Applause', 'Laughter', 'Cry'
+        }
+        
+        for item in res:
+            text_with_tags = item.get("text", "")
+            # 提取标签，例如 <|zh|><|HAPPY|><|Speech|><|withitn|>
+            tags = re.findall(r'<\|(.*?)\|>', text_with_tags)
             
-        return full_text.strip()
+            for tag in tags:
+                # 将全大写且不在非情感列表中的标签视为情感标签
+                if tag.isupper() and tag not in known_non_emotion_tags:
+                    emotions.add(tag)
+                # 可选：将某些特定的事件也视为情感表现
+                if tag in ['Applause', 'Laughter', 'Cry']:
+                    emotions.add(tag)
+            
+            # 移除所有标签得到纯文本
+            clean_text = re.sub(r'<\|.*?\|>', '', text_with_tags)
+            full_text += clean_text
+            
+        return {
+            "asr_text": full_text.strip(),
+            "emotions": list(emotions)
+        }
 
-    def _convert_to_json_serializable(self, obj):
-        """将对象转换为 JSON 可序列化的格式 (处理 numpy.ndarray 等)"""
-        try:
-            import numpy as np
-        except ImportError:
-            return obj
+    def analyze_emotion(self, audio_path: str) -> list:
+        """调用模型进行情感分析 (为了保持向下兼容)"""
+        if not self.model: return []
+        res = self.model.generate(
+            input=audio_path,
+            cache={},
+            language="auto",
+            use_itn=True,
+            ban_emo_unk=False,
+            batch_size=64
+        )
+        parsed = self._parse_sense_voice_result(res)
+        return [{"label": emo, "score": 1.0} for emo in parsed["emotions"]]
 
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, dict):
-            return {k: self._convert_to_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._convert_to_json_serializable(v) for v in obj]
-        elif isinstance(obj, (np.int64, np.int32, np.int16)):
-            return int(obj)
-        elif isinstance(obj, (np.float64, np.float32, np.float16)):
-            return float(obj)
-        return obj
+    def transcribe_audio(self, audio_path: str) -> str:
+        """调用模型进行语音转文字 (为了保持向下兼容)"""
+        if not self.model: return ""
+        res = self.model.generate(
+            input=audio_path,
+            cache={},
+            language="auto",
+            use_itn=True,
+            ban_emo_unk=False,
+            batch_size=64
+        )
+        parsed = self._parse_sense_voice_result(res)
+        return parsed["asr_text"]
 
     async def process_voice_input(self, audio_path: str) -> dict:
-        """处理完整的语音输入流程"""
+        """处理完整的语音输入流程 (ASR + 情感分析 + LLM 评价)"""
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"未找到音频文件: {audio_path}")
-            
-        # 1. 调用emotion2vec模型做情感分析
-        raw_emotion_result = self.analyze_emotion(audio_path)
-        # 确保情感结果是 JSON 可序列化的 (处理可能存在的 ndarray)
-        emotion_result = self._convert_to_json_serializable(raw_emotion_result)
+
+        if not self.model:
+            return {
+                "asr_text": "语音模型未加载",
+                "emotion_features": [],
+                "llm_analysis": {"feedback_to_candidate": "服务暂不可用"}
+            }
+
+        # 1. 调用 SenseVoiceSmall 模型一键完成 ASR 和情感分析
+        res = self.model.generate(
+            input=audio_path,
+            cache={},
+            language="auto",
+            use_itn=True,
+            ban_emo_unk=False,
+            batch_size=64
+        )
         
-        # 2. 调用ASR来把wav转成文字
-        asr_text = self.transcribe_audio(audio_path)
+        parsed_result = self._parse_sense_voice_result(res)
+        asr_text = parsed_result["asr_text"]
+        emotion_result = [{"label": emo, "score": 1.0} for emo in parsed_result["emotions"]]
         
-        # 3. 将文字 + 情感字典 全部传给同用的LLM
+        # 如果没有检测到明显情感，默认设为 NEUTRAL
+        if not emotion_result:
+            emotion_result = [{"label": "NEUTRAL", "score": 1.0}]
+
+        # 2. 将文字 + 情感字典 全部传给 LLM 进行初步分析
         chain = self.voice_answer_analyzer_prompt | DeepSeek_LLM | StrOutputParser()
         result = await chain.ainvoke({
             "asr_text": asr_text,
             "emotion_dict": json.dumps(emotion_result, ensure_ascii=False)
         })
-        
+
         # 解析返回的 JSON
         try:
             json_match = re.search(r'\{.*\}', result, re.DOTALL)
@@ -139,7 +181,7 @@ class VoiceRAGService:
                 "content_evaluation": "无法解析返回结果",
                 "feedback_to_candidate": result
             }
-            
+
         return {
             "asr_text": asr_text,
             "emotion_features": emotion_result,
