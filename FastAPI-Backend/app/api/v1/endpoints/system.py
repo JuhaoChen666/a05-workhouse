@@ -7,7 +7,6 @@ from fastapi import APIRouter, status
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.llm.deepseek import get_deepseek_provider
-from app.llm.modelscope import get_modelscope_provider
 from app.models.schemas.common import DataResponse, HealthCheck
 
 logger = get_logger(__name__)
@@ -27,14 +26,6 @@ async def health_check() -> DataResponse[HealthCheck]:
     except Exception as e:
         logger.warning("DeepSeek health check failed", error=str(e))
         components["deepseek"] = "unhealthy"
-
-    # Check ModelScope (just check if provider is initialized)
-    try:
-        get_modelscope_provider()
-        components["modelscope"] = "healthy"
-    except Exception as e:
-        logger.warning("ModelScope health check failed", error=str(e))
-        components["modelscope"] = "unhealthy"
 
     # Overall status
     overall_status = "healthy" if all(
