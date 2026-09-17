@@ -342,7 +342,11 @@ def test_migration_roundtrip_preserves_legacy_schema_and_rows(mysql_schema):
             assert connection.scalar(text("SELECT content_text FROM resumes WHERE id=1")) == "original"
             assert connection.scalar(text("SELECT optimized_text FROM resume_optimizations WHERE session_id='old'")) == "# Legacy"
         migrate(mysql_schema)
-        assert len(inspect(engine).get_table_names()) == 7
+        assert set(inspect(engine).get_table_names()) == {
+            "resumes", "resume_optimizations", "resume_phase1_alembic_version",
+            "experience_items", "resume_templates", "resume_generation_jobs", "resume_documents",
+            "experience_import_batches", "experience_import_drafts",
+        }
         assert [(c["name"], str(c["type"])) for c in old_columns] == [(c["name"], str(c["type"])) for c in inspect(engine).get_columns("resumes")]
     finally:
         engine.dispose()
