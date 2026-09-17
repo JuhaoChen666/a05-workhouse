@@ -1,0 +1,153 @@
+% !TEX program = xelatex
+\documentclass[10pt,a4paper]{article}
+
+\usepackage{xeCJK}
+\usepackage{geometry}
+\geometry{left=1.4cm,right=1.4cm,top=1.2cm,bottom=1.2cm}
+\usepackage{xcolor}
+\usepackage{fontawesome5}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{tikz}
+
+% 商务科技蓝主色调
+\definecolor{primary}{RGB}{28, 78, 156}
+\definecolor{subtext}{RGB}{80, 80, 80}
+\definecolor{linecolor}{RGB}{200, 200, 200}
+
+% 跨平台中文字体自适应回退策略
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKmainfont{Noto Sans CJK SC}
+}{
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmainfont{PingFang SC}
+  }{
+    \IfFontExistsTF{Microsoft YaHei}{
+      \setCJKmainfont{Microsoft YaHei}
+    }{
+      \setCJKmainfont{SimSun}
+    }
+  }
+}
+
+\pagestyle{empty}
+
+% 节标题格式化：带主题色下划线
+\titleformat{\section}
+  {\Large\bfseries\color{primary}}
+  {}
+  {0em}
+  {}
+  [{\color{primary}\titlerule[1pt]}]
+
+\titlespacing*{\section}{0pt}{1.2ex plus .2ex minus .2ex}{0.8ex plus .1ex}
+
+% 列表紧凑格式
+\setlist[itemize]{leftmargin=1.5em, itemsep=0.15ex, topsep=0.2ex, parsep=0ex}
+
+\newcommand{\dateditem}[2]{
+  \noindent \textbf{ #1 } \hfill \textcolor{subtext}{ #2 } \par
+}
+
+\newcommand{\subitemdetail}[2]{
+  \noindent \textit{ #1 } \hfill \textcolor{subtext}{ #2 } \par
+}
+
+\begin{document}
+
+{% if options.show_avatar and basic_info.avatar_path %}
+% 证件照插槽：TikZ 悬浮定位于右上角
+\begin{tikzpicture}[remember picture, overlay]
+  \node[anchor=north east, xshift=-1.4cm, yshift=-1.2cm] at (current page.north east) {
+    \includegraphics[height=2.7cm]{ {{ basic_info.avatar_path }} }
+  };
+\end{tikzpicture}
+{% endif %}
+
+% ==================== 顶部信息栏 ====================
+\begin{center}
+  {\LARGE \textbf{\color{primary} {{ basic_info.name | latex_escape }} }} \\
+  \vspace{0.4ex}
+  {% if basic_info.title %}
+  {\small \textbf{意向岗位}: {{ basic_info.title | latex_escape }} } \\
+  \vspace{0.4ex}
+  {% endif %}
+  {\footnotesize
+    \faPhone\ {{ basic_info.phone | latex_escape }} \quad
+    {% if basic_info.email %}\faEnvelope\ \href{mailto:{{ basic_info.email }}}{ {{ basic_info.email | latex_escape }} } \quad {% endif %}
+    {% if basic_info.github %}\faGithub\ \href{https://github.com/{{ basic_info.github }}}{ {{ basic_info.github | latex_escape }} } \quad {% endif %}
+    {% if basic_info.city %}\faMapMarker*\ {{ basic_info.city | latex_escape }}{% endif %}
+  }
+\end{center}
+
+% ==================== 专业技能 ====================
+{% if skills %}
+\section{\faCogs\ 专业技能}
+\begin{itemize}
+  {% for s in skills %}
+  \item \textbf{ {{ s.category | latex_escape }} }: {{ (s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else s.items)) | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+
+% ==================== 工作与实习经历 ====================
+{% if work %}
+\section{\faBriefcase\ 工作与实习经历}
+{% for item in work %}
+  \dateditem{ {{ item.company | latex_escape }} \quad \textbar \quad {{ item.role | latex_escape }} }{ {{ item.date_range | latex_escape }} }
+  {% if item.bullets %}
+  \begin{itemize}
+    {% for b in item.bullets %}
+    \item {{ b | latex_escape }}
+    {% endfor %}
+  \end{itemize}
+  {% endif %}
+  \vspace{0.4ex}
+{% endfor %}
+{% endif %}
+
+% ==================== 核心项目经历 ====================
+{% if projects %}
+\section{\faProjectDiagram\ 核心项目经历}
+{% for proj in projects %}
+  \dateditem{ {{ proj.title | latex_escape }} \quad \textbar \quad \textbf{角色}: {{ proj.role | latex_escape }} }{ {{ proj.date_range | latex_escape }} }
+  {% if proj.tech_stack %}
+  \noindent \textcolor{subtext}{\footnotesize \textbf{技术栈}: {{ proj.tech_stack | latex_escape }} {% if proj.project_url %} \hfill \href{ {{ proj.project_url }} }{[项目链接]} {% endif %}} \par
+  {% endif %}
+  {% if proj.bullets %}
+  \begin{itemize}
+    {% for b in proj.bullets %}
+    \item {{ b | latex_escape }}
+    {% endfor %}
+  \end{itemize}
+  {% endif %}
+  \vspace{0.4ex}
+{% endfor %}
+{% endif %}
+
+% ==================== 教育背景 ====================
+{% if education %}
+\section{\faGraduationCap\ 教育背景}
+{% for edu in education %}
+  \dateditem{ {{ edu.school | latex_escape }} \quad ({{ edu.degree | latex_escape }}) \quad \textbf{专业}: {{ edu.major | latex_escape }} }{ {{ edu.date_range | latex_escape }} }
+{% endfor %}
+{% endif %}
+
+% ==================== 竞赛与获奖荣誉 ====================
+{% if competitions %}
+\section{\faTrophy\ 竞赛获奖与荣誉}
+{% for comp in competitions %}
+  \dateditem{ {{ comp.title | latex_escape }} \quad \textbf{ {{ comp.award_level | latex_escape }} } }{ {{ comp.award_date | latex_escape }} }
+{% endfor %}
+{% endif %}
+
+% ==================== 资质证书 ====================
+{% if certificates %}
+\section{\faCertificate\ 资质证书与知识产权}
+{% for cert in certificates %}
+  \dateditem{ {{ cert.title | latex_escape }} \quad {% if cert.category %}({{ cert.category | latex_escape }}){% endif %} }{ {{ cert.issue_date | latex_escape }} }
+{% endfor %}
+{% endif %}
+
+\end{document}

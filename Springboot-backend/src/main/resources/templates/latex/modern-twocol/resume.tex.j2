@@ -34,7 +34,7 @@
   }
 }
 
-\newcommand{\sectiontitle}[1]{%
+\newcommand{\sectiontitle}[1]{
   \vspace{0.8ex}%
   {\large\bfseries #1}%
   \par\vspace{0.2ex}\hrule height 0.6pt\vspace{0.6ex}%
@@ -82,7 +82,7 @@
 \sectiontitle{技术技能}
 {% for s in skills %}
 \textbf{ {{ s.category | latex_escape }} } \\
-{\footnotesize {{ s.items | latex_escape }} } \\
+{\footnotesize {{ (s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else s.items)) | latex_escape }} } \\
 \vspace{0.4ex}
 {% endfor %}
 {% endif %}

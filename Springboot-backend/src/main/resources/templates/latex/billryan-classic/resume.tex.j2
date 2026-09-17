@@ -114,7 +114,7 @@
 \section{\faCogs\ 专业技能}
 \begin{itemize}
   {% for s in skills %}
-  \item \textbf{ {{ s.category | latex_escape }} }: {{ s.items | latex_escape }}
+  \item \textbf{ {{ s.category | latex_escape }} }: {{ (s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else s.items)) | latex_escape }}
   {% endfor %}
 \end{itemize}
 {% endif %}

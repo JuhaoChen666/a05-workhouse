@@ -14,14 +14,31 @@ Springboot-backend/src/main/resources/templates/latex/
 ### 目录层级结构
 ```
 Springboot-backend/src/main/resources/templates/latex/
-├── billryan-classic/                       # 模板 1: 中文经典单栏模板
+├── billryan-classic/                       # 模板 1: 中文经典单栏模板 (IT研发)
 │   ├── template.json                       # 模板元数据清单与占位符协议
 │   ├── resume.cls                          # LaTeX 文档类定制文件
 │   └── resume.tex.j2                       # Jinja2 参数化 LaTeX 模板源码
 │
-└── modern-twocol/                          # 模板 2: 现代两栏高信息密度模板
+├── modern-twocol/                          # 模板 2: 现代两栏高信息密度模板
+│   ├── template.json                       # 模板元数据清单与占位符协议
+│   └── resume.tex.j2                       # Jinja2 参数化两栏 LaTeX 源码
+│
+├── jakes-resume/                           # 模板 3: Jake's Resume 极简 ATS 单栏
+│   ├── template.json                       # 模板元数据清单与占位符协议
+│   └── resume.tex.j2                       # Jinja2 参数化单栏 ATS 源码
+│
+├── huajh-resume/                           # 模板 4: 大厂技术求职精简单页
+│   ├── template.json                       # 模板元数据清单与占位符协议
+│   └── resume.tex.j2                       # Jinja2 参数化国内大厂单页源码
+│
+├── altacv/                                 # 模板 5: AltaCV 现代非对称双栏 (技能胶囊)
+│   ├── template.json                       # 模板元数据清单与占位符协议
+│   ├── altacv.cls                          # AltaCV 文档类定义
+│   └── resume.tex.j2                       # Jinja2 参数化非对称两栏源码
+│
+└── zheyuye-chinese/                        # 模板 6: zheyuye 极简中文单栏 (零依赖)
     ├── template.json                       # 模板元数据清单与占位符协议
-    └── resume.tex.j2                       # Jinja2 参数化两栏 LaTeX 源码
+    └── resume.tex.j2                       # Jinja2 参数化轻量源码
 ```
 
 ---
