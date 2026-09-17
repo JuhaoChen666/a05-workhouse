@@ -195,7 +195,11 @@ class ExperienceImportService:
             self.require_editable(batch)
             if not batch.source_asset:
                 raise ExperienceError("PDF_SOURCE_UNAVAILABLE", "Import source unavailable", 409)
-            self.store.read(self.owner, batch.source_asset)
+            try:
+                self.store.read(self.owner, batch.source_asset)
+            except (OSError, ValueError):
+                # Stored metadata and bytes are server-managed, not invalid user input.
+                raise ExperienceError("PDF_SOURCE_UNAVAILABLE", "Import source unavailable", 409) from None
             inputs, errors = [], []
             for entry in selected:
                 draft = await self.owned_draft(id_, entry["id"])

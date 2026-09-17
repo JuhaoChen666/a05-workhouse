@@ -91,3 +91,13 @@ python -m alembic -c alembic.ini current
 本轮没有 push、创建 PR、合并/自动合并或部署。新分支创建时跟踪 origin/master；后续推送需显式指向经用户授权的参与者 fork，不能直接 push origin 或绕过原仓库权限。提交使用 Refs #1；将来 PR 使用 Part of #1。
 
 已建立本地阶段提交：5334893（认证/五类 API）和 aad9703（PDF 持久草稿/原子确认/来源保护）。测试与文档提交随后建立，完整日志以 git log 为准。
+
+## Review 后发布前补充验证
+
+2026-09-17：纳入 review 后的来源校验修复：确认时源 PDF 摘要、大小、文件或元数据不可用，统一返回 `409 / PDF_SOURCE_UNAVAILABLE`，不创建正式经历、不改变 READY 草稿或回执；恢复来源后可重新确认。新增 5 项实际文件/ASGI 回归与 3 项真实 MySQL 待执行回归。
+
+修复 MySQL 测试夹具的管理员连接：使用 URL._replace 显式清除输入数据库，避免 URL.set(database=None) 保留原库；新增 2 项不访问数据库的连接参数回归。
+
+发布前全套回归：**91 passed、55 skipped、2.11s**；其中 P1/MySQL 31 项与 P2/MySQL 24 项仍因缺少显式测试连接跳过。首次沙箱运行因测试临时目录访问受限失败，经审批使用新生成的项目专用临时目录重跑后通过。以上结果取代前述 84 passed/52 skipped 的本地交付时点结果；真实 MySQL 与真实外部 AI 验收仍待执行。
+
+用户已授权推送参与者 fork 并发布 PR；前述“没有 push、创建 PR”仅描述原始本地交付时点。最终外部操作状态以 PR 和 Git 远程实际结果为准，不合并、不启用自动合并、不部署。

@@ -226,6 +226,38 @@ async def test_concurrent_confirmation_creates_once(api):
         assert (await http.get("/api/experiences")).json()["total"] == 1
 
 
+@pytest.mark.parametrize("failure", ["digest", "size", "missing"])
+async def test_confirm_source_failure_preserves_ready_batch_and_allows_retry(
+    api, sessions, private_store, failure
+):
+    async with client(api) as http:
+        batch = await upload(http)
+        async with sessions() as session, session.begin():
+            stored = await session.get(Batch, batch["id"])
+            asset = deepcopy(stored.source_asset)
+        path = private_store.path(71, asset["key"])
+        original = private_store.read(71, asset)
+        if failure == "digest":
+            path.write_bytes(b"x" + original[1:])
+        elif failure == "size":
+            path.write_bytes(original[:-1])
+        else:
+            path.unlink()  # Only this test upload's freshly generated source.
+        selection = {"items": [{"id": batch["items"][0]["id"], "expected_revision": 1}]}
+        response = await http.post(f"/api/experience-imports/{batch['id']}/confirm", json=selection)
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["code"] == "PDF_SOURCE_UNAVAILABLE"
+        assert (await http.get("/api/experiences")).json()["total"] == 0
+        saved = (await http.get(f"/api/experience-imports/{batch['id']}")).json()
+        assert saved["status"] == "READY" and saved["confirmation_result"] is None
+        assert saved["items"] == batch["items"]
+        # Restore only this fixture's bytes, then prove the unchanged draft can confirm.
+        path.write_bytes(original)
+        response = await http.post(f"/api/experience-imports/{batch['id']}/confirm", json=selection)
+        assert response.status_code == 200, response.text
+        assert (await http.get("/api/experiences")).json()["total"] == 1
+
+
 async def test_confirmation_database_failure_rolls_back_whole_batch(api, sessions):
     async with client(api) as http:
         batch = await upload(http)
