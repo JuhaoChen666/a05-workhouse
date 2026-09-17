@@ -1,0 +1,78 @@
+{
+  "id": "tpl-jakes-resume",
+  "name": "Jake's Resume 极简 ATS 单栏模板",
+  "version": "1.0.0",
+  "description": "全球最流行的单栏 ATS 友好简历模板，排版严谨紧凑、无外部复杂类库依赖，专为技术岗求职与外企/大厂面试优化。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [1, 2],
+  "supports_avatar": true,
+  "default_avatar_style": "tikz_overlay_top_right",
+  "entry_file": "resume.tex.j2",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "work",
+    "projects",
+    "skills",
+    "competitions",
+    "certificates"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "competitions": [
+      {
+        "title": "string",
+        "award_level": "string",
+        "award_date": "string",
+        "organization": "string"
+      }
+    ],
+    "certificates": [
+      {
+        "title": "string",
+        "authority": "string",
+        "issue_date": "string",
+        "certificate_no": "string"
+      }
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+% !TEX program = xelatex
+\documentclass[10pt,a4paper]{article}
+\usepackage{xeCJK}
+\usepackage{graphicx}
+\usepackage{paracol}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{fontawesome}
+\usepackage{enumitem}
+
+\geometry{
+  left=0.5in,
+  right=0.5in,
+  top=0.5in,
+  bottom=0.5in
+}
+
+\setlength{\parindent}{0pt}
+\hypersetup{hidelinks}
+\setlist{noitemsep, topsep=0.15em, leftmargin=1em}
+
+% 跨平台中文字体自适应回退策略
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKmainfont{Noto Sans CJK SC}
+}{
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmainfont{PingFang SC}
+  }{
+    \IfFontExistsTF{Microsoft YaHei}{
+      \setCJKmainfont{Microsoft YaHei}
+    }{
+      \setCJKmainfont{SimSun}
+    }
+  }
+}
+
+\newcommand{\sectiontitle}[1]{
+  \vspace{0.8ex}%
+  {\large\bfseries #1}%
+  \par\vspace{0.2ex}\hrule height 0.6pt\vspace{0.6ex}%
+}
+
+\begin{document}
+\pagenumbering{gobble}
+
+% 顶部大标题
+\begin{center}
+  {\LARGE \textbf{ {{ basic_info.name | latex_escape }} }} \quad
+  {% if basic_info.title %}{\large \textit{ {{ basic_info.title | latex_escape }} }}{% endif %} \\
+  \vspace{0.4ex}
+  {\small
+    \faPhone\ {{ basic_info.phone | latex_escape }} \quad
+    {% if basic_info.email %}\faEnvelope\ {{ basic_info.email | latex_escape }} \quad{% endif %}
+    {% if basic_info.github %}\faGithub\ {{ basic_info.github | latex_escape }}{% endif %}
+  }
+\end{center}
+\vspace{0.5ex}
+
+% 设置两栏比例 (左栏 30%, 间隙 4%, 右栏 66%)
+\setcolumnwidth{0.30\textwidth, 0.66\textwidth}
+\setlength{\columnsep}{0.04\textwidth}
+
+\begin{paracol}{2}
+
+% ==================== 左栏 (侧边栏) ====================
+{% if options.show_avatar and basic_info.avatar_path %}
+\begin{center}
+  \includegraphics[width=0.75\linewidth]{ {{ basic_info.avatar_path }} }
+\end{center}
+\vspace{0.5ex}
+{% endif %}
+
+\sectiontitle{教育背景}
+{% for edu in education %}
+\textbf{ {{ edu.school | latex_escape }} } \\
+{\footnotesize {{ edu.major | latex_escape }} ({{ edu.degree | latex_escape }})} \\
+{\scriptsize \textit{ {{ edu.date_range | latex_escape }} }} \\
+\vspace{0.4ex}
+{% endfor %}
+
+{% if skills %}
+\sectiontitle{技术技能}
+{% for s in skills %}
+\textbf{ {{ s.category | latex_escape }} } \\
+{\footnotesize {{ (s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else s.items)) | latex_escape }} } \\
+\vspace{0.4ex}
+{% endfor %}
+{% endif %}
+
+{% if certificates %}
+\sectiontitle{资质证书}
+{% for cert in certificates %}
+{\footnotesize • {{ cert.title | latex_escape }} } \\
+{% endfor %}
+{% endif %}
+
+\switchcolumn
+
+% ==================== 右栏 (主内容) ====================
+{% if work %}
+\sectiontitle{工作与实习经历}
+{% for item in work %}
+\textbf{ {{ item.company | latex_escape }} } \hfill \textit{ {{ item.date_range | latex_escape }} } \\
+{\small \textbf{ {{ item.role | latex_escape }} }}
+{% if item.bullets %}
+\begin{itemize}
+  {% for b in item.bullets %}
+  \item {\small {{ b | latex_escape }} }
+  {% endfor %}
+\end{itemize}
+{% endif %}
+\vspace{0.5ex}
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+\sectiontitle{核心项目经历}
+{% for proj in projects %}
+\textbf{ {{ proj.title | latex_escape }} } \hfill \textit{ {{ proj.date_range | latex_escape }} } \\
+{\small \textit{角色: {{ proj.role | latex_escape }} {% if proj.tech_stack %}| 技术栈: {{ proj.tech_stack | latex_escape }}{% endif %}}}
+{% if proj.bullets %}
+\begin{itemize}
+  {% for b in proj.bullets %}
+  \item {\small {{ b | latex_escape }} }
+  {% endfor %}
+\end{itemize}
+{% endif %}
+\vspace{0.5ex}
+{% endfor %}
+{% endif %}
+
+{% if competitions %}
+\sectiontitle{竞赛荣誉}
+{% for comp in competitions %}
+\textbf{ {{ comp.title | latex_escape }} } \hfill \textit{ {{ comp.award_date | latex_escape }} } \\
+{\small {{ comp.award_level | latex_escape }} {% if comp.rank %}({{ comp.rank | latex_escape }}){% endif %} } \\
+\vspace{0.3ex}
+{% endfor %}
+{% endif %}
+
+\end{paracol}
+
+\end{document}

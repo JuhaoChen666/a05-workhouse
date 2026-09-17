@@ -7,6 +7,9 @@ target/
 
 # FastAPI Backend 项目忽略文件
 .env
+__pycache__/
+*.py[cod]
+*$py.class
 #Springboot Backend 项目忽略文件
 application.properties
 

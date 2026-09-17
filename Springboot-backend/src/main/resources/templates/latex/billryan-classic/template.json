@@ -1,0 +1,82 @@
+{
+  "id": "tpl-billryan-classic",
+  "name": "billryan-resume 中文经典单栏模板",
+  "version": "1.0.0",
+  "description": "专为国内技术研发岗位优化的单栏经典 LaTeX 模板，排版严谨工整，支持 TikZ 证件照右上角挂载，高度适合一页纸 ATS 解析。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [1],
+  "supports_avatar": true,
+  "default_avatar_style": "tikz_overlay_top_right",
+  "entry_file": "resume.tex.j2",
+  "cls_file": "resume.cls",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "work",
+    "projects",
+    "certificates",
+    "competitions",
+    "skills"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "department": "string",
+        "city": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "project_url": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "certificates": [
+      {
+        "title": "string",
+        "authority": "string",
+        "issue_date": "string",
+        "certificate_no": "string"
+      }
+    ],
+    "competitions": [
+      {
+        "title": "string",
+        "award_level": "string",
+        "award_date": "string",
+        "organization": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ]
+  }
+}

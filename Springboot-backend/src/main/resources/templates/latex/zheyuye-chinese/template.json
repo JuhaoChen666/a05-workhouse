@@ -1,0 +1,78 @@
+{
+  "id": "tpl-zheyuye-chinese",
+  "name": "zheyuye 中文通用极简单栏模板",
+  "version": "1.0.0",
+  "description": "零外部类库依赖（纯标准宏包）的中文单栏简历模板，排版轻巧、编译速度极快、字体兼容性最强，适合任何标准 XeLaTeX 容器环境。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [1, 2],
+  "supports_avatar": true,
+  "default_avatar_style": "tikz_overlay_top_right",
+  "entry_file": "resume.tex.j2",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "skills",
+    "work",
+    "projects",
+    "competitions",
+    "certificates"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "competitions": [
+      {
+        "title": "string",
+        "award_level": "string",
+        "award_date": "string",
+        "organization": "string"
+      }
+    ],
+    "certificates": [
+      {
+        "title": "string",
+        "authority": "string",
+        "issue_date": "string",
+        "certificate_no": "string"
+      }
+    ]
+  }
+}

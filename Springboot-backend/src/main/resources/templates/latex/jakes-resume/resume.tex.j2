@@ -1,0 +1,201 @@
+% !TEX program = xelatex
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{xeCJK}
+\usepackage{tikz}
+
+% 跨平台中文字体自适应回退策略
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKmainfont{Noto Sans CJK SC}
+}{
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmainfont{PingFang SC}
+  }{
+    \IfFontExistsTF{Microsoft YaHei}{
+      \setCJKmainfont{Microsoft YaHei}
+    }{
+      \setCJKmainfont{SimSun}
+    }
+  }
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% 页面边距微调
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% 节标题格式化 (带下划线)
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Jake's Resume 经典命令定义
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    { #1 \vspace{-2pt} }
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{ #1 } & #2 \\
+      \textit{\small #3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small #1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small #1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{ #1 }\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+{% if options.show_avatar and basic_info.avatar_path %}
+% 证件照插槽：TikZ 悬浮定位，不挤占 ATS 单栏排版结构
+\begin{tikzpicture}[remember picture, overlay]
+  \node[anchor=north east, xshift=-1.5cm, yshift=-1.2cm] at (current page.north east) {
+    \includegraphics[height=2.6cm]{ {{ basic_info.avatar_path }} }
+  };
+\end{tikzpicture}
+{% endif %}
+
+% ==================== 头部个人信息 ====================
+\begin{center}
+    \textbf{\Huge \scshape {{ basic_info.name | latex_escape }}} \\ \vspace{1pt}
+    {% if basic_info.title %}
+    \small \textit{ {{ basic_info.title | latex_escape }} } \\ \vspace{1pt}
+    {% endif %}
+    \small {{ basic_info.phone | latex_escape }} $|$ 
+    {% if basic_info.email %}\href{mailto:{{ basic_info.email }}}{\underline{ {{ basic_info.email | latex_escape }} }} $|$ {% endif %}
+    {% if basic_info.github %}\href{https://github.com/{{ basic_info.github }}}{\underline{github.com/{{ basic_info.github | latex_escape }} }} $|$ {% endif %}
+    {% if basic_info.city %}{{ basic_info.city | latex_escape }}{% endif %}
+\end{center}
+
+% ==================== 教育背景 ====================
+{% if education %}
+\section{教育背景}
+  \resumeSubHeadingListStart
+    {% for edu in education %}
+    \resumeSubheading
+      { {{ edu.school | latex_escape }} }{ {{ edu.date_range | latex_escape }} }
+      { {{ edu.degree | latex_escape }} - {{ edu.major | latex_escape }} }{ {% if edu.gpa %}GPA: {{ edu.gpa | latex_escape }}{% endif %} }
+    {% endfor %}
+  \resumeSubHeadingListEnd
+{% endif %}
+
+% ==================== 工作与实习经历 ====================
+{% if work %}
+\section{工作与实习经历}
+  \resumeSubHeadingListStart
+    {% for item in work %}
+    \resumeSubheading
+      { {{ item.company | latex_escape }} }{ {{ item.date_range | latex_escape }} }
+      { {{ item.role | latex_escape }} }{ {% if item.city %}{{ item.city | latex_escape }}{% endif %} }
+      {% if item.bullets %}
+      \resumeItemListStart
+        {% for b in item.bullets %}
+        \resumeItem{ {{ b | latex_escape }} }
+        {% endfor %}
+      \resumeItemListEnd
+      {% endif %}
+    {% endfor %}
+  \resumeSubHeadingListEnd
+{% endif %}
+
+% ==================== 核心项目经历 ====================
+{% if projects %}
+\section{核心项目经历}
+  \resumeSubHeadingListStart
+    {% for proj in projects %}
+    \resumeProjectHeading
+      {\textbf{ {{ proj.title | latex_escape }} } $|$ \emph{ {{ proj.role | latex_escape }} } {% if proj.tech_stack %}$|$ \footnotesize{ {{ proj.tech_stack | latex_escape }} }{% endif %}}{ {{ proj.date_range | latex_escape }} }
+      {% if proj.bullets %}
+      \resumeItemListStart
+        {% for b in proj.bullets %}
+        \resumeItem{ {{ b | latex_escape }} }
+        {% endfor %}
+      \resumeItemListEnd
+      {% endif %}
+    {% endfor %}
+  \resumeSubHeadingListEnd
+{% endif %}
+
+% ==================== 专业技能 ====================
+{% if skills %}
+\section{专业技能}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+      {% for s in skills %}
+      \textbf{ {{ s.category | latex_escape }} }{: {{ (s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else s.items)) | latex_escape }} } \\
+      {% endfor %}
+    }}
+ \end{itemize}
+{% endif %}
+
+% ==================== 比赛获奖与荣誉 ====================
+{% if competitions %}
+\section{比赛获奖与荣誉}
+  \resumeSubHeadingListStart
+    {% for comp in competitions %}
+    \resumeProjectHeading
+      {\textbf{ {{ comp.title | latex_escape }} } $|$ \emph{ {{ comp.award_level | latex_escape }} } {% if comp.organization %}$|$ \footnotesize{ {{ comp.organization | latex_escape }} }{% endif %}}{ {{ comp.award_date | latex_escape }} }
+    {% endfor %}
+  \resumeSubHeadingListEnd
+{% endif %}
+
+% ==================== 证书与资质 ====================
+{% if certificates %}
+\section{资格证书与知识产权}
+  \resumeSubHeadingListStart
+    {% for cert in certificates %}
+    \resumeProjectHeading
+      {\textbf{ {{ cert.title | latex_escape }} } {% if cert.category %}$|$ \emph{ {{ cert.category | latex_escape }} }{% endif %} {% if cert.authority %}$|$ \footnotesize{ {{ cert.authority | latex_escape }} }{% endif %}}{ {{ cert.issue_date | latex_escape }} }
+    {% endfor %}
+  \resumeSubHeadingListEnd
+{% endif %}
+
+\end{document}

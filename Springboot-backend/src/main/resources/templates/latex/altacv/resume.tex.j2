@@ -1,0 +1,120 @@
+% !TEX program = xelatex
+\documentclass[10pt,a4paper]{altacv}
+
+\usepackage{xeCJK}
+\usepackage{fontawesome5}
+
+% 跨平台中文字体自适应回退策略
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKmainfont{Noto Sans CJK SC}
+}{
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmainfont{PingFang SC}
+  }{
+    \IfFontExistsTF{Microsoft YaHei}{
+      \setCJKmainfont{Microsoft YaHei}
+    }{
+      \setCJKmainfont{SimSun}
+    }
+  }
+}
+
+\begin{document}
+
+\name{ {{ basic_info.name | latex_escape }} }
+{% if basic_info.title %}
+\tagline{ {{ basic_info.title | latex_escape }} }
+{% endif %}
+
+{% if options.show_avatar and basic_info.avatar_path %}
+\photo{2.5cm}{ {{ basic_info.avatar_path }} }
+{% endif %}
+
+\personalinfo{
+  \faPhone\ {{ basic_info.phone | latex_escape }} \quad
+  {% if basic_info.email %}\faEnvelope\ \href{mailto:{{ basic_info.email }}}{ {{ basic_info.email | latex_escape }} } \quad {% endif %}
+  {% if basic_info.github %}\faGithub\ \href{https://github.com/{{ basic_info.github }}}{ {{ basic_info.github | latex_escape }} } \quad {% endif %}
+  {% if basic_info.city %}\faMapMarker*\ {{ basic_info.city | latex_escape }}{% endif %}
+}
+
+\makecvheader
+
+% 非对称双栏比例：左侧核心主栏 60%，右侧信息栏 40%
+\columnratio{0.6}
+\begin{paracol}{2}
+
+% ==================== 左栏：工作经历 & 核心项目 ====================
+{% if work %}
+\cvsection{工作经历}
+{% for item in work %}
+\cvevent{ {{ item.company | latex_escape }} }{ {{ item.role | latex_escape }} }{ {{ item.date_range | latex_escape }} }{ {% if item.city %}{{ item.city | latex_escape }}{% endif %} }
+{% if item.bullets %}
+\begin{itemize}
+  {% for b in item.bullets %}
+  \item {{ b | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+\vspace{0.4ex}
+{% endfor %}
+{% endif %}
+
+{% if projects %}
+\cvsection{核心项目经历}
+{% for proj in projects %}
+\cvevent{ {{ proj.title | latex_escape }} }{ {{ proj.role | latex_escape }} }{ {{ proj.date_range | latex_escape }} }{ {% if proj.tech_stack %}\textbf{技术栈}: {{ proj.tech_stack | latex_escape }}{% endif %} }
+{% if proj.bullets %}
+\begin{itemize}
+  {% for b in proj.bullets %}
+  \item {{ b | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+\vspace{0.4ex}
+{% endfor %}
+{% endif %}
+
+% ==================== 右栏：技能、教育、竞赛、证书 ====================
+\switchcolumn
+
+{% if skills %}
+\cvsection{专业技能}
+{% for s in skills %}
+\textbf{ {{ s.category | latex_escape }} }\par
+\vspace{0.2ex}
+{% set skill_str = s['items'] if 'items' in s else (s.skills | join('、') if s.skills is defined else '') %}
+{% set skill_list = skill_str.split('、') if '、' in skill_str else skill_str.split(',') %}
+{% for tag in skill_list %}
+\cvtag{ {{ tag.strip() | latex_escape }} }
+{% endfor %}
+\par\vspace{0.5ex}
+{% endfor %}
+{% endif %}
+
+{% if education %}
+\cvsection{教育背景}
+{% for edu in education %}
+\cvevent{ {{ edu.school | latex_escape }} }{ {{ edu.major | latex_escape }} }{ {{ edu.date_range | latex_escape }} }{ {{ edu.degree | latex_escape }} }
+\vspace{0.2ex}
+{% endfor %}
+{% endif %}
+
+{% if competitions %}
+\cvsection{比赛获奖}
+{% for comp in competitions %}
+\cvevent{ {{ comp.title | latex_escape }} }{ {{ comp.award_level | latex_escape }} }{ {{ comp.award_date | latex_escape }} }{ {% if comp.organization %}{{ comp.organization | latex_escape }}{% endif %} }
+\vspace{0.2ex}
+{% endfor %}
+{% endif %}
+
+{% if certificates %}
+\cvsection{证书与知识产权}
+{% for cert in certificates %}
+\cvevent{ {{ cert.title | latex_escape }} }{ {% if cert.category %}{{ cert.category | latex_escape }}{% endif %} }{ {{ cert.issue_date | latex_escape }} }{ {% if cert.authority %}{{ cert.authority | latex_escape }}{% endif %} }
+\vspace{0.2ex}
+{% endfor %}
+{% endif %}
+
+\end{paracol}
+
+\end{document}

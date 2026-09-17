@@ -1,0 +1,80 @@
+{
+  "id": "tpl-altacv",
+  "name": "AltaCV 现代非对称双栏模板",
+  "version": "1.0.0",
+  "description": "基于经典 AltaCV 架构的非对称两栏（6:4）布局，视觉层次丰富，独创技能胶囊标签（Pill Tags）与原生圆形证件照裁剪，极其适合突出复合技能与多维度项目经历。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [1, 2],
+  "supports_avatar": true,
+  "default_avatar_style": "native_macro",
+  "entry_file": "resume.tex.j2",
+  "cls_file": "altacv.cls",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "skills",
+    "work",
+    "projects",
+    "competitions",
+    "certificates"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "city": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "competitions": [
+      {
+        "title": "string",
+        "award_level": "string",
+        "award_date": "string",
+        "organization": "string"
+      }
+    ],
+    "certificates": [
+      {
+        "title": "string",
+        "authority": "string",
+        "issue_date": "string",
+        "certificate_no": "string"
+      }
+    ]
+  }
+}
