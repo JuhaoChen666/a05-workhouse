@@ -58,15 +58,20 @@ $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出
 | 字段名 | 类型 | 必填 | 说明 |
 | :--- | :--- | :---: | :--- |
 | `id` | `VARCHAR(36)` | 是 | UUID 唯一标识 |
-| `user_id` | `VARCHAR(64)` | 是 | 所属用户 ID（服务端鉴权注入，绝不信任前端传入） |
+| `user_id` | `INTEGER` | 是 | 对齐 Spring User.userID/旧 ORM，可信服务端正整数，创建输入禁止提供 |
 | `type` | `ENUM` | 是 | `CERTIFICATE` \| `COMPETITION_AWARD` \| `PROJECT` \| `WORK` \| `SKILL` |
 | `title` | `VARCHAR(200)` | 是 | 经历主标题（如项目名、公司名、比赛名、证书名、技能分类名） |
 | `start_date` | `VARCHAR(10)` | 否 | 开始日期，格式 `YYYY-MM` |
-| `end_date` | `VARCHAR(10)` | 否 | 结束日期，格式 `YYYY-MM`，为空或 `"present"` 表示至今 |
+| `end_date` | `VARCHAR(7)` | 否 | `YYYY-MM`；null=未提供，`"present"`=持续中；年月不得早于 start_date |
 | `tags` | `JSON / List[str]` | 否 | 技术标签 / 关键词列表（如 `["Go", "Kubernetes", "分布式"]`） |
 | `is_archived`| `BOOLEAN` | 是 | 是否归档，默认 `false` |
-| `created_at` | `TIMESTAMP` | 是 | 创建时间 |
-| `updated_at` | `TIMESTAMP` | 是 | 更新时间 |
+| `sort_order` | `INTEGER` | 是 | 非负排序，默认0 |
+| `revision` | `INTEGER` | 是 | 服务端初始1，更新/归档按 expected_revision 原子递增 |
+| `source_type` | `ENUM` | 是 | MANUAL/PDF_IMPORT，默认手工；来源仅追溯不验证事实 |
+| `source_resume_id` | `BIGINT` | 否 | 原始简历引用，按 owner 检查；手工录入不要求附件 |
+| `source_locator` | `JSON` | 是 | 定位对象，默认空，页码/片段等 |
+| `created_at` | `DATETIME(6)` | 是 | 服务端 UTC 创建时间，创建输入禁止提供 |
+| `updated_at` | `DATETIME(6)` | 是 | 服务端 UTC 更新时间，创建输入禁止提供 |
 
 ---
 
