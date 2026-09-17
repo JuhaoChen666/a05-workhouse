@@ -11,7 +11,8 @@ No push, PR, production migration or deployment. No merges before user review.
 
 Only Phase 1 storage: four tables, migration, transactional internal repository, frozen inputs/template resources,
 private files, retention cleanup and tests. No HTTP CRUD/UI/PDF parsing/AI/rendering/compiler/authentication rewrite.
-Inherited six `.tex.j2`/`.cls`/`template.json` files and legacy routes/models remain unchanged.
+Inherited six `.tex.j2`/`.cls`/`template.json` files and legacy models remain unchanged.
+Review fixes update the existing PDF delete route to preserve files on database errors and provide retryable file cleanup.
 Necessary P0 input corrections and rationale are in [storage contracts](resume_phase1_storage_contracts.md).
 
 ## Files and tables
@@ -27,6 +28,7 @@ Necessary P0 input corrections and rationale are in [storage contracts](resume_p
 | FastAPI-Backend/app/infrastructure/mapper/resume_storage_mapper.py | Owner-scoped experiences, jobs, documents and old Markdown access |
 | FastAPI-Backend/app/infrastructure/resume_template_store.py | Exact full-resource snapshot, immutable initialization and explicit-env CLI |
 | FastAPI-Backend/app/infrastructure/private_resume_assets.py | Private files, compensation, advisory lock, dry-run cleanup |
+| FastAPI-Backend/app/infrastructure/legacy_resume_deletion.py | Database-first legacy delete and pending-file retry journal |
 | FastAPI-Backend/tests/, requirements-storage-test.txt | Fresh independent boundary/MySQL tests and pinned storage-only dependencies |
 
 Reuse `session_models.Base`; InnoDB, utf8mb4, MySQL JSON and UTC-naive DATETIME(6). Nullable JSON uses SQL NULL,
@@ -37,7 +39,7 @@ not JSON null, so JSON shape CHECKs remain enforced. UUID/template identities us
 | experience_items | owner, five types/common attributes, tags, dates, revision, sorting/archive, provenance/locator, timestamps | owner+archive+type+order+id; owner+updated; positive owner/revision/order; type/source and JSON checks |
 | resume_templates | composite (id,version), full metadata/resources/base64/sha/size, main source/digest, modules/pages/languages, validation/enable | available state index; enabled requires VALIDATED; object/array JSON checks |
 | resume_generation_jobs | owner, pinned template, actual JD/full experience revision/content/personal/options/template snapshots, status/stage/progress/error/traces/retry/time | owner+created; status+updated; unique(id,owner); status/ranges/language/JSON checks |
-| resume_documents | owner, name/format, job/full snapshot, file metadata, copy source, optional legacy Markdown/optimization, soft-delete/retention/purge times | owner+deleted+created; purge markers/deadline; unique(id,owner); format/job/retention/JSON checks |
+| resume_documents | owner, name/format, job/full snapshot, file metadata, copy source, optional legacy Markdown/optimization, soft-delete/retention/purge times | owner+deleted+created; purge markers/deadline; unique(id,owner); format/job/retention/JSON checks; latex requires both outputs |
 
 RESTRICT FKs: experience.source_resume_id→legacy resumes.id; job.template identity→template;
 document(job_id,owner)→job(id,owner); document(copy_id,owner)→document(id,owner);
@@ -57,19 +59,24 @@ python -m alembic -c alembic.ini upgrade head
 python -m alembic -c alembic.ini current
 ```
 
-Revision `phase1_storage_001`, separate version table `resume_phase1_alembic_version`.
-Upgrade creates only four business tables plus version table. Autogenerate filters to these four tables.
-Revision embeds a frozen snapshot of the newly authored schema, never imports mutable application ORM definitions.
+Current head is `phase1_storage_002`, separate version table `resume_phase1_alembic_version`.
+001 creates only four business tables plus version table. Autogenerate filters to these four tables.
+001 embeds a frozen schema snapshot, never imports mutable application ORM definitions; it remains unchanged by these fixes.
+002 adds `ck_document_outputs` and resets existing purge markers once, because 001's cleaner recorded intent before unlink.
+Its online preflight refuses to proceed when any existing latex document lacks a PDF or LaTeX asset. Reconcile such rows
+using genuine outputs and a separately reviewed data repair before upgrading; no fake files or automatic record deletion.
+Offline SQL cannot perform this preflight: check for these rows before executing it. 002 modifies only resume_documents.
 Online preflight requires MySQL 8.0.16+ with enforced CHECK and compatible existing legacy primary keys/owner.
 Offline SQL cannot reflect real legacy definitions; manually verify signedness/collation before using it.
 
 ```powershell
-python -m alembic -c alembic.ini downgrade phase1_storage_001:base --sql
+python -m alembic -c alembic.ini downgrade phase1_storage_002:base --sql
 # Destructive: only execute against disposable test DB, or after separately authorized verified backup:
 python -m alembic -c alembic.ini downgrade base
 ```
 
-Downgrade deletes all data in the four new tables. It never deletes old tables/files. MySQL DDL implicitly commits;
+Downgrading 002 to 001 only removes its output CHECK; it does not restore previous purge marker values.
+Downgrade to base deletes all data in the four new tables. It never deletes old tables/files. MySQL DDL implicitly commits;
 partial upgrade failure needs state inspection/manual recovery, not automatic DROP/retry. No production rollback executed
 and no backup made or asserted. Old P1 databases are not an upgrade target for this fresh initial migration.
 
@@ -101,7 +108,9 @@ PENDING→PROCESSING→COMPILED/FAILED; PENDING may also fail. Compiled requires
 Retry FAILED→PENDING increments retry count and preserves immutable inputs while rechecking referenced files.
 There is no generation executor or real compiler validation in fixtures.
 
-COMPILED same-owner job can create latex document; rename/copy/list/soft delete are internal APIs.
+COMPILED same-owner job can create latex document only with both verified PDF and LaTeX assets.
+Create/rename/copy/save-legacy use the same trimmed, nonblank, at-most-200-character name contract.
+Rename/copy/list/soft delete are internal APIs.
 `read_legacy_markdown` owner-scopes old optimization; `save_legacy_markdown` creates one explicit compatible document.
 No bulk conversion/old optimization writes. Default retention30 days; repeated deletion keeps initial deadline.
 Historical identity/template content/snapshots/files are guarded against ORM replacement; direct SQL can bypass ORM guards.
@@ -141,17 +150,44 @@ unknown files are deliberately retained. No automatic orphan recovery or public 
 report = await cleanup_documents(session, store, authenticated_user.id)
 # Authorized retention-maintenance entry only:
 report = await cleanup_documents(session, store, authenticated_user.id, dry_run=False)
+# Advance even when a protected tombstone occupies the first batch:
+while report["has_more"]:
+    report = await cleanup_documents(
+        session, store, authenticated_user.id, dry_run=False, after=report["next_cursor"]
+    )
 ```
 
-Cleaner selects expired tombstones, verifies candidate output paths/digests, protects living/unexpired documents including
-copies and their snapshots plus PENDING/PROCESSING job input/traces. It does not discover orphan files by directory scanning.
+Cleaner selects expired, not-yet-completed tombstones ordered by (purge_after,id), verifies candidate output paths/digests,
+and protects living/unexpired documents including copies/snapshots, PENDING/PROCESSING job input/traces, and all
+experience source_locator assets, including archived experiences. It does not discover orphan files by directory scanning.
 Only expired document PDF/LaTeX outputs are candidates; input-only avatars are not cleanup targets.
-Commit purge markers before unlink under same mutex. Failed unlink is retryable using retained metadata/tombstones.
+Unlink eligible files under the same mutex before committing completion markers. Failed unlink or commit leaves
+uncompleted tombstones retryable; already missing files are tolerated. A protected output prevents row completion.
+`has_more`/`next_cursor` support dry-run and real cleanup; finish a round by following the cursor, then begin a later
+round with after=None to recheck protected rows whose references may have changed. There is no stored scheduler cursor.
 Do not remove old files, unknown files or uncertain `.pending` references. No timer/production cleanup is started.
+
+## Legacy PDF delete compatibility
+
+The existing delete route locks the matching owner/id/filename row, records a pending cleanup journal, and commits
+database deletion before unlinking the PDF. MySQL FK1451 produces HTTP409 and preserves PDF plus source records;
+other commit failures preserve PDF/journal. A successful commit followed by unlink failure returns success with
+`file_cleanup_pending=True` and a cleanup task ID, instead of claiming the record deletion failed.
+Journals are Git-ignored at `FastAPI-Backend/data/resume_delete_pending` and must be retained with the legacy files.
+Internal `retry_legacy_file_deletions` requires a fresh session: it checks that the resume row is absent before unlinking,
+retains journals when a row still exists, and retries file failures. This also reconciles lost commit acknowledgements.
+No background retry service is started. Pending journals and returned status need integration with future maintenance.
 
 ## Validation and remaining scope
 
-Final fresh run on MySQL9.6.0: **60 passed, 0 skipped, 9.06s**, including14 real database integration scenarios.
+Original fresh run: 60 passed, 0 skipped, 9.06s, including14 real database integration scenarios.
+Review-fix full regression on MySQL9.6.0: **78 passed, 0 skipped, 21.33s**, including31 real database cases and47 unit cases.
+The previous 70-test characterization run proved defects; its new tests now assert corrected business behavior.
+Added coverage includes FK-rejected/normal legacy deletion, commit failure/lost acknowledgement, pending unlink retry,
+completed/protected cleanup heads with limit=1, active/archived experience source protection, partial unlink failures,
+three incomplete-output variants, direct-SQL output CHECKs, consistent names, 002 invalid-row preflight and marker reset.
+Legacy route tests load its actual business body through AST with a framework exception stand-in; no HTTP/ASGI test
+or full FastAPI dependency installation is claimed. See [review verification and fixes](resume_phase1_review_verification.md).
 Verified five category persistence/owner reads+writes, CAS revisions, multi-table rollback, actual JD selection/frozen inputs,
 six-template initialization/idempotency/content+duplicate conflicts, state/retry rules, JSON_EXTRACT/3819 CHECK/FK enforcement,
 ORM immutable replacements, legacy Markdown/soft delete, fresh-file rollback and commit/copy/shared retention/dry run,
@@ -187,7 +223,12 @@ Phase 6 downloads check owner then private asset integrity. User review required
 | 90b1b76 | Six-template initialization and private asset retention |
 | d0849d2 | Owner repository and immutable job/document snapshots |
 | 9fdc8d2 | Fresh real MySQL/boundary regression suite |
+| ab20ac5 | Original storage handoff |
+| 95e4ed9 | Legacy PDF preservation and pending deletion reconciliation |
+| a4ef94b | Complete outputs, unified names and migration002 |
+| 6a3e6be | Cleanup cursor, provenance protection and actual completion |
+| f90f740 | Correct-behavior regression and failure/migration recovery tests |
 
-Final docs commit is the following local `docs(resume)` entry in the log.
+Review fixes and their regression/docs commits follow these entries in the local log.
 Use `git log --reverse b7bf53ff27748db720b28c40c0c6409e1ef33d5c..HEAD --oneline` for fresh local commits.
 No old P1 commits are ancestors of this branch. Every new commit references Issue1, never closes Phase0–7.

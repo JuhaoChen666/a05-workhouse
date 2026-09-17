@@ -17,6 +17,8 @@ Null selection freezes all active experiences; [] freezes none. Phase 1 does not
 Keep P0 statuses PENDING/PROCESSING/COMPILED/FAILED; store progress/error/retries/traces without running generation.
 
 Documents own immutable job snapshots/files, support rename/copy and soft deletion with default 30-day retention.
+Creating a LaTeX document requires both verified PDF and LaTeX output assets; a database CHECK also rejects missing outputs.
+Create/rename/copy/save-legacy share one name validator: trim whitespace, reject empty, maximum 200 characters after trimming.
 Old optimization Markdown is read owner-scoped and optionally saved explicitly, never bulk converted.
 Four tables use shared session_models.Base, MySQL JSON/InnoDB/utf8mb4, RESTRICT foreign keys and owner indexes.
 Caller owns AsyncSession/transaction; repository flushes but never commits. Historical content is guarded at ORM layer;
@@ -24,4 +26,7 @@ arbitrary direct SQL is not an approved business interface and can bypass ORM im
 
 Necessary P0 corrections: reject managed creation fields, fix category/date validation, align owner Integer,
 preserve full metadata extras, and align currently unused Python/TypeScript names to snake_case.
-No routes/UI/authentication rewrite or changes to inherited template resources/legacy business tables.
+The existing resume delete route now commits record deletion before touching its PDF, returns 409 for source references,
+and journals failed/uncertain cleanup for internal retry. No new business routes/UI/authentication rewrite or changes to
+inherited template resources/legacy table definitions. Cleanup protects active and archived experience provenance,
+skips completed tombstones, and returns a keyset cursor to advance past protected records.
