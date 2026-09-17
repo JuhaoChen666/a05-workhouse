@@ -40,3 +40,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local development and private Phase 1 storage
+.venv/
+.phase1-local/
+.pytest_cache/
+pytest-cache-files-*/
+issue1-*.local.*
+FastAPI-Backend/data/private_resume_assets/
+FastAPI-Backend/data/resume_delete_pending/
