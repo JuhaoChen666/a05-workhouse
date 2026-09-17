@@ -78,6 +78,7 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         sa.ForeignKeyConstraint(["copied_from_id", "user_id"], ["resume_documents.id", "resume_documents.user_id"], ondelete="RESTRICT"),
         sa.CheckConstraint("user_id > 0 AND format IN ('latex','markdown')", name="ck_document_format"),
         sa.CheckConstraint("format <> 'latex' OR generation_job_id IS NOT NULL", name="ck_document_job"),
+        sa.CheckConstraint("format <> 'latex' OR (pdf_asset IS NOT NULL AND latex_asset IS NOT NULL)", name="ck_document_outputs"),
         sa.CheckConstraint("(deleted_at IS NULL AND purge_after IS NULL AND files_purged_at IS NULL) OR (deleted_at IS NOT NULL AND purge_after >= deleted_at)", name="ck_document_retention"),
         object_check("snapshot"), object_check("pdf_asset"), object_check("latex_asset"),
         sa.Index("ix_document_owner_list", "user_id", "deleted_at", "created_at"),

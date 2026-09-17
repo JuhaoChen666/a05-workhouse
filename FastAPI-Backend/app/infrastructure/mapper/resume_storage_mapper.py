@@ -3,7 +3,7 @@ from copy import deepcopy
 from datetime import timedelta
 from uuid import uuid4
 from sqlalchemy import select, update
-from app.models.resume_storage_contracts import ExperienceInput, GenerationInput, DocumentInput, FileAsset, owner_id
+from app.models.resume_storage_contracts import ExperienceInput, GenerationInput, DocumentInput, DocumentNameAdapter, FileAsset, owner_id
 from app.models.resume_storage_models import (
     ExperienceItemModel as Experience, ResumeTemplateModel as Template,
     ResumeGenerationJobModel as Job, ResumeDocumentModel as Document, utcnow,
@@ -180,6 +180,8 @@ class ResumeStorageMapper:
 
     async def create_document(self, data, *, pdf_asset=None, latex_asset=None):
         data = DocumentInput.model_validate(data)
+        if pdf_asset is None or latex_asset is None:
+            raise ValueError("both PDF and LaTeX output assets are required")
         job = await self.owned(Job, data.generation_job_id, lock=True)
         if job.status != "COMPILED":
             raise ValueError("COMPILED job required")
@@ -210,16 +212,14 @@ class ResumeStorageMapper:
         return list((await self.session.execute(select(Document).where(Document.user_id == self.owner, Document.deleted_at.is_(None)).order_by(Document.created_at, Document.id))).scalars())
 
     async def rename_document(self, id_, name):
-        if not isinstance(name, str) or not name.strip() or len(name) > 200:
-            raise ValueError("valid document name required")
+        name = DocumentNameAdapter.validate_python(name)
         row = await self.owned(Document, id_, active=True, lock=True)
         row.name, row.updated_at = name, utcnow()
         await self.session.flush()
         return row
 
     async def copy_document(self, id_, name):
-        if not isinstance(name, str) or not name.strip() or len(name) > 200:
-            raise ValueError("valid document name required")
+        name = DocumentNameAdapter.validate_python(name)
         row = await self.owned(Document, id_, active=True, lock=True)
         values = {k: deepcopy(getattr(row, k)) for k in ("format", "generation_job_id", "snapshot", "pdf_asset", "latex_asset", "markdown_content", "legacy_optimization_id")}
         verify_references(self.session, self.owner, [values["snapshot"], values["pdf_asset"], values["latex_asset"]])
@@ -241,8 +241,7 @@ class ResumeStorageMapper:
         return row.optimized_text
 
     async def save_legacy_markdown(self, id_, name):
-        if not isinstance(name, str) or not name.strip() or len(name) > 200:
-            raise ValueError("valid document name required")
+        name = DocumentNameAdapter.validate_python(name)
         row = await self.legacy(ResumeOptimizationModel, ResumeOptimizationModel.session_id, id_)
         return await self._add_document(name=name, format="markdown", snapshot={"legacy_optimization_id": id_},
             markdown_content=row.optimized_text, legacy_optimization_id=id_)
