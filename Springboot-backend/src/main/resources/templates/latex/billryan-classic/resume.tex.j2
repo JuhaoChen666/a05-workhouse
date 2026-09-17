@@ -1,0 +1,122 @@
+% !TEX program = xelatex
+\documentclass{resume}
+\usepackage{xeCJK}
+\usepackage{graphicx}
+\usepackage{tikz}
+
+% 跨平台中文字体自适应回退策略
+\IfFontExistsTF{Noto Sans CJK SC}{
+  \setCJKmainfont{Noto Sans CJK SC}
+}{
+  \IfFontExistsTF{PingFang SC}{
+    \setCJKmainfont{PingFang SC}
+  }{
+    \IfFontExistsTF{Microsoft YaHei}{
+      \setCJKmainfont{Microsoft YaHei}
+    }{
+      \setCJKmainfont{SimSun}
+    }
+  }
+}
+
+\begin{document}
+\pagenumbering{gobble}
+
+{% if options.show_avatar and basic_info.avatar_path %}
+% 证件照插槽：采用 TikZ 绝对定位，悬浮于右上角，零占用文档流高度
+\begin{tikzpicture}[remember picture, overlay]
+  \node[anchor=north east, xshift=-1.8cm, yshift=-1.2cm] at (current page.north east) {
+    \includegraphics[height=2.8cm]{ {{ basic_info.avatar_path }} }
+  };
+\end{tikzpicture}
+{% endif %}
+
+% ==================== 个人信息 Header ====================
+\begin{center}
+  {\Huge \textbf{ {{ basic_info.name | latex_escape }} }} \\
+  \vspace{0.8ex}
+  {% if basic_info.title %}
+  {\small \textit{求职意向: {{ basic_info.title | latex_escape }} }} \\
+  \vspace{0.4ex}
+  {% endif %}
+  {\small
+    \faPhone\ {{ basic_info.phone | latex_escape }}
+    {% if basic_info.email %} \quad \faEnvelope\ \href{mailto:{{ basic_info.email }}}{ {{ basic_info.email | latex_escape }} } {% endif %}
+    {% if basic_info.github %} \quad \faGithub\ \href{https://github.com/{{ basic_info.github }}}{ {{ basic_info.github | latex_escape }} } {% endif %}
+  }
+\end{center}
+
+% ==================== 教育背景 ====================
+{% if education %}
+\section{\faGraduationCap\ 教育背景}
+{% for edu in education %}
+\datedsubsection{ {{ edu.school | latex_escape }} \quad \textbf{ {{ edu.major | latex_escape }} } \quad ({{ edu.degree | latex_escape }})}{ {{ edu.date_range | latex_escape }} }
+{% endfor %}
+{% endif %}
+
+% ==================== 工作与实习经历 ====================
+{% if work %}
+\section{\faBriefcase\ 工作经历}
+{% for item in work %}
+\datedsubsection{ {{ item.company | latex_escape }} \hfill \role{ {{ item.role | latex_escape }} }{ {% if item.city %}{{ item.city | latex_escape }}{% endif %} } }{ {{ item.date_range | latex_escape }} }
+{% if item.bullets %}
+\begin{itemize}
+  {% for b in item.bullets %}
+  \item {{ b | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+% ==================== 核心项目经历 ====================
+{% if projects %}
+\section{\faFolderOpen\ 项目经历}
+{% for proj in projects %}
+\datedsubsection{ {{ proj.title | latex_escape }} \hfill \textbf{ {{ proj.role | latex_escape }} } }{ {{ proj.date_range | latex_escape }} }
+{% if proj.tech_stack %}
+\role{技术栈: {{ proj.tech_stack | latex_escape }} }{ {% if proj.project_url %}\href{ {{ proj.project_url }} }{链接}{% endif %} }
+{% endif %}
+{% if proj.bullets %}
+\begin{itemize}
+  {% for b in proj.bullets %}
+  \item {{ b | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+% ==================== 比赛获奖与荣誉 ====================
+{% if competitions %}
+\section{\faTrophy\ 比赛获奖}
+{% for comp in competitions %}
+\datedsubsection{ {{ comp.title | latex_escape }} \quad \textbf{ {{ comp.award_level | latex_escape }} } }{ {{ comp.award_date | latex_escape }} }
+{% if comp.organization or comp.rank %}
+\role{ {% if comp.organization %}主办方: {{ comp.organization | latex_escape }}{% endif %} }{ {% if comp.rank %}名次/角色: {{ comp.rank | latex_escape }}{% endif %} }
+{% endif %}
+{% endfor %}
+{% endif %}
+
+% ==================== 证书与知识产权 ====================
+{% if certificates %}
+\section{\faCertificate\ 证书与知识产权}
+{% for cert in certificates %}
+\datedsubsection{ {{ cert.title | latex_escape }} \quad {% if cert.category %}({{ cert.category | latex_escape }}){% endif %} }{ {{ cert.issue_date | latex_escape }} }
+{% if cert.authority or cert.certificate_no %}
+\role{ {% if cert.authority %}发证机构: {{ cert.authority | latex_escape }}{% endif %} }{ {% if cert.certificate_no %}编号: {{ cert.certificate_no | latex_escape }}{% endif %} }
+{% endif %}
+{% endfor %}
+{% endif %}
+
+% ==================== 专业技能 ====================
+{% if skills %}
+\section{\faCogs\ 专业技能}
+\begin{itemize}
+  {% for s in skills %}
+  \item \textbf{ {{ s.category | latex_escape }} }: {{ s.items | latex_escape }}
+  {% endfor %}
+\end{itemize}
+{% endif %}
+
+\end{document}

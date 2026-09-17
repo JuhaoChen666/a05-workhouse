@@ -1,0 +1,62 @@
+{
+  "id": "tpl-modern-twocol",
+  "name": "现代两栏高信息密度模板",
+  "version": "1.0.0",
+  "description": "基于左侧侧边栏（个人信息、教育、技能、证书）与右侧核心内容栏（项目与工作）的紧凑两栏排版，单页容纳极高信息量，适合全栈/算法与应届工程师。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [1],
+  "supports_avatar": true,
+  "default_avatar_style": "sidebar_top",
+  "entry_file": "resume.tex.j2",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "skills",
+    "certificates",
+    "work",
+    "projects",
+    "competitions"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "bullets": ["string"]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "bullets": ["string"]
+      }
+    ]
+  }
+}
