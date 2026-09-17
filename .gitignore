@@ -48,3 +48,4 @@ build/
 pytest-cache-files-*/
 issue1-*.local.*
 FastAPI-Backend/data/private_resume_assets/
+FastAPI-Backend/data/resume_delete_pending/

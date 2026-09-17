@@ -9,6 +9,7 @@ from app.utils.pdf_utils import extract_text_from_pdf
 from datetime import datetime
 from sqlalchemy import select, func
 from app.models.interview_models import ResumeDeleteRequest, ResumeListItem, ResumeListResponse
+from app.infrastructure.legacy_resume_deletion import delete_legacy_resume, LegacyResumeNotFound, LegacyResumeInUse
 
 
 router = APIRouter(prefix="/api/resumes", tags=["简历管理"])
@@ -84,38 +85,24 @@ async def delete_resume(
     db: AsyncSession = Depends(get_db_session)
 ):
     """
-    删除简历：先删除本地文件，再删除数据库记录
+    删除简历：数据库删除提交成功后清理文件；被来源引用时返回409并保留PDF。
     """
     try:
-        # 1. 查找记录
-        stmt = select(ResumeModel).where(
-            ResumeModel.id == request.id,
-            ResumeModel.user_id == request.user_id,
-            ResumeModel.filename == request.filename
-        )
-        result = await db.execute(stmt)
-        resume_record = result.scalar_one_or_none()
-
-        if not resume_record:
-            raise HTTPException(status_code=404, detail="简历不存在或无权删除")
-
-        # 2. 删除本地文件
-        local_path = resume_record.local_path
-        if local_path and os.path.exists(local_path):
-            os.remove(local_path)
-
-        # 3. 删除数据库记录
-        await db.delete(resume_record)
-        await db.commit()
-
+        cleanup = await delete_legacy_resume(db, request.id, request.user_id, request.filename)
         return {
             "code": 200,
-            "message": "简历删除成功",
+            "message": "简历删除成功，文件清理待重试" if cleanup["file_cleanup_pending"] else "简历删除成功",
             "data": {
                 "id": request.id,
-                "filename": request.filename
+                "filename": request.filename,
+                **cleanup,
             }
         }
+    except LegacyResumeNotFound:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail="简历不存在或无权删除")
+    except LegacyResumeInUse as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
