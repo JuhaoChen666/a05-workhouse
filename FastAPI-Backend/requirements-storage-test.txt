@@ -1,0 +1,7 @@
+SQLAlchemy==2.0.48
+alembic==1.18.4
+aiomysql==0.3.2
+PyMySQL==1.1.2
+pydantic==2.12.5
+pytest==8.4.2
+pytest-asyncio==1.2.0

@@ -45,5 +45,6 @@ build/
 .venv/
 .phase1-local/
 .pytest_cache/
+pytest-cache-files-*/
 issue1-*.local.*
 FastAPI-Backend/data/private_resume_assets/
