@@ -1,0 +1,62 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setCJKmainfont{Microsoft YaHei}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{nosep,leftmargin=1.5em}
+\begin{document}
+\begin{center}
+{\LARGE\bfseries {{ basic_info.name | latex_escape }}}\\
+{{ basic_info.title | latex_escape }}\\
+{{ basic_info.phone | latex_escape }} \quad {{ basic_info.email | latex_escape }} \quad {{ basic_info.city | latex_escape }}
+{% if basic_info.github %}\\{{ basic_info.github | latex_escape }}{% endif %}
+\end{center}
+{% if options.show_avatar and basic_info.avatar_path %}
+% This layout intentionally omits the avatar.
+{% endif %}
+{% if education %}
+\section*{教育背景}
+{% for entry in education %}
+\textbf{ {{ entry.school | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.major | latex_escape }} \quad {{ entry.degree | latex_escape }} \quad {{ entry.gpa | latex_escape }}\par
+{% endfor %}{% endif %}
+{% if skills %}
+\section*{专业技能}
+{% for entry in skills %}
+\textbf{ {{ entry.category | latex_escape }} }: {{ entry['items'] | latex_escape }}\par
+{% endfor %}{% endif %}
+{% if work %}
+\section*{工作经历}
+{% for entry in work %}
+\textbf{ {{ entry.company | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.role | latex_escape }} \quad {{ entry.department | latex_escape }} \quad {{ entry.city | latex_escape }}
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet | latex_escape }}
+{% endfor %}\end{itemize}
+{% endfor %}{% endif %}
+{% if projects %}
+\section*{项目经历}
+{% for entry in projects %}
+\textbf{ {{ entry.title | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.role | latex_escape }} \quad {{ entry.tech_stack | latex_escape }}
+{% if entry.project_url %}\\{{ entry.project_url | latex_escape }}{% endif %}
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet | latex_escape }}
+{% endfor %}\end{itemize}
+{% endfor %}{% endif %}
+{% if certificates %}
+\section*{证书}
+{% for entry in certificates %}
+\textbf{ {{ entry.title | latex_escape }} } \quad {{ entry.authority | latex_escape }} \hfill {{ entry.issue_date | latex_escape }}\\
+{{ entry.category | latex_escape }} \quad {{ entry.certificate_no | latex_escape }} \quad {{ entry.description | latex_escape }}\par
+{% endfor %}{% endif %}
+{% if competitions %}
+\section*{获奖}
+{% for entry in competitions %}
+\textbf{ {{ entry.title | latex_escape }} } \quad {{ entry.award_level | latex_escape }} \hfill {{ entry.award_date | latex_escape }}\\
+{{ entry.organization | latex_escape }} \quad {{ entry.rank | latex_escape }} \quad {{ entry.description | latex_escape }}\par
+{% endfor %}{% endif %}
+\end{document}

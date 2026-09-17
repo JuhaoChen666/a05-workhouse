@@ -132,7 +132,8 @@ class ResumeTemplateMetadata(BaseModel):
     model_config = ConfigDict(extra="allow")
     id: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(..., description="模板展示名称")
-    version: str = Field("1.0.0", min_length=1, max_length=32)
+    version: str = Field("1.0.0", min_length=1, max_length=32, pattern=r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$")
+    protocol_version: Optional[Literal["1.0"]] = None
     entry_file: str = "resume.tex.j2"
     supported_languages: List[Literal["zh", "en"]] = Field(default_factory=lambda: ["zh"], min_length=1)
     engine: str = Field("xelatex", description="编译引擎，如 xelatex")
@@ -141,6 +142,7 @@ class ResumeTemplateMetadata(BaseModel):
     supports_avatar: bool = Field(True, description="是否支持证件照头像")
     default_avatar_style: str = Field("tikz_overlay_top_right", description="头像定位方式")
     supported_sections: List[str] = Field(..., description="支持的简历版块列表")
+    placeholders: Dict[str, Any] = Field(..., description="固定模块占位符声明")
 
 
 class ResumeGenerationRequest(BaseModel):
