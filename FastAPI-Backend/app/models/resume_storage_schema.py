@@ -1,5 +1,6 @@
 """Four storage tables; legacy tables remain under their existing owners."""
 import sqlalchemy as sa
+from sqlalchemy.dialects.mysql import DATETIME
 
 TABLE_NAMES = ("experience_items", "resume_templates", "resume_generation_jobs", "resume_documents")
 
@@ -11,13 +12,13 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
     def owner():
         return column("user_id", sa.Integer, nullable=False)
     def json_column(name, nullable=False):
-        return column(name, sa.JSON, nullable=nullable)
+        return column(name, sa.JSON(none_as_null=True), nullable=nullable)
     def object_check(name):
         return sa.CheckConstraint(f"JSON_TYPE({name}) = 'OBJECT'", name=f"ck_{name}_object")
     def array_check(name):
         return sa.CheckConstraint(f"JSON_TYPE({name}) = 'ARRAY'", name=f"ck_{name}_array")
     def created():
-        return column("created_at", sa.DateTime, nullable=False)
+        return column("created_at", DATETIME(fsp=6), nullable=False)
     experience = sa.Table("experience_items", metadata,
         column("id", identity(), primary_key=True), owner(), column("type", sa.String(32), nullable=False),
         column("title", sa.String(200), nullable=False), column("start_date", sa.String(7)), column("end_date", sa.String(7)),
@@ -25,7 +26,7 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         column("sort_order", sa.Integer, nullable=False), column("revision", sa.Integer, nullable=False),
         column("source_type", sa.String(16), nullable=False),
         column("source_resume_id", legacy_resume_type or sa.BigInteger, sa.ForeignKey("resumes.id", ondelete="RESTRICT")),
-        json_column("source_locator"), created(), column("updated_at", sa.DateTime, nullable=False),
+        json_column("source_locator"), created(), column("updated_at", DATETIME(fsp=6), nullable=False),
         sa.CheckConstraint("user_id > 0 AND revision > 0 AND sort_order >= 0", name="ck_experience_ranges"),
         sa.CheckConstraint("type IN ('CERTIFICATE','COMPETITION_AWARD','PROJECT','WORK','SKILL')", name="ck_experience_type"),
         sa.CheckConstraint("source_type IN ('MANUAL','PDF_IMPORT')", name="ck_experience_source"),
@@ -55,7 +56,7 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         column("status", sa.String(16), nullable=False), column("stage", sa.String(100), nullable=False),
         column("progress_percentage", sa.Integer, nullable=False), json_column("error", nullable=True),
         json_column("traces"), column("retry_count", sa.Integer, nullable=False),
-        created(), column("updated_at", sa.DateTime, nullable=False), column("started_at", sa.DateTime), column("finished_at", sa.DateTime),
+        created(), column("updated_at", DATETIME(fsp=6), nullable=False), column("started_at", DATETIME(fsp=6)), column("finished_at", DATETIME(fsp=6)),
         sa.UniqueConstraint("id", "user_id", name="uq_job_owner"),
         sa.ForeignKeyConstraint(["template_id", "template_version"], ["resume_templates.id", "resume_templates.version"], ondelete="RESTRICT"),
         sa.CheckConstraint("status IN ('PENDING','PROCESSING','COMPILED','FAILED')", name="ck_job_status"),
@@ -70,8 +71,8 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         json_column("snapshot"), json_column("pdf_asset", nullable=True), json_column("latex_asset", nullable=True),
         column("markdown_content", sa.Text),
         column("legacy_optimization_id", legacy_optimization_type or sa.String(36), sa.ForeignKey("resume_optimizations.session_id", ondelete="RESTRICT")),
-        column("copied_from_id", identity()), created(), column("updated_at", sa.DateTime, nullable=False),
-        column("deleted_at", sa.DateTime), column("purge_after", sa.DateTime), column("files_purged_at", sa.DateTime),
+        column("copied_from_id", identity()), created(), column("updated_at", DATETIME(fsp=6), nullable=False),
+        column("deleted_at", DATETIME(fsp=6)), column("purge_after", DATETIME(fsp=6)), column("files_purged_at", DATETIME(fsp=6)),
         sa.UniqueConstraint("id", "user_id", name="uq_document_owner"),
         sa.ForeignKeyConstraint(["generation_job_id", "user_id"], ["resume_generation_jobs.id", "resume_generation_jobs.user_id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["copied_from_id", "user_id"], ["resume_documents.id", "resume_documents.user_id"], ondelete="RESTRICT"),

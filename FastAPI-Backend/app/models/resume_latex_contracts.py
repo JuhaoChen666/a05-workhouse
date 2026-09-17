@@ -23,9 +23,9 @@ class BaseExperienceItem(BaseModel):
     """所有经历条目的通用基础字段"""
     model_config = ConfigDict(extra="forbid")
     type: ExperienceTypeEnum = Field(..., description="经历枚举分类")
-    title: str = Field(..., max_length=200, description="经历主标题（项目名/公司名/比赛名/证书名/技能分类名）")
+    title: str = Field(..., min_length=1, max_length=200, description="经历主标题（项目名/公司名/比赛名/证书名/技能分类名）")
     start_date: Optional[str] = Field(None, description="开始日期 (格式: YYYY-MM)")
-    end_date: Optional[str] = Field(None, description="结束日期 (格式: YYYY-MM，为空或present表示至今)")
+    end_date: Optional[str] = Field(None, description="结束年月；null=未提供，present=持续中")
     tags: List[str] = Field(default_factory=list, description="技术标签/关键词列表")
     is_archived: bool = Field(False, description="是否归档")
     sort_order: int = Field(0, ge=0)
@@ -59,7 +59,7 @@ class SkillItemCreate(BaseExperienceItem):
     """专业技能分类与技术栈"""
     type: Literal[ExperienceTypeEnum.SKILL] = ExperienceTypeEnum.SKILL
     category: str = Field(..., max_length=100, description="技能分类名称，如: 后端开发、前端工程、云原生与架构")
-    skills: List[str] = Field(..., min_items=1, description="该分类包含的具体技术栈列表，如: ['Go', 'Python', 'FastAPI', 'Docker']")
+    skills: List[str] = Field(..., min_length=1, description="该分类包含的具体技术栈列表，如: ['Go', 'Python', 'FastAPI', 'Docker']")
     proficiency: Optional[str] = Field(None, max_length=50, description="熟练度级别，如: 精通/熟练/掌握")
     description: Optional[str] = Field(None, description="补充说明或核心技术实践年限")
 
@@ -91,7 +91,7 @@ class ProjectItemCreate(BaseExperienceItem):
     project_url: Optional[str] = Field(None, max_length=255, description="开源或演示链接")
     tech_stack: List[str] = Field(default_factory=list, description="技术栈清单")
     description: Optional[str] = Field(None, description="项目简要背景概述")
-    bullets: List[str] = Field(..., min_items=1, description="核心亮点与产出 (STAR法则)")
+    bullets: List[str] = Field(..., min_length=1, description="核心亮点与产出 (STAR法则)")
 
 
 class WorkItemCreate(BaseExperienceItem):
@@ -100,7 +100,7 @@ class WorkItemCreate(BaseExperienceItem):
     department: Optional[str] = Field(None, max_length=100, description="所在部门/业务线")
     role: str = Field(..., max_length=100, description="职位名称")
     city: Optional[str] = Field(None, max_length=50, description="工作所在城市")
-    bullets: List[str] = Field(..., min_items=1, description="核心职责与量化业务成果")
+    bullets: List[str] = Field(..., min_length=1, description="核心职责与量化业务成果")
 
 
 class ExperienceItemResponse(BaseModel):
