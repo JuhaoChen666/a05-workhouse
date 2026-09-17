@@ -3,7 +3,7 @@
  * 对应 docs/specs/resume_latex_phase0_technical_contracts.md 规范
  */
 
-export type ExperienceType = 'CERTIFICATE' | 'COMPETITION_AWARD' | 'PROJECT' | 'WORK'
+export type ExperienceType = 'CERTIFICATE' | 'COMPETITION_AWARD' | 'PROJECT' | 'WORK' | 'SKILL'
 
 export interface BaseExperienceItem {
   id?: string
@@ -15,6 +15,14 @@ export interface BaseExperienceItem {
   isArchived: boolean
   createdAt?: string
   updatedAt?: string
+}
+
+export interface SkillItem extends BaseExperienceItem {
+  type: 'SKILL'
+  category: string   // 技能分类，如：后端开发、前端工程、云原生与微服务
+  skills: string[]   // 技术栈清单，如：['Go', 'Python', 'FastAPI', 'Docker']
+  proficiency?: string // 熟练度，如：精通/熟练/掌握
+  description?: string // 补充说明
 }
 
 export interface CertificateItem extends BaseExperienceItem {
@@ -52,7 +60,7 @@ export interface WorkItem extends BaseExperienceItem {
   bullets: string[]
 }
 
-export type ExperienceItem = CertificateItem | CompetitionAwardItem | ProjectItem | WorkItem
+export type ExperienceItem = CertificateItem | CompetitionAwardItem | ProjectItem | WorkItem | SkillItem
 
 export interface ResumeTemplateMetadata {
   id: string

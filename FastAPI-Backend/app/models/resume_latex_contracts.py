@@ -10,18 +10,19 @@ from pydantic import BaseModel, Field
 
 
 class ExperienceTypeEnum(str, Enum):
-    """四类经历枚举分类"""
+    """五类经历枚举分类"""
     CERTIFICATE = "CERTIFICATE"                 # 证书/知识产权
     COMPETITION_AWARD = "COMPETITION_AWARD"     # 比赛获奖/荣誉
     PROJECT = "PROJECT"                         # 项目经历
     WORK = "WORK"                               # 工作/实习经历
+    SKILL = "SKILL"                             # 专业技能/技术栈归类
 
 
 class BaseExperienceItem(BaseModel):
     """所有经历条目的通用基础字段"""
     id: Optional[str] = Field(None, description="经历条目唯一UUID")
     type: ExperienceTypeEnum = Field(..., description="经历枚举分类")
-    title: str = Field(..., max_length=200, description="经历主标题（项目名/公司名/比赛名/证书名）")
+    title: str = Field(..., max_length=200, description="经历主标题（项目名/公司名/比赛名/证书名/技能分类名）")
     start_date: Optional[str] = Field(None, description="开始日期 (格式: YYYY-MM)")
     end_date: Optional[str] = Field(None, description="结束日期 (格式: YYYY-MM，为空或present表示至今)")
     tags: List[str] = Field(default_factory=list, description="技术标签/关键词列表")
@@ -31,8 +32,17 @@ class BaseExperienceItem(BaseModel):
 
 
 # ==========================================
-# 四类经历专用输入模型 (Item Create/Update)
+# 五类经历专用输入模型 (Item Create/Update)
 # ==========================================
+
+class SkillItemCreate(BaseExperienceItem):
+    """专业技能分类与技术栈"""
+    type: ExperienceTypeEnum = ExperienceTypeEnum.SKILL
+    category: str = Field(..., max_length=100, description="技能分类名称，如: 后端开发、前端工程、云原生与架构")
+    skills: List[str] = Field(..., min_items=1, description="该分类包含的具体技术栈列表，如: ['Go', 'Python', 'FastAPI', 'Docker']")
+    proficiency: Optional[str] = Field(None, max_length=50, description="熟练度级别，如: 精通/熟练/掌握")
+    description: Optional[str] = Field(None, description="补充说明或核心技术实践年限")
+
 
 class CertificateItemCreate(BaseExperienceItem):
     """证书与知识产权"""

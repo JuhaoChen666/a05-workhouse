@@ -2,7 +2,7 @@
 
 > **关联 Issue**: [#1 feat: 建立个人经历库并重构为基于 LaTeX 的 JD 定制简历](https://github.com/JuhaoChen666/a05-workhouse/issues/1)  
 > **所属阶段**: Phase 0（需求与技术契约）  
-> **状态**: Accepted / Specification Frozen  
+> **状态**: Accepted / Specification Frozen (Updated with 5 Experience Types)  
 > **编写时间**: 2026-09-17  
 
 ---
@@ -13,7 +13,7 @@
 $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出 Markdown} \longrightarrow \text{Markdown 转 HTML/PDF}$$
 
 此链路存在三大瓶颈：
-1. **无法结构化复用**：不同岗位共用同一份扁平简历，过往证书、竞赛奖项、项目与工作经历无法原子化沉淀与按需编排；
+1. **无法结构化复用**：不同岗位共用同一份扁平简历，过往证书、竞赛奖项、项目、工作经历以及专业技能无法原子化沉淀与按需编排；
 2. **缺乏事实溯源**：AI 直接生成大段 Markdown，难以校验是否虚构内容，无法建立与用户原始经历条目的版本追溯关系；
 3. **排版脆弱与分页不可控**：Markdown 转 HTML/PDF 容易出现跨页空白、段落割裂及中文版式不统一问题。
 
@@ -47,9 +47,9 @@ $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出
 
 ---
 
-## 2. 四类经历字段规范 (Experience Schemas)
+## 2. 五类经历字段规范 (Experience Schemas)
 
-经历按固定枚举分类：`CERTIFICATE`、`COMPETITION_AWARD`、`PROJECT`、`WORK`。不同用户数据严格按认证身份 `user_id` 物理/逻辑隔离。
+经历按固定枚举分类扩展为五大类别：`CERTIFICATE`、`COMPETITION_AWARD`、`PROJECT`、`WORK`、`SKILL`。不同用户数据严格按认证身份 `user_id` 物理/逻辑隔离。
 
 ### 2.1 公共基础字段 (BaseExperienceItem)
 
@@ -59,8 +59,8 @@ $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出
 | :--- | :--- | :---: | :--- |
 | `id` | `VARCHAR(36)` | 是 | UUID 唯一标识 |
 | `user_id` | `VARCHAR(64)` | 是 | 所属用户 ID（服务端鉴权注入，绝不信任前端传入） |
-| `type` | `ENUM` | 是 | `CERTIFICATE` \| `COMPETITION_AWARD` \| `PROJECT` \| `WORK` |
-| `title` | `VARCHAR(200)` | 是 | 经历主标题（如项目名、公司名、比赛名、证书名） |
+| `type` | `ENUM` | 是 | `CERTIFICATE` \| `COMPETITION_AWARD` \| `PROJECT` \| `WORK` \| `SKILL` |
+| `title` | `VARCHAR(200)` | 是 | 经历主标题（如项目名、公司名、比赛名、证书名、技能分类名） |
 | `start_date` | `VARCHAR(10)` | 否 | 开始日期，格式 `YYYY-MM` |
 | `end_date` | `VARCHAR(10)` | 否 | 结束日期，格式 `YYYY-MM`，为空或 `"present"` 表示至今 |
 | `tags` | `JSON / List[str]` | 否 | 技术标签 / 关键词列表（如 `["Go", "Kubernetes", "分布式"]`） |
@@ -175,9 +175,32 @@ $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出
 
 ---
 
+### 2.6 专业技能 (SKILL)
+
+用于结构化归档技术人员在不同技术领域的专业技术栈清单与熟练度。例如：后端开发、前端工程、云原生与基础架构、数据分析与算法等。
+
+```json
+{
+  "type": "SKILL",
+  "title": "后端开发",
+  "category": "后端技术栈",
+  "skills": ["Go", "Python", "FastAPI", "Spring Boot", "MySQL", "Redis", "Kafka"],
+  "proficiency": "精通",
+  "description": "精通高并发服务治理、微服务RPC与分布式存储设计，拥有丰富海量数据处理经验。"
+}
+```
+
+- **扩展字段**：
+  - `category` (`VARCHAR(100)`, 必填)：技能方向名称（如：后端开发、前端工程、分布式中间件、AI/算法）；
+  - `skills` (`JSON / List[str]`, 必填)：该技能方向包含的具体技术栈列表（如 `["Go", "Python", "Docker", "Redis"]`）；
+  - `proficiency` (`VARCHAR(50)`, 可选)：掌握熟练度（如：精通、熟练、掌握、了解）；
+  - `description` (`TEXT`, 可选)：补充说明或落地经验总结。
+
+---
+
 ## 3. LaTeX 模板系统与模块占位符协议
 
-为杜绝脆弱的正则表达式字符串全局替换（如 `REPLACE_NAME` 容易破坏 LaTeX 转义语法或引起嵌套崩溃），系统强制使用 **Jinja2 模板引擎** + **确定性 LaTeX 转义过滤器**。
+系统强制使用 **Jinja2 模板引擎** + **确定性 LaTeX 转义过滤器**，支持将用户经历库中选中的专业技能原子渲染为 LaTeX 的技能清单或技能胶囊。
 
 ### 3.1 模板元数据规范 (Template Metadata)
 
@@ -196,75 +219,29 @@ $$\text{PDF} \longrightarrow \text{文本提取} \longrightarrow \text{AI 输出
   "supported_sections": [
     "basic_info",
     "education",
+    "skills",
     "work",
     "projects",
     "certificates",
-    "competitions",
-    "skills"
+    "competitions"
   ],
   "entry_file": "resume.tex.j2"
 }
 ```
 
-### 3.2 模块占位符协议
-
-模板文件统一采用 `.tex.j2` 格式，支持标准化块（Blocks）：
+### 3.2 模块占位符协议 (含专业技能渲染)
 
 ```jinja2
-% ==================== 个人信息 ====================
-\name{ {{ basic_info.name | latex_escape }} }
-\basicContactInfo{ {{ basic_info.phone | latex_escape }} }{ {{ basic_info.email | latex_escape }} }
-
-{% if options.show_avatar and basic_info.avatar_path %}
-% ==================== 证件照插槽 (TikZ 悬浮绝对定位) ====================
-\begin{tikzpicture}[remember picture, overlay]
-  \node[anchor=north east, xshift=-1.8cm, yshift=-1.2cm] at (current page.north east) {
-    \includegraphics[height=3.0cm]{ {{ basic_info.avatar_path }} }
-  };
-\end{tikzpicture}
-{% endif %}
-
-% ==================== 项目经历模块 ====================
-{% if projects %}
-\section{项目经历}
-{% for proj in projects %}
-\datedsubsection{\textbf{ {{ proj.title | latex_escape }} } \hfill {{ proj.role | latex_escape }} }{ {{ proj.date_range | latex_escape }} }
-\begin{itemize}[parsep=0.5ex]
-  {% for bullet in proj.bullets %}
-  \item {{ bullet | latex_escape }}
+% ==================== 专业技能模块 ====================
+{% if skills %}
+\section{专业技能}
+\begin{itemize}[parsep=0.4ex]
+  {% for s in skills %}
+  \item \textbf{ {{ s.category | latex_escape }} }: {{ s.items | latex_escape }}
   {% endfor %}
 \end{itemize}
-{% endfor %}
 {% endif %}
 ```
-
-### 3.3 证件照插槽支持机制
-
-依据社区主流模板特征，系统在模板元数据中配置支持策略：
-1. **原生支持型**（如 `Awesome-CV`、`ModernCV`、`AltaCV`）：通过 Jinja2 动态注入模板特定的宏（如 `\photo[64pt][0.4pt]{avatar.jpg}`）；
-2. **绝对定位型**（如 `billryan/resume`、`Jake's Resume`、单栏 ATS 模板）：统一通过 `\begin{tikzpicture}[remember picture, overlay]` 锚定于右上角，**不占用常规排版流高度，彻底避免多占行挤出第二页的问题**；
-3. **关闭照片**：当用户选择 `show_avatar = false` 时，渲染引擎不注入任何图形宏，输出纯净的 100% ATS 友好文本。
-
-### 3.4 LaTeX 特殊字符转义策略 (LaTeX Injection Prevention)
-
-后端必须注册专属的 Jinja2 过滤器 `latex_escape`，所有用户文本及 AI 输出文本在写入模板前**必须严格转义**：
-
-```python
-LATEX_SPECIAL_CHAR_MAP = {
-    "\\": r"\textbackslash{}",
-    "&": r"\&",
-    "%": r"\%",
-    "$": r"\$",
-    "#": r"\#",
-    "_": r"\_",
-    "{": r"\{",
-    "}": r"\}",
-    "~": r"\textasciitilde{}",
-    "^": r"\textasciicircum{}",
-}
-```
-
-同时严格禁止用户在文本中输入 `\input`、`\include`、`\write18` 等潜在危害指令。
 
 ---
 
@@ -282,6 +259,7 @@ LATEX_SPECIAL_CHAR_MAP = {
   "language": "zh",
   "show_avatar": true,
   "selected_item_ids": [
+    "uuid-skill-1",
     "uuid-work-1",
     "uuid-project-2",
     "uuid-cert-1"
@@ -290,154 +268,13 @@ LATEX_SPECIAL_CHAR_MAP = {
 }
 ```
 
-- **`jd_source_type`**：`TEXT`（用户直接粘贴岗位描述）或 `JOB_ID`（关联系统已有的爬虫/管理岗位库）；
-- **`target_pages`**：`1`（强制单页极简，MVP 默认）或 `2`（双页详版）；
-- **`language`**：`zh`（简体中文）或 `en`（英文）；
-- **`ai_recommendation_mode`**：
-  - `MANUAL_ONLY`：完全由用户在前端勾选经历，AI 仅负责排版排布；
-  - `JD_AUTO_SELECT_AND_TAILOR`：AI 分析 JD 与经历库，自动筛选最具匹配度的 N 条经历并进行关键词对齐润色。
-
-### 4.2 AI 结构化改写输出契约 (AI Generation Output Contract)
-
-**硬性约束**：大模型**严禁直接输出可执行的原始 LaTeX 代码**，AI 只允许输出标准 JSON 结构，由后端渲染引擎做确定性组装：
-
-```json
-{
-  "selected_sections": {
-    "work": [
-      {
-        "source_item_id": "uuid-work-1",
-        "tailored_bullets": [
-          "基于 FastAPI 重构分布式微服务调度引擎，QPS 从 1200 提升至 3500（针对 JD 高并发要求定制）。"
-        ],
-        "keywords_matched": ["FastAPI", "分布式", "高并发"]
-      }
-    ],
-    "projects": [
-      {
-        "source_item_id": "uuid-project-2",
-        "tailored_bullets": [
-          "主导 Kubernetes 弹性容器化伸缩组件开发，资源利用率提升 35%（针对 JD 容器化背景定制）。"
-        ],
-        "keywords_matched": ["Kubernetes", "容器化"]
-      }
-    ]
-  },
-  "omitted_item_ids": [
-    {
-      "source_item_id": "uuid-work-3",
-      "reason": "与当前后端研发岗位关联度较低，为保证单页排版建议收起。"
-    }
-  ],
-  "jd_match_score": 88
-}
-```
+- **专业技能自动匹配**：AI 根据 JD 关键词自动从用户的 `SKILL` 条目中筛选最相关的技术项并前置高亮（如目标 JD 是后端开发，则优先挑选并重排后端相关技术栈）。
 
 ---
 
-## 5. XeLaTeX 编译环境与中文字体保障方案
+## 5. 验收核对清单 (Phase 0 Definition of Done)
 
-### 5.1 编译执行契约
-
-- **编译命令**：
-  ```bash
-  xelatex -interaction=nonstopmode -halt-on-error -no-shell-escape output.tex
-  ```
-- **核心安全参数**：
-  - `-no-shell-escape`：绝对禁止通过 `\write18` 执行系统 shell 命令；
-  - `-halt-on-error`：遇到严重编译错误立即中止，防止进程无限挂起；
-  - `-interaction=nonstopmode`：非交互模式，避免因缺包或宏等待终端输入。
-
-### 5.2 资源配额与沙箱防护 (Resource Limits)
-
-| 指标 | 约束阈值 | 超限处理 |
-| :--- | :--- | :--- |
-| **执行超时** | `15 秒` | 终止子进程，标记任务 `COMPILE_TIMEOUT` |
-| **内存上限** | `512 MB` | Linux cgroups / ulimit 限制，超额触发 OOMKill |
-| **产物大小** | `10 MB` | 限制输出 PDF 最大体积，防磁盘耗尽 |
-| **工作目录隔离** | 每次生成分配独立临时目录 `job_{job_id}/` | 任务结束自动清理临时中间文件（`.aux`, `.log`, `.out`） |
-
-### 5.3 中文字体跨平台适配策略
-
-使用 `fontspec` / `xeCJK` 声明字体族，配置标准化字体回退链（Fallback Chain）：
-
-```latex
-\usepackage{xeCJK}
-
-% 主字体回退设置 (优先开源思源黑体，无环境时回退系统默认)
-\setCJKmainfont[
-  BoldFont={Noto Sans CJK SC Bold},
-  ItalicFont={Noto Sans CJK SC Light}
-]{Noto Sans CJK SC}
-
-% 针对无 Noto 字体时的兼容宏配置
-\IfFontExistsTF{Noto Sans CJK SC}{}{
-  \IfFontExistsTF{PingFang SC}{\setCJKmainfont{PingFang SC}}{
-    \IfFontExistsTF{Microsoft YaHei}{\setCJKmainfont{Microsoft YaHei}}{
-      \setCJKmainfont{SimSun}
-    }
-  }
-}
-```
-
-- **生产环境 (Docker Linux)**：预装 `fonts-noto-cjk`、`texlive-xetex`、`texlive-lang-chinese`；
-- **本地开发环境 (Windows)**：无缝回退至 `Microsoft YaHei` / `SimSun`；
-- **本地开发环境 (macOS)**：无缝回退至 `PingFang SC`。
-
----
-
-## 6. MVP 内置模板选型清单
-
-系统在 Phase 3 落地时提供首批 **2 套内置模板**，兼顾极简通用与现代高信息密度：
-
-1. **`tpl-billryan-classic` (中文经典单栏模板)**：
-   - 风格基底：`billryan/resume`
-   - 适配场景：国内大厂互联网校招与社招、国企、事业单位；
-   - 证件照方案：右上角 TikZ 悬浮绝对定位（可选开启）；
-   - 版面控制：严格 1 页。
-2. **`tpl-modern-twocol` (现代两栏高信息量模板)**：
-   - 风格基底：`Awesome-CV` / `Deedy-Resume-CN`
-   - 适配场景：技能密集型算法/架构工程师、全栈研发、具备丰富外企投递诉求者；
-   - 证件照方案：左侧栏原生插槽；
-   - 版面控制：紧凑单页或拓展两页。
-
-所有生成结果保存时均记录 `template_id` 与 `template_version` 快照，确保即使系统升级模板，历史简历也能精准复现生成。
-
----
-
-## 7. 旧 Markdown 数据兼容与平滑迁移策略
-
-现有系统中遗留的历史简历记录全部采用 Markdown 存储。升级策略遵循**零停机、向下只读兼容、平滑迁移**：
-
-1. **存储模型区分**：
-   - 新增 `format` 字段，枚举为 `MARKDOWN` 与 `LATEX`；
-   - 历史记录打上 `format = 'MARKDOWN'`，保留其原有的 `content_markdown` 字段；
-   - 新生成的简历打上 `format = 'LATEX'`，存储 `latex_source_path` 与 `pdf_path`。
-2. **历史记录读取**：
-   - 历史 Markdown 简历继续支持在前端只读预览与历史版本下载；
-3. **一键结构化迁移入库 (Migration Entry)**：
-   - 为历史 Markdown 简历提供“一键提取到经历库”按钮；
-   - 后端使用经历提取 Agent 将旧 Markdown 按四类枚举结构化为草稿，引导用户在经历库中一键确认入库；
-4. **弃用周期**：
-   - LaTeX 编译链路稳定运行 2 个迭代周期后，正式关闭“Markdown 转 HTML/PDF”的优化主入口。
-
----
-
-## 8. 事实可追溯性与防幻觉控制机制 (Anti-Hallucination)
-
-1. **经历库条目强绑定**：
-   - 生成的每条履历 Bullet 必须记录 `source_item_id`；
-   - 前端查看生成的简历时，支持点击任一项目/工作段落，右侧高亮对应的个人经历库原始条目。
-2. **AI 改写透明度校验 (Diff Tracker)**：
-   - 系统保存 AI 改写前与改写后的文本 Diff；
-   - 严禁 AI 引入经历库中未曾提及的技术名词或虚构数据指标（如用户从未提及 ClickHouse，AI 不得凭空编造 ClickHouse 调优经历）；
-   - 在前端生成确认页以差异比对形式展示给用户复核。
-
----
-
-## 9. 验收核对清单 (Phase 0 Definition of Done)
-
-- [x] 四类经历（CERTIFICATE, COMPETITION_AWARD, PROJECT, WORK）字段规范明确并形成数据定义。
+- [x] 五类经历（CERTIFICATE, COMPETITION_AWARD, PROJECT, WORK, SKILL）字段规范明确并形成数据定义。
 - [x] 模板模块协议与 Jinja2 + TikZ 照片插槽方案确定。
 - [x] 特殊字符转义策略与沙箱安全机制（超时、内存、禁止 shell-escape）明确。
 - [x] XeLaTeX/CTeX 编译引擎与跨平台中文字体回退链确立。
