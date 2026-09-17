@@ -13,15 +13,21 @@ from alembic.config import Config
 BACKEND = Path(__file__).resolve().parents[1]
 
 
-def migrate(url, direction="upgrade"):
+@pytest.fixture
+def private_store(tmp_path):
+    from app.infrastructure.private_resume_assets import PrivateAssets
+    return PrivateAssets(tmp_path / "private")
+
+
+def migrate(url, direction="upgrade", revision=None):
     config = Config(str(BACKEND / "alembic.ini"))
     previous = os.environ.get("RESUME_DATABASE_URL")
     os.environ["RESUME_DATABASE_URL"] = url.render_as_string(hide_password=False)
     try:
         if direction == "upgrade":
-            command.upgrade(config, "head")
+            command.upgrade(config, revision or "head")
         else:
-            command.downgrade(config, "base")
+            command.downgrade(config, revision or "base")
     finally:
         if previous is None:
             os.environ.pop("RESUME_DATABASE_URL", None)

@@ -31,6 +31,12 @@ async def complete_fixture(mapper, **values):
     return job
 
 
+def document_outputs(files):
+    # Storage fixtures, never a claim of successful rendering/compilation.
+    return {"pdf_asset": files.write(b"pdf fixture", "pdf"),
+        "latex_asset": files.write(b"latex fixture", "tex")}
+
+
 async def test_categories_revision_owner_and_atomic_compare(sessions):
     async with sessions() as session:
         async with session.begin():
@@ -110,9 +116,9 @@ async def test_duplicate_template_preflight_writes_nothing(sessions, tmp_path):
         async with session.begin(): assert not list((await session.execute(select(Template))).scalars())
 
 
-async def test_snapshots_actual_jd_selection_and_cross_owner(sessions):
+async def test_snapshots_actual_jd_selection_and_cross_owner(sessions, private_store):
     async with sessions() as session:
-        async with session.begin():
+        async with private_asset_transaction(session, private_store, 71) as files:
             await approve_fixture(session)
             mapper, other = ResumeStorageMapper(session, 71), ResumeStorageMapper(session, 72)
             item = await mapper.create_experience(EXAMPLES[2])
@@ -130,7 +136,7 @@ async def test_snapshots_actual_jd_selection_and_cross_owner(sessions):
             await mapper.update_experience(item.id, {**EXAMPLES[2], "bullets": ["Changed"]}, expected_revision=1)
             await mapper.update_job(job.id, status="PROCESSING", stage="TEST", progress=40)
             await mapper.update_job(job.id, status="COMPILED", stage="TEST", progress=100)
-            doc = await mapper.create_document({"name":"Frozen", "generation_job_id":job.id})
+            doc = await mapper.create_document({"name":"Frozen", "generation_job_id":job.id}, **document_outputs(files))
             job_id, doc_id = job.id, doc.id
         async with session.begin():
             await session.refresh(job)
@@ -142,15 +148,15 @@ async def test_snapshots_actual_jd_selection_and_cross_owner(sessions):
             assert not await other.list_jobs() and not await other.list_documents()
 
 
-async def test_retry_state_rules_and_frozen_template(sessions):
+async def test_retry_state_rules_and_frozen_template(sessions, private_store):
     async with sessions() as session:
-        async with session.begin():
+        async with private_asset_transaction(session, private_store, 71) as files:
             await approve_fixture(session)
             mapper = ResumeStorageMapper(session, 71)
             job = await mapper.create_job(request())
             frozen = deepcopy(job.template_snapshot)
             with pytest.raises(ValueError): await mapper.update_job(job.id, status="COMPILED", stage="BAD", progress=100)
-            with pytest.raises(ValueError): await mapper.create_document({"name":"Early", "generation_job_id":job.id})
+            with pytest.raises(ValueError, match="COMPILED"): await mapper.create_document({"name":"Early", "generation_job_id":job.id}, **document_outputs(files))
             await mapper.update_job(job.id, status="FAILED", stage="TEST", progress=0, error={"message":"fixture"})
             await mapper.retry_job(job.id)
             assert job.status == "PENDING" and job.retry_count == 1 and job.error is None
@@ -162,14 +168,14 @@ async def test_retry_state_rules_and_frozen_template(sessions):
             with pytest.raises(ValueError): await mapper.update_job(job.id, status="COMPILED", stage="TEST", progress=99)
 
 
-async def test_json_check_fk_and_orm_immutability(sessions):
+async def test_json_check_fk_and_orm_immutability(sessions, private_store):
     async with sessions() as session:
-        async with session.begin():
+        async with private_asset_transaction(session, private_store, 71) as files:
             await approve_fixture(session)
             mapper = ResumeStorageMapper(session, 71)
             item = await mapper.create_experience(EXAMPLES[2])
             job = await complete_fixture(mapper)
-            doc = await mapper.create_document({"name":"Constraints", "generation_job_id":job.id})
+            doc = await mapper.create_document({"name":"Constraints", "generation_job_id":job.id}, **document_outputs(files))
             item_id, job_id, doc_id = item.id, job.id, doc.id
             assert await session.scalar(text("SELECT JSON_UNQUOTE(JSON_EXTRACT(attributes,'$.role')) FROM experience_items WHERE id=:id"), {"id":item_id}) == "Developer"
         for sql in ("UPDATE experience_items SET attributes=JSON_ARRAY() WHERE id=:id", "UPDATE experience_items SET revision=0 WHERE id=:id"):
@@ -178,6 +184,11 @@ async def test_json_check_fk_and_orm_immutability(sessions):
             assert error.value.orig.args[0] == 3819
         with pytest.raises(IntegrityError):
             async with session.begin(): await session.execute(text("UPDATE resume_documents SET user_id=72 WHERE id=:id"), {"id":doc_id})
+        for field in ("pdf_asset", "latex_asset"):
+            with pytest.raises(DBAPIError) as error:
+                async with session.begin():
+                    await session.execute(text(f"UPDATE resume_documents SET {field}=NULL WHERE id=:id"), {"id":doc_id})
+            assert error.value.orig.args[0] == 3819
         for model, key, field, value in ((Template, ("tpl-billryan-classic","1.0.0"), "main_source", "changed"), (Job, job_id, "jd_snapshot", {"text":"changed"}), (Document, doc_id, "snapshot", {})):
             with pytest.raises(ValueError, match="immutable"):
                 async with session.begin():
@@ -249,7 +260,7 @@ async def test_active_job_input_protection_and_owner_file_validation(sessions, t
             mapper = ResumeStorageMapper(session, 71)
             job = await complete_fixture(mapper)
             pdf = batch.write(b"fixture", "pdf")
-            doc = await mapper.create_document({"name":"Protected", "generation_job_id":job.id}, pdf_asset=pdf)
+            doc = await mapper.create_document({"name":"Protected", "generation_job_id":job.id}, pdf_asset=pdf, latex_asset=batch.write(b"latex", "tex"))
             await mapper.delete_document(doc.id, retention_days=0)
             active = await mapper.create_job(request(personal_info={"avatar_asset":pdf.model_dump()}))
             active_id = active.id
@@ -292,11 +303,12 @@ async def test_document_snapshot_assets_require_boundary(sessions, tmp_path):
             mapper = ResumeStorageMapper(session, 71)
             job = await complete_fixture(mapper, personal_info={"avatar_asset": avatar.model_dump()})
             job_id = job.id
+            outputs = document_outputs(batch)
         async with session.begin():
             with pytest.raises(RuntimeError, match="private_asset_transaction"):
-                await mapper.create_document({"name":"Snapshot", "generation_job_id":job_id})
+                await mapper.create_document({"name":"Snapshot", "generation_job_id":job_id}, **outputs)
         async with private_asset_transaction(session, store, 71):
-            doc = await mapper.create_document({"name":"Snapshot", "generation_job_id":job_id})
+            doc = await mapper.create_document({"name":"Snapshot", "generation_job_id":job_id}, **outputs)
             assert doc.snapshot["personal_info_snapshot"]["avatar_asset"]["key"] == avatar.key
 
 
@@ -308,7 +320,7 @@ async def test_cleanup_refreshes_traces_from_other_session(sessions, tmp_path):
             mapper = ResumeStorageMapper(first, 71)
             output_job = await complete_fixture(mapper)
             pdf = batch.write(b"retained by trace", "pdf")
-            doc = await mapper.create_document({"name":"Trace protection", "generation_job_id":output_job.id}, pdf_asset=pdf)
+            doc = await mapper.create_document({"name":"Trace protection", "generation_job_id":output_job.id}, pdf_asset=pdf, latex_asset=batch.write(b"latex", "tex"))
             await mapper.delete_document(doc.id, retention_days=0)
             active = await mapper.create_job(request())
             active_id = active.id
