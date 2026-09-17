@@ -4,10 +4,10 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
-from sqlalchemy import select, text, or_
+from sqlalchemy import select, text, or_, and_
 from app.infrastructure.resume_template_store import safe_path
-from app.models.resume_storage_contracts import FileAsset, owner_id
-from app.models.resume_storage_models import ResumeDocumentModel, ResumeGenerationJobModel, utcnow
+from app.models.resume_storage_contracts import FileAsset, CleanupCursor, owner_id
+from app.models.resume_storage_models import ExperienceItemModel, ResumeDocumentModel, ResumeGenerationJobModel, utcnow
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ROOT = BACKEND_ROOT / "data/private_resume_assets"
@@ -154,24 +154,39 @@ async def private_asset_transaction(session, store, owner):
             session.info.pop("resume_private_assets", None)
 
 
-async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, limit=100):
+async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, limit=100, after=None):
     owner_id(owner)
     if session.in_transaction() or not 1 <= limit <= 1000:
         raise ValueError("cleanup requires fresh session and bounded limit")
     now = now or utcnow()
     if now.tzinfo is not None:
         raise ValueError("expected UTC naive timestamp")
+    cursor = CleanupCursor.model_validate(after) if after is not None else None
     async with root_mutex(session, store):
         async with session.begin():
-            rows = list((await session.execute(select(ResumeDocumentModel).where(
+            stmt = select(ResumeDocumentModel).where(
                 ResumeDocumentModel.user_id == owner, ResumeDocumentModel.deleted_at.is_not(None),
-                ResumeDocumentModel.purge_after <= now,
-            ).order_by(ResumeDocumentModel.purge_after, ResumeDocumentModel.id).limit(limit).with_for_update().execution_options(populate_existing=True))).scalars())
+                ResumeDocumentModel.purge_after <= now, ResumeDocumentModel.files_purged_at.is_(None),
+            )
+            if cursor:
+                stmt = stmt.where(or_(ResumeDocumentModel.purge_after > cursor.purge_after,
+                    and_(ResumeDocumentModel.purge_after == cursor.purge_after, ResumeDocumentModel.id > cursor.id)))
+            rows = list((await session.execute(stmt.order_by(ResumeDocumentModel.purge_after, ResumeDocumentModel.id)
+                .limit(limit + 1).with_for_update().execution_options(populate_existing=True))).scalars())
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            next_cursor = CleanupCursor(purge_after=rows[-1].purge_after, id=rows[-1].id).model_dump(mode="json") if has_more else None
             candidates = {}
             for row in rows:
                 for asset in assets_in([row.pdf_asset, row.latex_asset]):
                     candidates[asset.key] = asset
             protected = set()
+            sources = (await session.execute(select(ExperienceItemModel.source_locator).where(
+                ExperienceItemModel.user_id == owner,
+            ).with_for_update())).scalars()
+            # Archived experiences still retain their provenance and may be reused.
+            for locator in sources:
+                protected.update(a.key for a in assets_in(locator))
             living = (await session.execute(select(ResumeDocumentModel).where(
                 ResumeDocumentModel.user_id == owner,
                 or_(ResumeDocumentModel.deleted_at.is_(None), ResumeDocumentModel.purge_after > now),
@@ -188,14 +203,16 @@ async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, li
                 if store.path(owner, asset.key).exists():
                     store.read(owner, asset)
             if not dry_run:
+                # Eligibility is already a committed soft-delete. Keep its metadata
+                # and hold the mutex until actual unlink and completion commit.
+                # Failed unlink/commit leaves an eligible tombstone for retry.
+                for asset in removable.values():
+                    store.remove(owner, asset)
                 for row in rows:
                     keys = {a.key for a in assets_in([row.pdf_asset, row.latex_asset])}
                     if not keys & protected:
                         row.files_purged_at = now
                 await session.flush()
-        # Markers committed before deleting, under the same mutex. Failed unlink is retryable.
-        if not dry_run:
-            for asset in removable.values():
-                store.remove(owner, asset)
         return {"dry_run": dry_run, "document_ids": [r.id for r in rows],
-            "removable_keys": sorted(removable), "protected_keys": sorted(set(candidates) & protected)}
+            "removable_keys": sorted(removable), "protected_keys": sorted(set(candidates) & protected),
+            "has_more": has_more, "next_cursor": next_cursor}
