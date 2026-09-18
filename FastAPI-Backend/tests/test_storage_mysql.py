@@ -79,14 +79,14 @@ async def test_transaction_rollback_and_legacy_provenance(sessions):
                 await ResumeStorageMapper(session, 72).create_experience({**EXAMPLES[0], "source_type": "PDF_IMPORT", "source_resume_id": 1})
 
 
-async def test_all_six_seed_and_content_conflict(sessions, tmp_path):
+async def test_all_template_versions_seed_and_content_conflict(sessions, tmp_path):
     async with sessions() as session:
         async with session.begin():
-            assert await initialize_templates(session) == 6
+            assert await initialize_templates(session) == 8
             assert await initialize_templates(session) == 0
             rows = list((await session.execute(select(Template))).scalars())
             assert {row.id for row in rows} == {"tpl-" + name for name in ("billryan-classic", "modern-twocol", "altacv", "jakes-resume", "huajh-resume", "zheyuye-chinese")}
-            assert all(row.validation_status == "UNVALIDATED" and not row.is_enabled for row in rows)
+            assert {(row.id, row.version) for row in rows if row.is_enabled} == {("tpl-billryan-classic", "1.1.0"), ("tpl-modern-twocol", "1.1.0")}
             with pytest.raises(ValueError, match="validated"):
                 await ResumeStorageMapper(session, 71).create_job(request())
             original = deepcopy((await session.get(Template, ("tpl-altacv", "1.0.0"))).resources)

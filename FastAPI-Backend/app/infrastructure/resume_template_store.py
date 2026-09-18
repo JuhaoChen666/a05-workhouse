@@ -5,14 +5,17 @@ import json
 import os
 import stat
 from pathlib import Path, PurePosixPath
+
 from sqlalchemy import select
+
 from app.models.resume_latex_contracts import ResumeTemplateMetadata
 from app.models.resume_storage_models import ResumeTemplateModel, utcnow
+from app.services.resume_template_service import validate_template
 
 BUILTIN_ROOT = Path(__file__).resolve().parents[3] / "Springboot-backend/src/main/resources/templates/latex"
 
 
-class TemplateVersionConflict(ValueError):
+class TemplateVersionConflict(ValueError):  # noqa: N818 - public Phase 1 API
     pass
 
 
@@ -62,12 +65,16 @@ def read_bundle(directory):
     for name in (entry, meta.model_extra.get("cls_file")):
         if name and relative_name(name) not in files:
             raise ValueError("required resource missing")
-    metadata = meta.model_dump(mode="json")
+    excluded = set() if "protocol_version" in meta.model_fields_set else {"protocol_version"}
+    metadata = meta.model_dump(mode="json", exclude=excluded)
     digest = hashlib.sha256(json.dumps({"metadata": metadata, "resources": files}, sort_keys=True, ensure_ascii=False, allow_nan=False).encode("utf8")).hexdigest()
-    return dict(id=meta.id, version=meta.version, name=meta.name, metadata_json=metadata,
-        supported_sections=meta.supported_sections, supported_pages=meta.recommended_pages,
-        supported_languages=meta.supported_languages, entry_file=entry,
-        main_source=base64.b64decode(files[entry]["content"]).decode("utf8"), resources=files, content_digest=digest)
+    return {
+        "id": meta.id, "version": meta.version, "name": meta.name, "metadata_json": metadata,
+        "supported_sections": meta.supported_sections, "supported_pages": meta.recommended_pages,
+        "supported_languages": meta.supported_languages, "entry_file": entry,
+        "main_source": base64.b64decode(files[entry]["content"]).decode("utf8"),
+        "resources": files, "content_digest": digest,
+    }
 
 
 async def initialize_templates(session, root=BUILTIN_ROOT):
@@ -96,8 +103,9 @@ async def initialize_templates(session, root=BUILTIN_ROOT):
             if any(getattr(existing, k) != v for k, v in values.items()):
                 raise TemplateVersionConflict("immutable version content differs")
         else:
-            session.add(ResumeTemplateModel(**values, validation_status="UNVALIDATED", is_enabled=False,
-                validation_details={}, created_at=utcnow()))
+            report = validate_template(values["metadata_json"], values["main_source"])
+            session.add(ResumeTemplateModel(**values, validation_status="VALIDATED" if report.valid else "INVALID",
+                is_enabled=report.valid, validation_details=report.model_dump(mode="json"), created_at=utcnow()))
             inserted += 1
     await session.flush()
     return inserted
@@ -105,7 +113,7 @@ async def initialize_templates(session, root=BUILTIN_ROOT):
 
 async def main():
     from sqlalchemy.engine import make_url
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     url = os.environ.get("RESUME_DATABASE_URL")
     if not url or make_url(url).drivername != "mysql+aiomysql":
         raise RuntimeError("explicit RESUME_DATABASE_URL required")
@@ -113,7 +121,7 @@ async def main():
     try:
         async with async_sessionmaker(engine)() as session, session.begin():
             count = await initialize_templates(session)
-        print(f"Initialized {count} versions, UNVALIDATED and disabled")
+        print(f"Initialized {count} immutable template versions")
     finally:
         await engine.dispose()
 

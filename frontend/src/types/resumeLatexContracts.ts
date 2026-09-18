@@ -67,6 +67,7 @@ export interface ResumeTemplateMetadata {
   id: string
   name: string
   version: string
+  protocol_version?: '1.0'
   entry_file: string
   supported_languages: Array<"zh" | "en">
   [key: string]: unknown
@@ -76,6 +77,83 @@ export interface ResumeTemplateMetadata {
   supports_avatar: boolean
   default_avatar_style: string
   supported_sections: string[]
+  placeholders: Record<string, unknown>
+}
+
+export type ResumeTemplateSection =
+  | 'basic_info'
+  | 'education'
+  | 'skills'
+  | 'work'
+  | 'projects'
+  | 'certificates'
+  | 'competitions'
+
+export interface ResumeTemplateSummary {
+  id: string
+  version: string
+  name: string
+  description: string
+  protocol_version: '1.0'
+  supported_sections: ResumeTemplateSection[]
+  supported_pages: number[]
+  supported_languages: Array<'zh' | 'en'>
+  supports_avatar: boolean
+  validation_status: 'UNVALIDATED' | 'VALIDATED' | 'INVALID'
+  is_enabled: boolean
+}
+
+export interface ResumeTemplateDetail extends ResumeTemplateSummary {
+  metadata: ResumeTemplateMetadata
+  content_digest: string
+  validation_details: Record<string, unknown>
+  available_versions: string[]
+}
+
+export interface TemplateValidationIssue {
+  code: string
+  message: string
+}
+
+export interface TemplateValidationReport {
+  valid: boolean
+  protocol_version: '1.0'
+  required_sections: ResumeTemplateSection[]
+  referenced_roots: string[]
+  issues: TemplateValidationIssue[]
+}
+
+export interface TemplateCompatibilityRequest {
+  language: 'zh' | 'en'
+  target_pages: 1 | 2
+  show_avatar: boolean
+  sections: ResumeTemplateSection[]
+}
+
+export interface TemplateCompatibilityResponse {
+  compatible: boolean
+  issues: TemplateValidationIssue[]
+}
+
+export interface TemplatePreviewRequest {
+  data: {
+    basic_info: Record<string, string>
+    education: Array<Record<string, string>>
+    skills: Array<Record<string, string>>
+    work: Array<Record<string, string | string[]>>
+    projects: Array<Record<string, string | string[]>>
+    certificates: Array<Record<string, string>>
+    competitions: Array<Record<string, string>>
+  }
+  options?: { show_avatar: boolean }
+}
+
+export interface TemplatePreviewResponse {
+  template_id: string
+  version: string
+  content_digest: string
+  source_sha256: string
+  latex_source: string
 }
 
 export interface ResumeGenerationRequest {
