@@ -82,11 +82,13 @@ async def test_transaction_rollback_and_legacy_provenance(sessions):
 async def test_all_template_versions_seed_and_content_conflict(sessions, tmp_path):
     async with sessions() as session:
         async with session.begin():
-            assert await initialize_templates(session) == 8
+            assert await initialize_templates(session) == 10
             assert await initialize_templates(session) == 0
             rows = list((await session.execute(select(Template))).scalars())
             assert {row.id for row in rows} == {"tpl-" + name for name in ("billryan-classic", "modern-twocol", "altacv", "jakes-resume", "huajh-resume", "zheyuye-chinese")}
-            assert {(row.id, row.version) for row in rows if row.is_enabled} == {("tpl-billryan-classic", "1.1.0"), ("tpl-modern-twocol", "1.1.0")}
+            assert {(row.id, row.version) for row in rows if row.is_enabled} == {
+                ("tpl-billryan-classic", "1.1.0"), ("tpl-modern-twocol", "1.1.0"),
+                ("tpl-billryan-classic", "1.2.0"), ("tpl-modern-twocol", "1.2.0")}
             with pytest.raises(ValueError, match="validated"):
                 await ResumeStorageMapper(session, 71).create_job(request())
             original = deepcopy((await session.get(Template, ("tpl-altacv", "1.0.0"))).resources)
@@ -114,6 +116,31 @@ async def test_duplicate_template_preflight_writes_nothing(sessions, tmp_path):
         with pytest.raises(TemplateVersionConflict, match="duplicate"):
             async with session.begin(): await initialize_templates(session, root)
         async with session.begin(): assert not list((await session.execute(select(Template))).scalars())
+
+
+async def test_publish_new_version_preserves_different_historical_bytes(sessions, tmp_path):
+    root = tmp_path / "version-publication"
+    root.mkdir()
+    for name in ("billryan-classic-v1.1.0", "billryan-classic-v1.2.0"):
+        bundle = root / name
+        bundle.mkdir()
+        for path in (BUILTIN_ROOT / name).iterdir():
+            (bundle / path.name).write_bytes(path.read_bytes())
+    async with sessions() as session:
+        async with session.begin():
+            await initialize_templates(session)
+            old = await session.get(Template, ("tpl-billryan-classic", "1.1.0"))
+            original_source, original_resources = old.main_source, deepcopy(old.resources)
+        with (root / "billryan-classic-v1.1.0" / "resume.tex.j2").open("ab") as stream:
+            stream.write(b"\n% different historical checkout bytes\n")
+        async with session.begin():
+            assert await initialize_templates(session, root, version="1.2.0") == 0
+        with pytest.raises(TemplateVersionConflict):
+            async with session.begin():
+                await initialize_templates(session, root)
+        async with session.begin():
+            await session.refresh(old)
+            assert old.main_source == original_source and old.resources == original_resources
 
 
 async def test_snapshots_actual_jd_selection_and_cross_owner(sessions, private_store):

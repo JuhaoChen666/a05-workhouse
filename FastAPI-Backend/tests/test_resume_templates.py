@@ -112,6 +112,8 @@ def test_only_protocol_versions_are_eligible_for_enablement():
     assert {identity for identity, valid in reports.items() if valid} == {
         ("tpl-billryan-classic", "1.1.0"),
         ("tpl-modern-twocol", "1.1.0"),
+        ("tpl-billryan-classic", "1.2.0"),
+        ("tpl-modern-twocol", "1.2.0"),
     }
 
 

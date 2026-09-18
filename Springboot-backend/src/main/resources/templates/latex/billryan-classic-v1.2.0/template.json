@@ -1,0 +1,104 @@
+{
+  "id": "tpl-billryan-classic",
+  "name": "经典单栏简历",
+  "version": "1.2.0",
+  "protocol_version": "1.1",
+  "description": "ATS 友好的单栏排版，突出教育、工作和项目经历。",
+  "engine": "xelatex",
+  "cjk_package": "xeCJK",
+  "recommended_pages": [
+    1,
+    2
+  ],
+  "supported_languages": [
+    "zh",
+    "en"
+  ],
+  "supports_avatar": false,
+  "default_avatar_style": "none",
+  "entry_file": "resume.tex.j2",
+  "supported_sections": [
+    "basic_info",
+    "education",
+    "skills",
+    "work",
+    "projects",
+    "certificates",
+    "competitions"
+  ],
+  "placeholders": {
+    "basic_info": {
+      "name": "string",
+      "title": "string",
+      "phone": "string",
+      "email": "string",
+      "github": "string",
+      "city": "string",
+      "avatar_path": "string"
+    },
+    "education": [
+      {
+        "school": "string",
+        "major": "string",
+        "degree": "string",
+        "date_range": "string",
+        "gpa": "string"
+      }
+    ],
+    "skills": [
+      {
+        "category": "string",
+        "items": "string"
+      }
+    ],
+    "work": [
+      {
+        "company": "string",
+        "role": "string",
+        "date_range": "string",
+        "department": "string",
+        "city": "string",
+        "bullets": [
+          "string"
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "title": "string",
+        "role": "string",
+        "date_range": "string",
+        "tech_stack": "string",
+        "project_url": "string",
+        "bullets": [
+          "string"
+        ]
+      }
+    ],
+    "certificates": [
+      {
+        "title": "string",
+        "authority": "string",
+        "issue_date": "string",
+        "certificate_no": "string",
+        "category": "string",
+        "description": "string"
+      }
+    ],
+    "competitions": [
+      {
+        "title": "string",
+        "award_level": "string",
+        "award_date": "string",
+        "organization": "string",
+        "rank": "string",
+        "description": "string"
+      }
+    ]
+  },
+  "generation_options": {
+    "module_order": true,
+    "language": true,
+    "page_limit": true
+  }
+}
