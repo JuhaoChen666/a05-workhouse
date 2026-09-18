@@ -107,6 +107,8 @@ const menuItems =   [
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
   { name: "HomeQuestion", label: "AI押题", icon: Opportunity },
   { name: "HomeResume", label: "简历管理", icon: Document },
+  { name: "HomeExperienceLibrary", label: "经历库", icon: Document },
+  { name: "HomeResumeGeneration", label: "生成简历", icon: Opportunity },
   { name: "HomeDoc", label: "帮助文档", icon: Notebook },
 ];
 
@@ -126,6 +128,8 @@ const titleMap: Record<string, string> = {
   HomeQuestion: "AI押题",
   HomePredictQuestions: "面试押题",
   HomeResume: "简历管理",
+  HomeExperienceLibrary: "经历库",
+  HomeResumeGeneration: "JD 简历生成",
   HomeResumeOptimize: "简历优化",
   HomeResumeOptimizeRun: "简历优化",
   HomeJob: "岗位检索",

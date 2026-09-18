@@ -50,3 +50,5 @@ pytest-cache-files-*/
 issue1-*.local.*
 FastAPI-Backend/data/private_resume_assets/
 FastAPI-Backend/data/resume_delete_pending/
+.phase45-output/
+.phase45-output-*/

@@ -161,9 +161,11 @@ export interface ResumeGenerationRequest {
   jd_text?: string
   job_id?: string
   template_id: string
+  template_version?: string
   target_pages: 1 | 2
   language: 'zh' | 'en'
   show_avatar: boolean
+  personal_info?: Record<string, unknown>
   selected_item_ids?: string[] | null
   ai_recommendation_mode: 'MANUAL_ONLY' | 'JD_AUTO_SELECT_AND_TAILOR'
 }
@@ -182,6 +184,15 @@ export interface ResumeGenerationJob {
   pdf_download_url?: string
   latex_source_url?: string
   compile_error_message?: string
+  compile_error_location?: string
+  stage?: string
+  retryable?: boolean
+  recommendation?: {
+    selected_item_ids: string[]
+    keyword_matches: Record<string, string[]>
+    keyword_count: number
+    trimmed_item_ids: string[]
+  } | null
   traces: AITailoredBulletTrace[]
   created_at: string
 }
