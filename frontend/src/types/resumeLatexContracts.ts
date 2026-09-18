@@ -180,7 +180,7 @@ export interface AITailoredBulletTrace {
 export interface ResumeGenerationJob {
   job_id: string
   document_id?: string | null
-  status: 'PENDING' | 'PROCESSING' | 'COMPILED' | 'FAILED'
+  status: 'PENDING' | 'PROCESSING' | 'WAITING_REVIEW' | 'COMPILED' | 'FAILED'
   progress_percentage: number
   pdf_download_url?: string
   latex_source_url?: string
@@ -194,7 +194,9 @@ export interface ResumeGenerationJob {
     keyword_count?: number
     trimmed_item_ids?: string[]
   } | null
-  result_metadata?: { ai_status?: string; ai_error_code?: string; actual_pages?: number; maximum_pages?: number; selected_item_ids?: string[]; module_order?: string[]; unverified_rewrites_preserved?: number } | null
+  result_metadata?: { ai_status?: string; ai_error_code?: string; actual_pages?: number; maximum_pages?: number; selected_item_ids?: string[]; module_order?: string[]; unverified_rewrites_preserved?: number; keyword_matches?: Record<string, string[]>; trim_suggestions?: string[]; review_status?: string } | null
+  review_plan?: { version: string; tailored_bullets: AITailoredBulletTrace[]; keyword_matches: Record<string, string[]>; trim_suggestions: string[] } | null
+  review_decision?: { version: string; accepted_indices: number[] } | null
   traces: AITailoredBulletTrace[]
   created_at: string
 }

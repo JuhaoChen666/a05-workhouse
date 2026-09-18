@@ -74,6 +74,7 @@ const loading = ref(false);
 const visible = ref(false);
 const previewVisible = ref(false);
 const previewURL = ref('');
+const previewDocumentId = ref('');
 const edit = reactive<any>({ jd_text: '', personal_info: {}, selected_item_ids: [], target_pages: 1, language: 'zh', ai_recommendation_mode: 'MANUAL_ONLY' });
 const personFields = [{ key: 'name', label: '姓名' }, { key: 'title', label: '求职方向' }, { key: 'phone', label: '电话' }, { key: 'email', label: '邮箱' }, { key: 'city', label: '城市' }, { key: 'github', label: 'GitHub / 作品链接' }];
 const educationFields = [{ key: 'school', label: '学校' }, { key: 'major', label: '专业' }, { key: 'degree', label: '学历' }, { key: 'date_range', label: '就读年月' }, { key: 'gpa', label: 'GPA' }];
@@ -116,7 +117,17 @@ async function nameAction(row: SavedResumeDocument, copy: boolean) {
   } catch (error) { if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message); }
 }
 async function remove(row: SavedResumeDocument) {
-  try { await ElMessageBox.confirm(`删除“${row.name}”？文件按保留期清理，共享副本仍可访问。`, '删除简历'); await interviewRequest.delete(`/resume-documents/${row.id}`); await reload(); }
+  try {
+    await ElMessageBox.confirm(`删除“${row.name}”？文件按保留期清理，共享副本仍可访问。`, '删除简历');
+    await interviewRequest.delete(`/resume-documents/${row.id}`);
+    if (detail.value?.id === row.id) { visible.value = false; detail.value = undefined; }
+    if (previewDocumentId.value === row.id) {
+      previewVisible.value = false;
+      if (previewURL.value) URL.revokeObjectURL(previewURL.value);
+      previewURL.value = ''; previewDocumentId.value = '';
+    }
+    await reload();
+  }
   catch (error) { if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message); }
 }
 async function asset(row: SavedResumeDocument, format: 'pdf' | 'latex', preview = false) {
@@ -124,7 +135,7 @@ async function asset(row: SavedResumeDocument, format: 'pdf' | 'latex', preview 
     const response = await fetch(`${INTERVIEW_API_ORIGIN}/api/resume-documents/${row.id}/${format}`, { headers: { Authorization: `Bearer ${user.token}` } });
     if (!response.ok) throw new Error(`文件不可用（${response.status}）`);
     const url = URL.createObjectURL(await response.blob());
-    if (preview) { if (previewURL.value) URL.revokeObjectURL(previewURL.value); previewURL.value = url; previewVisible.value = true; }
+    if (preview) { if (previewURL.value) URL.revokeObjectURL(previewURL.value); previewURL.value = url; previewDocumentId.value = row.id; previewVisible.value = true; }
     else { const link = document.createElement('a'); link.href = url; link.download = `${row.name}.${format === 'pdf' ? 'pdf' : 'tex'}`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
   } catch (error) { ElMessage.error((error as Error).message); }
 }

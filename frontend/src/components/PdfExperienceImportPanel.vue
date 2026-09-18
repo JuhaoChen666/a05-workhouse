@@ -21,13 +21,19 @@
       <div class="controls">
         <el-button v-if="batch.status === 'FAILED'" @click="run(() => retryImport(batch!.id))">重试解析</el-button>
         <el-button v-if="['READY', 'FAILED', 'PROCESSING'].includes(batch.status)" @click="run(() => cancelImport(batch!.id))">取消本批次</el-button>
-        <el-button v-if="batch.status === 'READY'" type="primary" :disabled="!selected.length || dirtyIds.length > 0" @click="confirm">确认选中的 {{ selected.length }} 条经历</el-button>
+        <el-button v-if="batch.status === 'READY'" type="primary" :disabled="!selected.length || dirtyIds.length > 0 || conflicts.length > 0 || missingIds.length > 0" @click="confirm">确认选中的 {{ selected.length }} 条经历</el-button>
         <el-tag v-if="dirtyIds.length" type="warning">有 {{ dirtyIds.length }} 条未保存修正，请先保存</el-tag>
         <el-tag v-if="batch.status === 'CONFIRMED'" type="success">已确认入库；再次确认不会重复创建经历</el-tag>
       </div>
       <el-collapse>
         <el-collapse-item v-for="draft in batch.items" :key="draft.id" :name="draft.id" :title="`${draft.content.title || '待补充标题'}${draft.needs_correction ? ' · 需要修正' : ''}`">
           <el-checkbox v-model="selected" :value="draft.id" :disabled="batch.status !== 'READY'">选择此经历</el-checkbox>
+          <el-alert v-if="missingIds.includes(draft.id)" title="服务端已删除此草稿；本地修正仍保留，请复制需要的内容后明确丢弃。" type="warning" :closable="false" />
+          <div v-for="conflict in conflicts.filter(row => row.draftId === draft.id)" :key="conflict.field">
+            <p>字段 {{ conflict.field }} 存在并发修改。服务端：{{ JSON.stringify(conflict.remote) }}；本地：{{ JSON.stringify(draft.content[conflict.field]) }}</p>
+            <el-button @click="resolveConflict(conflict, false)">保留本地修正</el-button>
+            <el-button @click="resolveConflict(conflict, true)">采用服务端版本</el-button>
+          </div>
           <p v-if="draft.source_locator.page">来源页码：{{ draft.source_locator.page }}</p>
           <blockquote v-if="draft.source_locator.snippet">{{ draft.source_locator.snippet }}</blockquote>
           <el-alert v-for="(issue, index) in draft.issues" :key="index" type="warning" :title="`${issue.field || ''} ${issue.message || issue.code || '请核实字段'}`" :closable="false" />
@@ -38,7 +44,7 @@
               <el-input v-else v-model="draft.content[field.key]" :type="field.key === 'description' ? 'textarea' : 'text'" />
             </el-form-item>
           </el-form>
-          <el-button :disabled="batch.status !== 'READY'" @click="save(draft)">保存修正</el-button>
+          <el-button :disabled="batch.status !== 'READY' || missingIds.includes(draft.id) || conflicts.some(row => row.draftId === draft.id)" @click="save(draft)">保存修正</el-button>
           <el-button type="danger" :disabled="batch.status !== 'READY'" @click="remove(draft)">删除草稿</el-button>
         </el-collapse-item>
       </el-collapse>
@@ -47,8 +53,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
+import { mergeDraftContent, type FieldConflict } from '@/utils/draftMerge';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { cancelImport, confirmImport, editDraft, existingImport, getImport, listImports, listPDFSources, removeDraft, retryImport, uploadImport, type ImportBatch, type ImportDraft } from '@/api/experienceImports';
 const emit = defineEmits<{ confirmed: [] }>();
@@ -61,6 +68,7 @@ const sourceId = ref<number>();
 const sourcePage = ref(1), batchPage = ref(1), moreSources = ref(false), moreBatches = ref(false);
 const selected = ref<string[]>([]);
 const savedContents = ref<Record<string, string>>({});
+const conflicts = ref<FieldConflict[]>([]), missingIds = ref<string[]>([]);
 const dirtyIds = computed(() => (batch.value?.items || []).filter(row => JSON.stringify(row.content) !== savedContents.value[row.id]).map(row => row.id));
 function rememberSaved() { savedContents.value = Object.fromEntries((batch.value?.items || []).map(row => [row.id, JSON.stringify(row.content)])); }
 const typeLabels: Record<string, string> = { WORK: '工作/实习', PROJECT: '项目', SKILL: '技能', CERTIFICATE: '证书', COMPETITION_AWARD: '比赛/荣誉' };
@@ -87,7 +95,46 @@ async function refresh() {
   batches.value = await listImports(); sources.value = await listPDFSources();
   sourcePage.value = batchPage.value = 1;
   moreSources.value = sources.value.length === 100; moreBatches.value = batches.value.length === 50;
-  if (batch.value && !dirtyIds.value.length) { batch.value = await getImport(batch.value.id); rememberSaved(); }
+  if (batch.value) await refreshCurrent();
+}
+async function refreshCurrent() {
+  if (!batch.value) return;
+  const local = batch.value.items, bases = { ...savedContents.value };
+  const fresh = await getImport(batch.value.id);
+  const pendingConflicts: FieldConflict[] = [];
+  const merged = fresh.items.map(remote => {
+    const row = local.find(item => item.id === remote.id);
+    if (!row) return remote;
+    const result = mergeDraftContent(remote.id, JSON.parse(bases[remote.id] || '{}'), row.content, remote.content);
+    pendingConflicts.push(...result.conflicts);
+    return { ...remote, content: result.content };
+  });
+  missingIds.value = local.filter(row => !fresh.items.some(item => item.id === row.id) && JSON.stringify(row.content) !== bases[row.id]).map(row => row.id);
+  batch.value = fresh; rememberSaved();
+  batch.value.items = [...merged, ...local.filter(row => missingIds.value.includes(row.id))];
+  for (const id of missingIds.value) savedContents.value[id] = bases[id]!;
+  // An unresolved conflict remains unresolved across repeated refreshes.
+  conflicts.value = [...pendingConflicts, ...conflicts.value.filter(old => !pendingConflicts.some(row => row.draftId === old.draftId && row.field === old.field) && fresh.items.some(row => row.id === old.draftId))];
+  selected.value = selected.value.filter(id => fresh.items.some(row => row.id === id));
+}
+function resolveConflict(conflict: FieldConflict, remote: boolean) {
+  const draft = batch.value?.items.find(row => row.id === conflict.draftId);
+  if (draft && remote) {
+    if (conflict.remote === undefined) delete draft.content[conflict.field]; else draft.content[conflict.field] = conflict.remote;
+  }
+  conflicts.value = conflicts.value.filter(row => row !== conflict);
+}
+async function protectChanges() {
+  if (!dirtyIds.value.length && !conflicts.value.length) return true;
+  try {
+    await ElMessageBox.confirm('有未保存修正。保存后继续，或明确丢弃；关闭窗口取消操作。', '保护草稿修正', { confirmButtonText: '保存后继续', cancelButtonText: '丢弃修正', distinguishCancelAndClose: true });
+    if (conflicts.value.length || missingIds.value.length) { ElMessage.warning('请先处理冲突或服务端删除的草稿'); return false; }
+    for (const id of [...dirtyIds.value]) {
+      const draft = batch.value?.items.find(row => row.id === id);
+      if (draft && !await save(draft)) return false;
+    }
+    return true;
+  } catch (error) { return error === 'cancel'; }
 }
 async function loadMoreSources() {
   try { const rows = await listPDFSources(sourcePage.value + 1); sources.value.push(...rows); sourcePage.value++; moreSources.value = rows.length === 100; }
@@ -97,10 +144,15 @@ async function loadMoreBatches() {
   try { const rows = await listImports(batchPage.value + 1); batches.value.push(...rows); batchPage.value++; moreBatches.value = rows.length === 50; }
   catch (error) { ElMessage.error((error as Error).message); }
 }
-async function openBatch(id: string) { batch.value = await getImport(id); rememberSaved(); selected.value = batch.value.items.map(row => row.id); }
+async function openBatch(id: string) {
+  if (batch.value?.id === id) { await refreshCurrent(); return; }
+  if (!await protectChanges()) return;
+  batch.value = await getImport(id); rememberSaved(); conflicts.value = []; missingIds.value = []; selected.value = batch.value.items.map(row => row.id);
+}
 async function run(action: () => Promise<ImportBatch>) {
+  if (!await protectChanges()) return;
   busy.value = true;
-  try { batch.value = await action(); rememberSaved(); selected.value = batch.value.items.map(row => row.id); await refresh(); }
+  try { batch.value = await action(); rememberSaved(); conflicts.value = []; missingIds.value = []; selected.value = batch.value.items.map(row => row.id); await refresh(); }
   catch (error) {
     const failure = error as Error & { details?: { import_id?: string } };
     ElMessage.error(failure.message);
@@ -114,19 +166,19 @@ async function upload(event: Event) {
   input.value = '';
 }
 async function save(draft: ImportDraft) {
+  const batchId = batch.value!.id;
+  const submitted = JSON.parse(JSON.stringify(draft));
   try {
-    await editDraft(batch.value!.id, draft);
-    const unsaved = batch.value!.items.filter(row => row.id !== draft.id && dirtyIds.value.includes(row.id)).map(row => ({ id: row.id, content: JSON.parse(JSON.stringify(row.content)) }));
-    const checked = [...selected.value];
-    batch.value = await getImport(batch.value!.id);
-    rememberSaved();
-    for (const local of unsaved) { const fresh = batch.value.items.find(row => row.id === local.id); if (fresh) fresh.content = local.content; }
-    selected.value = checked;
+    await editDraft(batchId, submitted);
+    if (batch.value?.id !== batchId) return false;
+    savedContents.value[draft.id] = JSON.stringify(submitted.content);
+    await refreshCurrent();
     ElMessage.success('修正已保存，请再次核对后确认');
-  } catch (error) { ElMessage.error(`${(error as Error).message}；请刷新批次核对最新版本，未保存的修正仍显示在当前表单。`); }
+    return true;
+  } catch (error) { ElMessage.error(`${(error as Error).message}；请刷新批次比较最新版本，本地修正将保留。`); return false; }
 }
 async function remove(draft: ImportDraft) {
-  try { await ElMessageBox.confirm('删除这条草稿？正式经历库不受影响。', '删除草稿'); await removeDraft(batch.value!.id, draft); await openBatch(batch.value!.id); }
+  try { await ElMessageBox.confirm('删除这条草稿？正式经历库不受影响。', '删除草稿'); await removeDraft(batch.value!.id, draft); batch.value!.items = batch.value!.items.filter(row => row.id !== draft.id); await refreshCurrent(); }
   catch (error) { if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message); }
 }
 async function confirm() {
@@ -136,7 +188,12 @@ async function confirm() {
     await openBatch(batch.value!.id); emit('confirmed'); ElMessage.success('经历已确认入库');
   } catch (error) { if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message); }
 }
-onMounted(() => { void refresh().then(() => typeof route.query.import === 'string' ? openBatch(route.query.import) : undefined).catch(error => ElMessage.error(error.message)); });
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (dirtyIds.value.length || conflicts.value.length) { event.preventDefault(); event.returnValue = ''; }
+}
+onMounted(() => { window.addEventListener('beforeunload', beforeUnload); void refresh().then(() => typeof route.query.import === 'string' ? openBatch(route.query.import) : undefined).catch(error => ElMessage.error(error.message)); });
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload));
+onBeforeRouteLeave(() => protectChanges());
 </script>
 <style scoped>
 .import-panel { padding: 18px; } .controls { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }

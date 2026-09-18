@@ -30,6 +30,10 @@ export function retryResumeGenerationApi(jobId: string) {
   );
 }
 
+export function confirmResumeReviewApi(jobId: string, version: string, accepted_indices: number[]) {
+  return interviewRequest.post<ResumeGenerationJob>(`/resume-generation/jobs/${encodeURIComponent(jobId)}/review`, { version, accepted_indices });
+}
+
 export function listSavedResumeDocumentsApi() {
   return interviewRequest.get<SavedResumeDocument[]>('/resume-generation/documents');
 }

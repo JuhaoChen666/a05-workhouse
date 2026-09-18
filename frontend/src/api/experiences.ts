@@ -20,6 +20,7 @@ export interface ExperienceListParams {
 export function listExperiencesApi(params: ExperienceListParams = {}) {
   return interviewRequest.get<ExperiencePage>('/experiences', {
     params: { ...params, tag: params.tag?.filter(Boolean) },
+    paramsSerializer: { indexes: null },
   });
 }
 

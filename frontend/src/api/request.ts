@@ -118,7 +118,8 @@ export function formatApiErrorText(payload: unknown, httpStatus?: number): strin
   return '响应格式异常';
 }
 
-function unwrapResponse<T = unknown>(response: { data: unknown }) {
+export function unwrapResponse<T = unknown>(response: { data: unknown; status?: number }) {
+  if (response.status === 204) return undefined as T;
   const raw = response.data;
   if (raw == null || typeof raw !== 'object') {
     return Promise.reject(new Error(formatApiErrorText(null)));

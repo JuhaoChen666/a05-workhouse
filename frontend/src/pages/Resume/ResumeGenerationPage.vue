@@ -62,7 +62,7 @@
         <el-select v-model="targetPages" style="width: 130px"><el-option :value="1" label="最多 1 页" /><el-option :value="2" label="最多 2 页" /></el-select>
         <el-select v-model="language" style="width: 130px"><el-option value="zh" label="中文" /><el-option value="en" label="English" /></el-select>
         <el-checkbox v-model="showAvatar" :disabled="!selectedTemplate?.supports_avatar">保留头像</el-checkbox>
-        <p>页数为 PDF 实际页数上限。语言控制标题，来源事实保留原文；无法验证的 AI 改写不会应用。</p>
+        <p>页数为 PDF 实际页数上限。语言控制标题，来源事实保留原文；AI 改写须逐条核对来源并明确确认后采用。</p>
         <el-form label-position="top" class="personal-info">
           <el-form-item v-for="field in personalFields" :key="field.key" :label="field.label"><el-input v-model="personal[field.key]" /></el-form-item>
           <div v-for="(entry, index) in personal.education" :key="index">
@@ -84,6 +84,18 @@
         </div>
         <el-progress :percentage="job?.progress_percentage || 0" :status="job?.status === 'FAILED' ? 'exception' : undefined" />
         <p class="stage">{{ stageLabel }}</p>
+        <div v-if="job?.status === 'WAITING_REVIEW' && job.review_plan" class="review-panel">
+          <el-alert title="请对照来源核实事实。仅采用勾选的建议，其余保留原文；用户确认不等于系统自动验证事实。" type="warning" :closable="false" />
+          <div v-for="(bullet, index) in job.review_plan.tailored_bullets" :key="index">
+            <p>来源经历：{{ bullet.source_item_id }}</p>
+            <blockquote>原文：{{ bullet.original_bullet }}</blockquote>
+            <p>建议：{{ bullet.tailored_bullet }}</p>
+            <el-checkbox v-model="acceptedRewrites" :value="index">确认事实无新增，采用这条建议</el-checkbox>
+          </div>
+          <p>关键词匹配：{{ JSON.stringify(job.review_plan.keyword_matches) }}</p>
+          <p v-for="(suggestion, index) in job.review_plan.trim_suggestions" :key="index">删减建议：{{ suggestion }}</p>
+          <el-button type="primary" :loading="reviewing" @click="submitReview">确认选择并继续生成（未选建议保留原文）</el-button>
+        </div>
         <div v-if="job?.status === 'FAILED'" class="error-box">
           <div>
             <strong>{{ job.compile_error_message || '生成失败' }}</strong>
@@ -96,6 +108,8 @@
           <span>已选经历 {{ job.result_metadata.selected_item_ids?.length || 0 }} 条</span>
           <span v-if="job.result_metadata.actual_pages">实际 {{ job.result_metadata.actual_pages }} 页 / 上限 {{ job.result_metadata.maximum_pages }} 页</span>
           <span v-if="job.result_metadata.unverified_rewrites_preserved">{{ job.result_metadata.unverified_rewrites_preserved }} 条无法验证的改写已保留原文</span>
+          <p v-if="job.result_metadata.keyword_matches">关键词匹配：{{ JSON.stringify(job.result_metadata.keyword_matches) }}</p>
+          <p v-for="(suggestion, index) in job.result_metadata.trim_suggestions || []" :key="index">删减建议：{{ suggestion }}</p>
         </div>
         <div v-if="job?.status === 'COMPILED'" class="download-actions">
           <el-button type="primary" class="theme-primary-btn" :loading="previewLoading" @click="previewPdf">预览 PDF</el-button>
@@ -112,12 +126,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import ResumeDocumentLibrary from '@/components/ResumeDocumentLibrary.vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import { getPositionDetailApi, getSimplePositionPageApi, type SimplePositionItem } from '@/api/jobs';
 import { listExperiencesApi } from '@/api/experiences';
 import {
   createResumeGenerationApi,
+  confirmResumeReviewApi,
   getResumeGenerationApi,
   listGenerationTemplatesApi,
   listSavedResumeDocumentsApi,
@@ -151,6 +166,8 @@ const language = ref<'zh' | 'en'>('zh');
 const showAvatar = ref(false);
 const starting = ref(false);
 const job = ref<ResumeGenerationJob>();
+const acceptedRewrites = ref<number[]>([]), reviewing = ref(false);
+watch(() => job.value?.review_plan?.version, () => { acceptedRewrites.value = []; });
 const documents = ref<SavedResumeDocument[]>([]);
 const previewUrl = ref('');
 const previewLoading = ref(false);
@@ -163,7 +180,7 @@ const filteredExperiences = computed(() => {
   if (!query) return experiences.value;
   return experiences.value.filter((item) => `${item.title} ${item.tags.join(' ')} ${JSON.stringify(item.attributes)}`.toLowerCase().includes(query));
 });
-const statusLabel = computed(() => ({ PENDING: '排队中', PROCESSING: '处理中', COMPILED: '生成完成', FAILED: '生成失败' }[job.value?.status || 'PENDING'] || '处理中'));
+const statusLabel = computed(() => ({ PENDING: '排队中', PROCESSING: '处理中', WAITING_REVIEW: '等待核实 AI 改写', COMPILED: '生成完成', FAILED: '生成失败' }[job.value?.status || 'PENDING'] || '处理中'));
 const stageLabel = computed(() => ({ PENDING: '等待处理', CLAIMED: '已开始处理', CONTENT_SELECTION: '选择和核对内容', LATEX_RENDER: '生成排版源码', ISOLATED_COMPILE: '编译 PDF', PERSIST_OUTPUTS: '保存简历', COMPLETED: '已完成', FAILED: '生成失败', INTERRUPTED: '服务中断，请重试' } as Record<string, string>)[job.value?.stage || 'PENDING'] || '处理中');
 
 function typeLabel(type: ExperienceType) {
@@ -189,7 +206,7 @@ async function loadSelectedJob() {
   if (!selectedJobId.value) return;
   try {
     const detail = await getPositionDetailApi(selectedJobId.value);
-    selectedJobText.value = String(detail.jobContent || detail.content || detail.description || '');
+    selectedJobText.value = [detail.responsibility, detail.skill_requirements].filter(value => typeof value === 'string' && value.trim()).join('\n\n') || String(detail.jobContent || detail.content || detail.description || '');
   } catch (error) {
     ElMessage.error((error as Error).message || '岗位详情加载失败');
   }
@@ -277,6 +294,16 @@ async function retry() {
   } catch (error) {
     ElMessage.error((error as Error).message || '重试失败');
   }
+}
+async function submitReview() {
+  if (!job.value?.review_plan) return;
+  try {
+    await ElMessageBox.confirm('已对照原文核实勾选建议，确认继续生成？未选建议保留原文。', '确认改写');
+    reviewing.value = true;
+    job.value = await confirmResumeReviewApi(job.value.job_id, job.value.review_plan.version, acceptedRewrites.value);
+    beginPolling();
+  } catch (error) { if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message); }
+  finally { reviewing.value = false; }
 }
 async function fetchAsset(format: 'pdf' | 'latex') {
   if (!job.value) return null;
