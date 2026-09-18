@@ -16,7 +16,8 @@ def upgrade():
     identity = lambda: sa.String(36, collation="utf8mb4_bin")
     op.create_table("resume_execution_slots", sa.Column("slot", sa.Integer, primary_key=True, autoincrement=False),
         sa.Column("token", identity(), unique=True), sa.Column("job_id", identity(), sa.ForeignKey("resume_generation_jobs.id")),
-        sa.Column("host_key", sa.String(64)), sa.Column("task_id", sa.String(32)), sa.Column("work_dir", sa.String(1024)),
+        sa.Column("host_key", sa.String(64)), sa.Column("task_id", sa.String(32)), sa.Column("container_name", sa.String(100)), sa.Column("work_dir", sa.String(1024)),
+        sa.Column("worker_pid", sa.Integer), sa.Column("worker_identity", sa.String(100)),
         sa.Column("state", sa.String(32), nullable=False), sa.Column("updated_at", DATETIME(fsp=6), nullable=False),
         sa.CheckConstraint("state IN ('FREE','ACTIVE','CLEANUP_REQUIRED')", name="ck_execution_state"),
         mysql_engine="InnoDB", mysql_charset="utf8mb4", mysql_collate="utf8mb4_unicode_ci")

@@ -10,6 +10,36 @@ from app.services import isolated_latex as sandbox
 from app.models.resume_template_contracts import FIXED_SECTIONS
 
 
+def test_worker_process_identity_distinguishes_terminated_owned_child():
+    import os
+    import subprocess
+    import sys
+    from app.services.resume_process_identity import process_identity
+    environment = {key: os.environ[key] for key in ("PATH", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP", "USERNAME") if key in os.environ}
+    with subprocess.Popen([sys.executable, "-c", "import sys;sys.stdin.readline()"], env=environment,
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as child:
+        try:
+            assert process_identity(child.pid)
+            child.stdin.write(b"\n"); child.stdin.flush(); child.wait(timeout=5)
+            assert process_identity(child.pid) is None
+        finally:
+            if child.poll() is None: child.terminate(); child.wait(timeout=5)
+
+
+def test_capacity_slot_container_identity_is_stable_across_attempts():
+    from types import SimpleNamespace
+    from app.services.resume_execution import container_name
+    factory = SimpleNamespace(kw={"bind": SimpleNamespace(url=SimpleNamespace(database="same-db"))})
+    context = {"factory": factory, "slot": 1}
+    name = container_name(context, "a" * 32)
+    assert name == container_name(context, "b" * 32)
+    assert name != container_name({**context, "slot": 2}, "b" * 32)
+    from pathlib import Path
+    command = sandbox.container_command("docker", "image", Path("work"), "a" * 32, name)
+    assert command[command.index("--name") + 1] == name
+    assert "--rm" in command and command[command.index("--label") + 1].endswith("a" * 32)
+
+
 @pytest.mark.asyncio
 async def test_actual_spring_position_contract_is_normalized(monkeypatch):
     real_client = httpx.AsyncClient

@@ -49,8 +49,8 @@ async def _capture(command, *, timeout=40, limit=MAX_OUTPUT):
         raise
 
 
-def container_command(docker, image, root, task_id):
-    return [docker, "run", "--rm", "--pull=never", "--name", f"resume-compile-{task_id}",
+def container_command(docker, image, root, task_id, name=None):
+    return [docker, "run", "--rm", "--pull=never", "--name", name or f"resume-compile-{task_id}",
             "--label", f"resume.compile.task={task_id}", "--cidfile", str(root / "container.id"),
             "--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
             "--user=65532:65532", "--memory=512m", "--memory-swap=512m", "--cpus=1", "--pids-limit=32",
@@ -99,18 +99,19 @@ async def compile_isolated(source, resources=None):
             "name=seccomp" in item and "unconfined" not in item for item in capabilities.get("SecurityOptions", [])):
         raise SandboxError("SANDBOX_UNAVAILABLE: Linux memory/swap/CPU/PID limits and seccomp required")
     task_id = uuid4().hex
-    from app.services.resume_execution import register_compile, execution
+    from app.services.resume_execution import register_compile, execution, container_name
     root = work_root / f"resume-compile-{task_id}"
-    await register_compile(task_id, root)
-    root.mkdir()
     context = execution.get()
+    name = container_name(context, task_id)
+    await register_compile(task_id, root, name)
+    root.mkdir()
     record = {"task_id": task_id, "work_dir": str(root), "token": context["token"] if context else None,
-        "job_id": context["job_id"] if context else None}
+        "job_id": context["job_id"] if context else None, "container_name": name}
     (root / "identity.json").write_text(json.dumps(record), encoding="utf8")
     try:
         (root / "input.json").write_text(json.dumps({"source": source, "resources": resources or {}}), encoding="utf-8")
         try:
-            code, output = await _capture(container_command(docker, image, root, task_id))
+            code, output = await _capture(container_command(docker, image, root, task_id, name))
             if code in (125, 126, 127):
                 raise SandboxError("SANDBOX_UNAVAILABLE: container startup failed; verify image, mount and daemon limits")
             if code:
@@ -146,6 +147,9 @@ async def recover_resources(record):
     task_id = record["task_id"]
     if not re.fullmatch(r"[a-f0-9]{32}", task_id):
         raise SandboxError("SANDBOX_CLEANUP_ID_INVALID")
+    name = record.get("container_name") or f"resume-compile-{task_id}"
+    if not re.fullmatch(r"resume-compile-(?:[a-f0-9]{32}|[a-f0-9]{16}-slot(?:[0-9]|1[0-5]))", name):
+        raise SandboxError("SANDBOX_CLEANUP_ID_INVALID")
     configured = os.environ.get("RESUME_COMPILE_WORK_ROOT", "")
     if not configured or not Path(configured).is_absolute():
         raise SandboxError("SANDBOX_CLEANUP_ROOT_INVALID")
@@ -157,7 +161,7 @@ async def recover_resources(record):
     if not docker:
         raise SandboxError("SANDBOX_UNAVAILABLE")
     # ps must succeed: a daemon error is not evidence that the container is absent.
-    code, output = await _capture([docker, "ps", "-aq", "--no-trunc", "--filter", f"name=^/resume-compile-{task_id}$"], timeout=10, limit=8192)
+    code, output = await _capture([docker, "ps", "-aq", "--no-trunc", "--filter", f"name=^/{name}$"], timeout=10, limit=8192)
     if code:
         raise SandboxError("SANDBOX_CLEANUP_UNCONFIRMED")
     for cid in output.decode("ascii").split():
@@ -170,7 +174,7 @@ async def recover_resources(record):
         if code:
             # --rm may have won the race; verify absence below instead of guessing.
             pass
-    code, remaining = await _capture([docker, "ps", "-aq", "--no-trunc", "--filter", f"name=^/resume-compile-{task_id}$"], timeout=10, limit=8192)
+    code, remaining = await _capture([docker, "ps", "-aq", "--no-trunc", "--filter", f"name=^/{name}$"], timeout=10, limit=8192)
     if code or remaining.strip():
         raise SandboxError("SANDBOX_CLEANUP_UNCONFIRMED")
     if not root.exists():
@@ -183,7 +187,7 @@ async def recover_resources(record):
         root.rmdir()
         return
     identity = json.loads(marker.read_text(encoding="utf8"))
-    if any(identity.get(key) != record.get(key) for key in ("task_id", "work_dir", "token", "job_id")):
+    if any(identity.get(key) != record.get(key) for key in ("task_id", "work_dir", "token", "job_id", "container_name")):
         raise SandboxError("SANDBOX_CLEANUP_OWNER_MISMATCH")
     # Exact known task files; never recurse or follow links into other directories.
     if any(path.name not in {"identity.json", "input.json", "container.id"} for path in root.iterdir()):

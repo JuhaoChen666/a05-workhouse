@@ -13,6 +13,7 @@ from sqlalchemy.dialects.mysql import insert
 from app.models.resume_execution_models import ResumeExecutionSlot as Slot
 from app.models.resume_storage_models import utcnow
 from app.services.resume_execution import cleanup_slot, execution, host_key
+from app.services.resume_process_identity import process_identity
 from app.infrastructure.resume_runtime import session_factory, asset_store
 from app.infrastructure.mapper.resume_storage_mapper import ResumeStorageMapper
 from app.models.resume_storage_models import ResumeGenerationJobModel as Job
@@ -26,6 +27,9 @@ async def run_once(factory=None, *, store=None, compiler=None):
     capacity = int(os.environ.get("LATEX_COMPILE_CONCURRENCY", "2"))
     if not 1 <= capacity <= 16:
         raise ValueError("LATEX_COMPILE_CONCURRENCY must be 1..16")
+    identity = process_identity(os.getpid())
+    if not identity:
+        raise RuntimeError("worker process identity unavailable")
     scope = hashlib.sha256(factory.kw["bind"].url.database.casefold().encode()).hexdigest()[:16]
     async with factory() as session:
         async with session.begin():
@@ -91,6 +95,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
                 async with factory() as session, session.begin():
                     state = await session.get(Slot, slot_index, with_for_update=True)
                     state.token, state.job_id, state.host_key = token, job_id, host_key()
+                    state.worker_pid, state.worker_identity = os.getpid(), identity
                     state.state, state.updated_at = "ACTIVE", utcnow()
                 async with factory() as session:
                     async with session.begin():
@@ -121,7 +126,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
                     work.cancel(); watcher.cancel()
                     await asyncio.gather(work, watcher, return_exceptions=True)
                     execution.reset(context_token)
-                    await asyncio.shield(cleanup_slot(factory, slot_index, token))
+                    await asyncio.shield(cleanup_slot(factory, slot_index, token, finished=True))
                 async with factory() as session, session.begin():
                     result = await session.get(Job, job_id)
                     duration = (result.finished_at - result.started_at).total_seconds() if result.finished_at and result.started_at else None
@@ -133,7 +138,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
                 if slot:
                     if token:
                         try:
-                            if not await cleanup_slot(factory, slot_index, token):
+                            if not await cleanup_slot(factory, slot_index, token, finished=True):
                                 async with factory() as session, session.begin():
                                     state = await session.get(Slot, slot_index)
                                     if state and state.token == token:

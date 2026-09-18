@@ -126,6 +126,20 @@ async def test_unconfirmed_resources_keep_capacity_occupied(sessions, private_st
         assert (await session.get(Slot, 0)).state == "CLEANUP_REQUIRED"
 
 
+@pytest.mark.asyncio
+async def test_live_old_process_blocks_slot_reuse_without_finish_ack(sessions, private_store, monkeypatch):
+    from app.services.resume_process_identity import process_identity
+    monkeypatch.setenv("LATEX_COMPILE_CONCURRENCY", "1")
+    job_id, _ = await seed(sessions)
+    async with sessions() as session, session.begin():
+        session.add(Slot(slot=0, token="old-execution", job_id=job_id, host_key=resume_execution.host_key(),
+            worker_pid=os.getpid(), worker_identity=process_identity(os.getpid()), state="ACTIVE", updated_at=utcnow()))
+    assert not await run_once(sessions, store=private_store, compiler=compiler)
+    async with sessions() as session, session.begin():
+        assert (await session.get(Job, job_id)).status == "PENDING"
+        assert (await session.get(Slot, 0)).state == "CLEANUP_REQUIRED"
+
+
 @pytest.mark.skipif(os.environ.get("RUN_RESUME_DOCKER_INTEGRATION") != "1", reason="real Linux Docker/trusted image explicitly required")
 @pytest.mark.asyncio
 async def test_real_container_worker_crash_recovers_input_and_capacity(sessions, private_store, monkeypatch, tmp_path):
@@ -152,9 +166,9 @@ async def test_real_container_worker_crash_recovers_input_and_capacity(sessions,
             async with sessions() as session, session.begin():
                 slot = await session.get(Slot, 0)
                 if slot and slot.task_id:
-                    record = {key: getattr(slot, key) for key in ("token", "task_id", "work_dir", "job_id")}
+                    record = {key: getattr(slot, key) for key in ("token", "task_id", "container_name", "work_dir", "job_id")}
             if record:
-                code, containers = await _capture(["docker", "ps", "-q", "--filter", f"name=^/resume-compile-{record['task_id']}$"], timeout=2, limit=8192)
+                code, containers = await _capture(["docker", "ps", "-q", "--filter", f"name=^/{record['container_name']}$"], timeout=2, limit=8192)
                 if code == 0 and containers.strip(): break
             assert child.poll() is None, "real test worker exited before its container was running"
             await asyncio.sleep(.1)
