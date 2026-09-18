@@ -45,13 +45,13 @@ python -m app.services.resume_worker
 
 启动前检查 daemon 报告的内存、swap、CPU quota、PID 限制、cgroup driver 和 seccomp；缺少能力即 `SANDBOX_UNAVAILABLE`。容器非 root、只读根文件系统、无网络、移除所有 capabilities、禁止新增权限；仅挂载本任务只读输入 JSON，工作目录与 `/tmp` 使用受限 tmpfs，内存 512 MiB、1 CPU、32 PID。编译进程只得到固定最小环境，不继承数据库密码和 AI Key。上述 Docker 限制的参数依据 [Docker run 文档](https://docs.docker.com/engine/containers/run/)；rootless 的资源控制能力仍取决于目标主机，见 [rootless 文档](https://docs.docker.com/engine/security/rootless/#limiting-resources)。参数和能力检查不能替代真实目标环境验收。
 
-编译子进程 30 秒超时，宿主 Docker 调用 40 秒超时，输入源码最大 2 MiB、资源总量最大 32 MiB、PDF 最大 12 MiB、返回流最大 18 MiB。超时仅清理 cidfile 指向且标签匹配本任务的容器，标签不匹配拒绝删除。仅返回编译错误类型和行号，不返回完整编译日志或私有内容。无隔离环境时不会回退宿主 XeLaTeX。
+编译子进程 30 秒超时，宿主 Docker 调用 40 秒超时，输入源码最大 2 MiB、资源总量最大 32 MiB、PDF 最大 12 MiB、返回流最大 18 MiB。镜像显式安装中文宏包并检查 xeCJK 与 Noto CJK 字体。容器使用 --rm；回收依据持久任务资源记录、精确容器名与标签核验，确认容器不存在后才删除本任务目录内的三个已知文件。不递归清理任意目录，发现身份不符、未知文件或 daemon 不可用时保留资源及容量并报警。仅返回编译错误类型和行号，不返回完整编译日志或私有内容。无隔离环境时不会回退宿主 XeLaTeX。
 
 ## 业务和兼容语义
 
 - 目标页数表示 PDF 页数上限。成功编译后用 pypdf 读取真实 PDF；超过上限为 `PAGE_LIMIT_EXCEEDED`，不保存成功文档，建议减少经历、提高上限或更换模板。
 - 语言控制规划请求与模板标题；事实正文保留来源语言，避免未验证翻译改变事实。界面明确显示该策略。
-- AI 只能选择冻结的允许经历；原始 bullet 必须逐字存在于相应经历。伪造 ID、原文、重复来源和新增数字拒绝。所有无法验证的语义改写保留原文，并记录数量和策略，不以来源 ID 代替事实校验。
+- AI 只能选择冻结的允许经历；原始 bullet 必须逐字存在于相应经历。伪造 ID、原文、重复来源、新增数字及可识别的无来源实体声明拒绝；这些保守规则不能证明全部语义事实正确。不同于原文的建议进入 WAITING_REVIEW，用户对照来源逐条确认后采用，未选建议保留原文。规划及确认版本冻结，重复相同确认幂等，不同确认拒绝覆盖，重试不重新规划。关键词匹配只展示冻结来源实际包含的词，删减建议保存并展示，不自动修改事实。
 - 新增 `billryan-classic`、`modern-twocol` **1.2.0 / 协议 1.1**，实现模块顺序和中英标题。原 1.0/1.1 模板文件未改写。历史 1.1 支持原语言和固定顺序；不支持的选项明确拒绝，已有 PDF/源码读取不受影响。
 - 草稿修正保存后才可确认；服务端保存来源信息、revision 和确认回执。重复相同确认不重复入库，不同确认/版本冲突明确返回错误。图像 PDF 明确拒绝 OCR。
 - 文档命名、复制、删除、快照和下载使用 **document_id**。复制可共享生成任务和输出文件，删除原文档不会使有效副本丢失文件。
@@ -61,6 +61,14 @@ python -m app.services.resume_worker
 ## 迁移、恢复和回退
 
 新增迁移 `resume_runtime_001`，基于 `phase2_experience_001`，增加任务执行 token/结果 metadata、批次历史 Markdown 来源标识和导入观测计数，并扩展经历来源约束。原 P1/P2 迁移文件未改写，不改动旧 resumes/优化正文。仅在明确目标数据库由运维执行迁移；本轮真实数据库验证均使用随机测试 schema。
+
+审查修复另加 `resume_review_002`，增加冻结的 review_plan/review_decision、WAITING_REVIEW 状态及 resume_execution_slots 容量/资源登记表。待审核任务不占编译容量。worker 独立优先扫描 PROCESSING，不受 PENDING 积压阻塞；每秒检查连接锁归属，断锁取消执行。持久容量在旧资源确认回收前不复用。只有原编译主机能够自动核实资源；改变主机名、Docker context/host 或临时根配置后，遗留容量会保守保持 CLEANUP_REQUIRED，须由维护者核对原主机资源后处理，不能直接释放槽位或删除目录。
+
+容量登记还保存原 worker PID/创建身份。旧进程存活且未确认该执行结束时不能释放容量，避免断锁后容器尚未启动的竞争窗口；Windows 限定信息只读查询和 Linux /proc 用于身份核验，不终止进程。无法核实身份时拒绝释放。每个数据库容量槽位使用固定容器名，同一 Docker daemon 上旧/新尝试无法同时创建该槽位容器；容器任务标签仍单独核验。
+
+自动恢复需同主机、稳定配置及相同 PID 命名空间。推荐 Linux 主机受控 worker 服务配合编译容器；应用 worker 自身容器重建可能改变主机/PID身份，此类部署不能直接套用本机进程恢复结论，需运维核实及目标环境验收，不能放宽权限绕过。
+
+降级到 resume_runtime_001 前必须在线预检：存在审核规划/确认或非 FREE 资源槽位时拒绝降级。采用应用回退时须停止相关任务写入口，不能让旧 worker 将 WAITING_REVIEW 当作普通任务运行。历史完成记录不可作为新分支测试结果，最新验证见 resume_review_fix_delivery.md。
 
 每个执行由独立 MySQL 连接持有任务锁和全局容量锁。不同 worker 无法重复领取同一任务；最终写入再次检查 token/状态，输出与文档同一私有文件事务提交。worker 崩溃释放连接锁，后续 worker 将遗留 `PROCESSING` 标成 `WORKER_INTERRUPTED`，用户明确重试；不会将中断任务假装成功，也不会读取变化后的经历替换冻结输入。
 
@@ -83,5 +91,7 @@ MySQL DDL 不是整体事务：生产迁移中断时须暂停写入，核对新�
 建议监控持续队列积压、长时间未完成任务、`SANDBOX_UNAVAILABLE`、`WORKER_INTERRUPTED`、编译超时和 AI 降级比例；阈值应由目标环境吞吐量实测后确定。本轮未部署监控平台。
 
 真实 Docker 测试入口：设置可信镜像、临时目录和 `RUN_RESUME_DOCKER_INTEGRATION=1`，运行 `tests/test_resume_isolation_integration.py`。包含正常 PDF、绝对路径读取拒绝和超时；还需在目标主机补做内存/PID、网络、并发、清理和中文字体的运行时验收。
+
+新增两套实际 1.2 中文模板编译测试；同时配置显式 MySQL 测试连接时，可运行 test_resume_review_fixes_mysql.py 的真实容器 worker 崩溃回收测试。缺少环境仍跳过，不计通过。指标新增待审核数、当前用户编译容量占用与 CLEANUP_REQUIRED 数。
 
 真实 AI 当前没有环境；真实 Linux Docker/XeLaTeX 当前未提供；浏览器连接工具返回连接失败。故真实中文 PDF、版面视觉、资源/网络隔离和浏览器完整端到端均为发布前阻塞项，不能用替身测试或此前 PR 的人工成功记录替代。

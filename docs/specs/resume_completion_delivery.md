@@ -1,5 +1,7 @@
 # Issue #1 剩余闭环本地交付记录
 
+本记录描述e96948b时点的历史交付；用户后续独立审查九项修复及当前验收结果见[审查修复记录](resume_review_fix_delivery.md)，以该记录和最新代码为准。
+
 日期：2026-09-18。关联 [Issue #1](https://github.com/JuhaoChen666/a05-workhouse/issues/1)。
 
 本轮完成可独立开发的业务代码与可用环境验证，形成供 review 的本地分支。**真实 AI、Linux 隔离编译与浏览器完整流程尚未验收，因此不能认定 Issue #1 全部完成，也不具备生产发布结论。**
