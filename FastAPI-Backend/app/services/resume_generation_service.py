@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
+import hashlib
 import json
 import os
 import re
 import shutil
 import tempfile
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -25,6 +28,7 @@ from app.services.resume_template_service import TemplateProtocolError, render_s
 
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 MAX_PDF_BYTES = 12 * 1024 * 1024
+MAX_TEMPLATE_RESOURCE_BYTES = 32 * 1024 * 1024
 COMPILE_TIMEOUT_SECONDS = int(os.getenv("LATEX_COMPILE_TIMEOUT_SECONDS", "30"))
 COMPILE_SLOTS = asyncio.Semaphore(max(1, int(os.getenv("LATEX_COMPILE_CONCURRENCY", "2"))))
 
@@ -330,7 +334,39 @@ def _error_lines(output: str) -> tuple[str, str | None]:
     return (lines[-1] if lines else "XeLaTeX failed", None)
 
 
-async def compile_latex(source: str) -> bytes:
+def _write_template_resources(root: Path, resources: dict[str, Any] | None) -> None:
+    if not resources:
+        return
+    total = 0
+    for name, metadata in resources.items():
+        relative = PurePosixPath(str(name))
+        if (
+            relative.is_absolute()
+            or not relative.parts
+            or any(part in {"", ".", ".."} for part in relative.parts)
+            or "\\" in str(name)
+        ):
+            raise LatexCompileError("template resource path is unsafe", retryable=False)
+        if not isinstance(metadata, dict) or metadata.get("encoding") != "base64":
+            raise LatexCompileError(f"template resource metadata is invalid: {name}", retryable=False)
+        try:
+            content = base64.b64decode(str(metadata.get("content") or ""), validate=True)
+        except (ValueError, TypeError):
+            raise LatexCompileError(f"template resource is not valid base64: {name}", retryable=False) from None
+        if len(content) != int(metadata.get("size_bytes", -1)):
+            raise LatexCompileError(f"template resource size mismatch: {name}", retryable=False)
+        digest = hashlib.sha256(content).hexdigest()
+        if digest != metadata.get("sha256"):
+            raise LatexCompileError(f"template resource checksum mismatch: {name}", retryable=False)
+        total += len(content)
+        if total > MAX_TEMPLATE_RESOURCE_BYTES:
+            raise LatexCompileError("template resources exceed the size limit", retryable=False)
+        path = root.joinpath(*relative.parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+
+async def compile_latex(source: str, resources: dict[str, Any] | None = None) -> bytes:
     if len(source.encode("utf-8")) > MAX_SOURCE_BYTES:
         raise LatexCompileError("LaTeX source exceeds the size limit", retryable=False)
     engine = os.getenv("LATEX_ENGINE", "xelatex").strip() or "xelatex"
@@ -340,14 +376,13 @@ async def compile_latex(source: str) -> bytes:
         root = Path(directory)
         tex_path = root / "resume.tex"
         tex_path.write_text(source, encoding="utf-8")
-        environment = {
-            "PATH": os.getenv("PATH", ""),
-            "HOME": str(root),
-            "TEXMFOUTPUT": str(root),
-        }
+        _write_template_resources(root, resources)
+        environment = os.environ.copy()
+        environment["TEXMFOUTPUT"] = str(root)
         command = [
             engine,
             "-no-shell-escape",
+            "-disable-installer",
             "-interaction=nonstopmode",
             "-halt-on-error",
             "-output-directory",
@@ -405,7 +440,8 @@ async def _transition(job_id: str, status: str, stage: str, progress: int, **kwa
 async def run_generation_job(job_id: str, owner_id: int) -> None:
     try:
         async with AsyncSessionLocal() as session:
-            job = await ResumeStorageMapper(session, owner_id).get_job(job_id)
+            async with session.begin():
+                job = await ResumeStorageMapper(session, owner_id).get_job(job_id)
             snapshot = {
                 "jd_snapshot": job.jd_snapshot,
                 "experience_snapshot": job.experience_snapshot,
@@ -434,7 +470,10 @@ async def run_generation_job(job_id: str, owner_id: int) -> None:
                 retryable=False,
             ) from exc
         await _transition(job_id, "PROCESSING", "XELATEX_COMPILE", 60, owner_id=owner_id, traces=[trace.model_dump(mode="json") for trace in traces])
-        pdf = await compile_latex(rendered.latex_source)
+        pdf = await compile_latex(
+            rendered.latex_source,
+            (snapshot["template_snapshot"] or {}).get("resources"),
+        )
         await _transition(job_id, "PROCESSING", "PERSIST_OUTPUTS", 90, owner_id=owner_id, traces=[trace.model_dump(mode="json") for trace in traces])
         async with AsyncSessionLocal() as session:
             root = os.getenv("RESUME_PRIVATE_ASSET_ROOT")
