@@ -44,7 +44,8 @@ def mysql_schema():
     if url.drivername != "mysql+aiomysql":
         raise ValueError("expected mysql+aiomysql")
     name = "resume_p1_restart_test_" + uuid4().hex[:16]
-    admin = create_engine(url.set(drivername="mysql+pymysql", database=None), echo=False)
+    # URL.set ignores None; explicitly clear the supplied database before bootstrap.
+    admin = create_engine(url._replace(drivername="mysql+pymysql", database=None), echo=False)
     created = False
     try:
         with admin.connect() as connection:

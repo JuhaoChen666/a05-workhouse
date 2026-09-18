@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from app.api import interview_routes, resume_routes, resume_optimize_routes, resume_template_routes
 from app.RAG.interview_service import InterviewService
+from app.api.experience_app import register_experience_routes
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,6 +36,7 @@ app.include_router(interview_routes.router)
 app.include_router(resume_routes.router)
 app.include_router(resume_optimize_routes.router)
 app.include_router(resume_template_routes.router)
+register_experience_routes(app)
 
 # 挂载静态文件目录，允许访问简历 PDF
 UPLOAD_DIR = "data/resumes"

@@ -187,6 +187,15 @@ async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, li
             # Archived experiences still retain their provenance and may be reused.
             for locator in sources:
                 protected.update(a.key for a in assets_in(locator))
+            # Durable P2 imports keep their source protected until explicit maintenance
+            # reconciles/relinquishes it, including cancelled/failed/expired batches.
+            from app.models.experience_import_models import ExperienceImportBatch
+            imports = (await session.execute(select(ExperienceImportBatch.source_asset).where(
+                ExperienceImportBatch.user_id == owner,
+                ExperienceImportBatch.files_purged_at.is_(None),
+            ).with_for_update())).scalars()
+            for source in imports:
+                protected.update(a.key for a in assets_in(source))
             living = (await session.execute(select(ResumeDocumentModel).where(
                 ResumeDocumentModel.user_id == owner,
                 or_(ResumeDocumentModel.deleted_at.is_(None), ResumeDocumentModel.purge_after > now),

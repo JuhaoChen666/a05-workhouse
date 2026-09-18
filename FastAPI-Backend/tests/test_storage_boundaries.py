@@ -130,6 +130,7 @@ def test_mysql_schema_json_and_scope():
         if old is None: os.environ.pop("RESUME_DATABASE_URL", None)
         else: os.environ["RESUME_DATABASE_URL"] = old
     sql = output.getvalue()
-    assert sql.count("CREATE TABLE") == 5
+    assert sql.count("CREATE TABLE") == 7  # Version table + four P1 tables + two P2 tables.
+    assert "CREATE TABLE experience_import_batches" in sql and "CREATE TABLE experience_import_drafts" in sql
     assert " JSON " in sql and "RESTRICT" in sql
     assert "ALTER TABLE resumes" not in sql and "DROP TABLE" not in sql

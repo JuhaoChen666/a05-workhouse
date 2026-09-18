@@ -7,6 +7,8 @@ from sqlalchemy.engine import make_url
 from app.models.session_models import Base
 from app.models import resume_storage_models
 from app.models.resume_storage_schema import TABLE_NAMES
+from app.models import experience_import_models
+from app.models.experience_import_schema import TABLE_NAMES as IMPORT_TABLE_NAMES
 
 url = os.environ.get("RESUME_DATABASE_URL")
 if not url or make_url(url).drivername != "mysql+aiomysql":
@@ -15,7 +17,7 @@ if not url or make_url(url).drivername != "mysql+aiomysql":
 
 def include_object(obj, name, type_, reflected, compare_to):
     table = obj if type_ == "table" else getattr(obj, "table", None)
-    return table is None or table.name in TABLE_NAMES
+    return table is None or table.name in TABLE_NAMES + IMPORT_TABLE_NAMES
 
 
 def configure(connection=None):
