@@ -29,7 +29,7 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         json_column("source_locator"), created(), column("updated_at", DATETIME(fsp=6), nullable=False),
         sa.CheckConstraint("user_id > 0 AND revision > 0 AND sort_order >= 0", name="ck_experience_ranges"),
         sa.CheckConstraint("type IN ('CERTIFICATE','COMPETITION_AWARD','PROJECT','WORK','SKILL')", name="ck_experience_type"),
-        sa.CheckConstraint("source_type IN ('MANUAL','PDF_IMPORT')", name="ck_experience_source"),
+        sa.CheckConstraint("source_type IN ('MANUAL','PDF_IMPORT','MARKDOWN_IMPORT')", name="ck_experience_source"),
         array_check("tags"), object_check("attributes"), object_check("source_locator"),
         sa.Index("ix_experience_owner_list", "user_id", "is_archived", "type", "sort_order", "id"),
         sa.Index("ix_experience_owner_updated", "user_id", "updated_at"), **options)
@@ -56,6 +56,7 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         column("status", sa.String(16), nullable=False), column("stage", sa.String(100), nullable=False),
         column("progress_percentage", sa.Integer, nullable=False), json_column("error", nullable=True),
         json_column("traces"), column("retry_count", sa.Integer, nullable=False),
+        json_column("result_metadata", nullable=True), column("run_token", identity()),
         created(), column("updated_at", DATETIME(fsp=6), nullable=False), column("started_at", DATETIME(fsp=6)), column("finished_at", DATETIME(fsp=6)),
         sa.UniqueConstraint("id", "user_id", name="uq_job_owner"),
         sa.ForeignKeyConstraint(["template_id", "template_version"], ["resume_templates.id", "resume_templates.version"], ondelete="RESTRICT"),

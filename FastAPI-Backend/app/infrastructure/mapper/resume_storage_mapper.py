@@ -173,6 +173,7 @@ class ResumeStorageMapper:
         verify_references(self.session, self.owner, [row.personal_info_snapshot, row.experience_snapshot])
         row.status, row.stage, row.progress_percentage = "PENDING", "PENDING", 0
         row.error, row.traces, row.started_at, row.finished_at = None, [], None, None
+        row.run_token, row.result_metadata = None, None
         row.retry_count += 1
         row.updated_at = utcnow()
         await self.session.flush()
@@ -192,7 +193,7 @@ class ResumeStorageMapper:
                 if asset.media_type != media:
                     raise ValueError("wrong document asset type")
                 files[name] = asset.model_dump(mode="json")
-        snapshot = {k: deepcopy(getattr(job, k)) for k in ("jd_snapshot", "experience_snapshot", "personal_info_snapshot", "template_snapshot", "options_snapshot", "traces")}
+        snapshot = {k: deepcopy(getattr(job, k)) for k in ("jd_snapshot", "experience_snapshot", "personal_info_snapshot", "template_snapshot", "options_snapshot", "traces", "result_metadata")}
         verify_references(self.session, self.owner, [files, snapshot])
         return await self._add_document(name=data.name, format="latex", generation_job_id=job.id, snapshot=snapshot, **files)
 

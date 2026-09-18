@@ -25,5 +25,6 @@ AsyncSessionLocal = sessionmaker(
 
 async def get_db_session() -> AsyncSession:
     """获取数据库Session生成器（FastAPI Depends注入用或独立使用）"""
-    async with AsyncSessionLocal() as session:
+    from app.infrastructure.resume_runtime import session_factory
+    async with session_factory()() as session:
         yield session
