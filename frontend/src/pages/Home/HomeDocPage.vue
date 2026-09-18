@@ -99,7 +99,7 @@
         </ol>
         <div class="help-actions">
           <RouterLink class="help-link" :to="{ name: 'HomeResume' }">前往简历管理</RouterLink>
-          <RouterLink class="help-link" :to="{ name: 'HomeResumeOptimize' }">前往简历优化</RouterLink>
+          <RouterLink class="help-link" :to="{ name: 'HomeResumeGeneration' }">前往 LaTeX 简历生成</RouterLink>
         </div>
       </article>
 

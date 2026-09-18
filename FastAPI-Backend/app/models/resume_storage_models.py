@@ -38,3 +38,11 @@ def immutable_fields(model, fields):
 immutable_fields(ResumeTemplateModel, set(ResumeTemplateModel.__table__.columns.keys()) - {"validation_status", "is_enabled", "validation_details"})
 immutable_fields(ResumeGenerationJobModel, {"id", "user_id", "template_id", "template_version", "jd_source_type", "job_id", "jd_snapshot", "experience_snapshot", "personal_info_snapshot", "template_snapshot", "options_snapshot", "target_pages", "language", "created_at"})
 immutable_fields(ResumeDocumentModel, {"id", "user_id", "format", "generation_job_id", "snapshot", "pdf_asset", "latex_asset", "markdown_content", "legacy_optimization_id", "copied_from_id", "created_at"})
+
+
+@event.listens_for(ResumeGenerationJobModel, "before_update")
+def freeze_review_after_creation(mapper, connection, target):
+    for field in ("review_plan", "review_decision"):
+        history = inspect(target).attrs[field].history
+        if history.has_changes() and any(old is not None for old in history.deleted):
+            raise ValueError("review plan/decision is immutable once recorded")

@@ -48,6 +48,8 @@ export interface PositionDetailRes {
   content?: string;
   jobContent?: string;
   description?: string;
+  responsibility?: string;
+  skill_requirements?: string;
   companyName?: string;
 }
 
@@ -94,6 +96,9 @@ export async function getPositionDetailApi(id: number | string) {
     timeout: 10000,
   });
   const raw = data as PositionDetailRes | { data?: PositionDetailRes; result?: PositionDetailRes };
+  if (raw && typeof raw === 'object' && 'code' in raw && ![0, '0', 200, '200'].includes(raw.code as string | number)) {
+    throw new Error('岗位详情服务返回失败');
+  }
   return (raw as { data?: PositionDetailRes }).data ??
     (raw as { result?: PositionDetailRes }).result ??
     (raw as PositionDetailRes);

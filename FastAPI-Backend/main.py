@@ -37,6 +37,8 @@ app.include_router(resume_routes.router)
 app.include_router(resume_optimize_routes.router)
 app.include_router(resume_template_routes.router)
 app.include_router(resume_generation_routes.router)
+from app.api.resume_document_routes import router as resume_documents_router
+app.include_router(resume_documents_router)
 register_experience_routes(app)
 
 # 挂载静态文件目录，允许访问简历 PDF

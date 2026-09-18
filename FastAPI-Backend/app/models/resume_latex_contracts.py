@@ -29,7 +29,7 @@ class BaseExperienceItem(BaseModel):
     tags: List[str] = Field(default_factory=list, description="技术标签/关键词列表")
     is_archived: bool = Field(False, description="是否归档")
     sort_order: int = Field(0, ge=0)
-    source_type: Literal["MANUAL", "PDF_IMPORT"] = "MANUAL"
+    source_type: Literal["MANUAL", "PDF_IMPORT", "MARKDOWN_IMPORT"] = "MANUAL"
     source_resume_id: Optional[int] = Field(None, gt=0)
     source_locator: Dict[str, Any] = Field(default_factory=dict)
 
@@ -114,7 +114,7 @@ class ExperienceItemResponse(BaseModel):
     tags: List[str] = Field(default_factory=list)
     revision: int
     sort_order: int = 0
-    source_type: Literal["MANUAL", "PDF_IMPORT"] = "MANUAL"
+    source_type: Literal["MANUAL", "PDF_IMPORT", "MARKDOWN_IMPORT"] = "MANUAL"
     source_resume_id: Optional[int] = None
     source_locator: Dict[str, Any] = Field(default_factory=dict)
     is_archived: bool = False
@@ -133,7 +133,7 @@ class ResumeTemplateMetadata(BaseModel):
     id: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(..., description="模板展示名称")
     version: str = Field("1.0.0", min_length=1, max_length=32, pattern=r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$")
-    protocol_version: Optional[Literal["1.0"]] = None
+    protocol_version: Optional[Literal["1.0", "1.1"]] = None
     entry_file: str = "resume.tex.j2"
     supported_languages: List[Literal["zh", "en"]] = Field(default_factory=lambda: ["zh"], min_length=1)
     engine: str = Field("xelatex", description="编译引擎，如 xelatex")
@@ -188,7 +188,8 @@ class AITailoredBulletTrace(BaseModel):
 class ResumeGenerationJobResponse(BaseModel):
     """简历生成异步任务响应状态"""
     job_id: str
-    status: str = Field(..., description="PENDING | PROCESSING | COMPILED | FAILED")
+    document_id: Optional[str] = None
+    status: str = Field(..., description="PENDING | PROCESSING | WAITING_REVIEW | COMPILED | FAILED")
     progress_percentage: int = Field(0, ge=0, le=100)
     pdf_download_url: Optional[str] = None
     latex_source_url: Optional[str] = None
@@ -197,5 +198,8 @@ class ResumeGenerationJobResponse(BaseModel):
     stage: str = "PENDING"
     retryable: bool = False
     recommendation: Optional[dict[str, Any]] = None
+    result_metadata: Optional[dict[str, Any]] = None
+    review_plan: Optional[dict[str, Any]] = None
+    review_decision: Optional[dict[str, Any]] = None
     traces: List[AITailoredBulletTrace] = Field(default_factory=list)
     created_at: datetime

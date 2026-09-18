@@ -83,7 +83,7 @@ def validate_template(metadata: dict[str, Any], source: str) -> TemplateValidati
     issues: list[TemplateValidationIssue] = []
     sections = metadata.get("supported_sections")
     placeholders = metadata.get("placeholders")
-    if metadata.get("protocol_version", TEMPLATE_PROTOCOL_VERSION) != TEMPLATE_PROTOCOL_VERSION:
+    if metadata.get("protocol_version", TEMPLATE_PROTOCOL_VERSION) not in ("1.0", "1.1"):
         issues.append(_issue("PROTOCOL_VERSION", "unsupported template protocol version"))
     if not isinstance(sections, list) or set(sections) != set(FIXED_SECTIONS) or len(sections) != len(FIXED_SECTIONS):
         issues.append(_issue("SECTIONS", "supported_sections must contain each fixed module exactly once"))
@@ -149,7 +149,7 @@ def validate_template(metadata: dict[str, Any], source: str) -> TemplateValidati
                 "competitions": [{"title": "Award"}],
             }
             context = TemplateRenderData.model_validate(sample).model_dump(mode="json")
-            rendered = env.from_string(source).render(**context, options={"show_avatar": False})
+            rendered = env.from_string(source).render(**context, options=render_options("zh", list(FIXED_SECTIONS), False))
             if "<built-in" in rendered or "<bound method" in rendered:
                 issues.append(_issue("RENDER", "rendered method object instead of field content"))
         except Exception as exc:
@@ -157,6 +157,7 @@ def validate_template(metadata: dict[str, Any], source: str) -> TemplateValidati
 
     return TemplateValidationReport(
         valid=not issues,
+        protocol_version=metadata.get("protocol_version", TEMPLATE_PROTOCOL_VERSION),
         referenced_roots=roots,
         issues=issues,
     )
@@ -186,10 +187,16 @@ def compatibility(snapshot: dict[str, Any], request: TemplateCompatibilityReques
 
 def render_snapshot(snapshot: dict[str, Any], request: TemplatePreviewRequest) -> TemplatePreviewResponse:
     report = validate_snapshot(snapshot)
+    if request.options.language not in snapshot["supported_languages"]:
+        report.issues.append(_issue("LANGUAGE", "requested output language is not supported"))
+        report.valid = False
+    if snapshot["metadata_json"].get("protocol_version", "1.0") == "1.0" and request.options.module_order != list(FIXED_SECTIONS):
+        report.issues.append(_issue("MODULE_ORDER", "this historical version has fixed module order"))
+        report.valid = False
     if not report.valid:
         raise TemplateProtocolError(report)
     context = request.data.model_dump(mode="json")
-    context["options"] = request.options.model_dump(mode="json")
+    context["options"] = render_options(request.options.language, request.options.module_order, request.options.show_avatar)
     source = environment().from_string(snapshot["main_source"]).render(**context)
     return TemplatePreviewResponse(
         template_id=snapshot["id"],
@@ -198,3 +205,9 @@ def render_snapshot(snapshot: dict[str, Any], request: TemplatePreviewRequest) -
         source_sha256=hashlib.sha256(source.encode("utf-8")).hexdigest(),
         latex_source=source,
     )
+
+
+def render_options(language, order, avatar):
+    labels = dict(zip(FIXED_SECTIONS, ("个人信息", "教育背景", "专业技能", "工作经历", "项目经历", "证书", "获奖") if language == "zh" else
+        ("Personal Information", "Education", "Skills", "Work Experience", "Projects", "Certificates", "Awards")))
+    return {"language": language, "module_order": order, "show_avatar": avatar, "labels": labels}
