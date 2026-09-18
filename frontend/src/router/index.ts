@@ -63,6 +63,18 @@ const routes: RouteRecordRaw[] = [
             component: () => import('../pages/Resume/ResumeManagePage.vue'),
           },
           {
+            path: 'resume/experiences',
+            name: 'HomeExperienceLibrary',
+            meta: { title: '经历库' },
+            component: () => import('../pages/Resume/ExperienceLibraryPage.vue'),
+          },
+          {
+            path: 'resume/generate',
+            name: 'HomeResumeGeneration',
+            meta: { title: 'JD 简历生成' },
+            component: () => import('../pages/Resume/ResumeGenerationPage.vue'),
+          },
+          {
             path: 'resume/optimize',
             name: 'HomeResumeOptimize',
             meta: { title: '简历优化' },

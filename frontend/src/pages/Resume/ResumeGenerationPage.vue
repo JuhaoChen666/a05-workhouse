@@ -1,0 +1,337 @@
+<template>
+  <section class="generation-page theme-page-shell">
+    <div class="intro theme-card">
+      <div>
+        <span class="eyebrow">JD RESUME STUDIO</span>
+        <h3>生成一份更贴近岗位的简历</h3>
+        <p>经历只作为事实来源，AI 负责选择与组织，最终 LaTeX 和 PDF 由后端确定性生成。</p>
+      </div>
+      <el-button link @click="router.push({ name: 'HomeExperienceLibrary' })">管理经历库</el-button>
+    </div>
+
+    <el-steps :active="activeStep" finish-status="success" simple>
+      <el-step title="岗位 / JD" />
+      <el-step title="模板与经历" />
+      <el-step title="生成与下载" />
+    </el-steps>
+
+    <div v-if="activeStep === 0" class="panel theme-card">
+      <div class="panel-heading">
+        <div><h4>选择目标岗位</h4><p>可以选择系统岗位，也可以粘贴一段 JD。</p></div>
+      </div>
+      <el-radio-group v-model="jdMode" class="mode-switch">
+        <el-radio-button label="JOB_ID">系统岗位</el-radio-button>
+        <el-radio-button label="TEXT">粘贴 JD</el-radio-button>
+      </el-radio-group>
+      <div v-if="jdMode === 'JOB_ID'" class="job-picker">
+        <el-select v-model="selectedJobId" filterable remote :remote-method="searchJobs" :loading="jobLoading" placeholder="搜索岗位" @change="loadSelectedJob">
+          <el-option v-for="job in jobs" :key="job.id" :label="job.name" :value="String(job.id)" />
+        </el-select>
+        <div v-if="selectedJobText" class="job-preview">{{ selectedJobText }}</div>
+      </div>
+      <el-input v-else v-model="jdText" type="textarea" :rows="12" maxlength="12000" show-word-limit placeholder="粘贴职位描述、职责和任职要求" />
+      <div class="actions"><el-button type="primary" class="theme-primary-btn" :disabled="!hasJd" @click="activeStep = 1">下一步</el-button></div>
+    </div>
+
+    <div v-else-if="activeStep === 1" class="workspace">
+      <div class="panel theme-card">
+        <div class="panel-heading"><div><h4>选择模板</h4><p>模板版本由后端冻结，生成后可下载完整源码。</p></div></div>
+        <div class="template-grid">
+          <button v-for="template in templates" :key="`${template.id}-${template.version}`" class="template-card" :class="{ selected: selectedTemplate?.id === template.id && selectedTemplate?.version === template.version }" @click="selectedTemplate = template">
+            <strong>{{ template.name }}</strong>
+            <span>{{ template.id }} · v{{ template.version }}</span>
+            <small>{{ template.supported_languages.join(' / ') }} · {{ template.supported_pages.join(' / ') }} 页</small>
+          </button>
+        </div>
+      </div>
+      <div class="panel theme-card">
+        <div class="panel-heading"><div><h4>选择经历</h4><p>不选具体经历时，系统会根据 JD 自动推荐。</p></div></div>
+        <div class="experience-toolbar">
+          <el-input v-model="experienceKeyword" clearable placeholder="筛选经历" />
+          <el-switch v-model="aiAutoSelect" active-text="AI 自动推荐" />
+        </div>
+        <el-checkbox-group v-model="selectedExperienceIds" class="experience-list">
+          <label v-for="item in filteredExperiences" :key="item.id" class="experience-option">
+            <el-checkbox :label="item.id" :disabled="aiAutoSelect" />
+            <span><strong>{{ item.title }}</strong><small>{{ typeLabel(item.type) }} · {{ experienceSummary(item) }}</small></span>
+          </label>
+        </el-checkbox-group>
+        <el-empty v-if="!filteredExperiences.length" description="暂无可用经历" :image-size="60" />
+      </div>
+      <div class="panel-options theme-card">
+        <el-select v-model="targetPages" style="width: 130px"><el-option :value="1" label="1 页" /><el-option :value="2" label="2 页" /></el-select>
+        <el-select v-model="language" style="width: 130px"><el-option value="zh" label="中文" /><el-option value="en" label="English" /></el-select>
+        <el-checkbox v-model="showAvatar">保留头像</el-checkbox>
+        <div class="actions"><el-button @click="activeStep = 0">上一步</el-button><el-button type="primary" class="theme-primary-btn" :loading="starting" @click="startGeneration">开始生成</el-button></div>
+      </div>
+    </div>
+
+    <div v-else class="result-layout">
+      <div class="panel theme-card">
+        <div class="progress-head">
+          <div><span class="eyebrow">GENERATION STATUS</span><h4>{{ statusLabel }}</h4></div>
+          <strong>{{ job?.progress_percentage || 0 }}%</strong>
+        </div>
+        <el-progress :percentage="job?.progress_percentage || 0" :status="job?.status === 'FAILED' ? 'exception' : undefined" />
+        <p class="stage">{{ job?.stage || '等待任务启动' }}</p>
+        <div v-if="job?.status === 'FAILED'" class="error-box">
+          <div>
+            <strong>{{ job.compile_error_message || '生成失败' }}</strong>
+            <small v-if="job.compile_error_location">{{ job.compile_error_location }}</small>
+          </div>
+          <el-button v-if="job.retryable" type="primary" link @click="retry">重试</el-button>
+        </div>
+        <div v-if="job?.recommendation" class="recommendation">
+          <span>关键词 {{ job.recommendation.keyword_count }} 个</span>
+          <span>已选经历 {{ job.recommendation.selected_item_ids.length }} 条</span>
+          <span>删减建议 {{ job.recommendation.trimmed_item_ids.length }} 条</span>
+        </div>
+        <div v-if="job?.status === 'COMPILED'" class="download-actions">
+          <el-button type="primary" class="theme-primary-btn" :loading="previewLoading" @click="previewPdf">预览 PDF</el-button>
+          <el-button @click="download('pdf')">下载 PDF</el-button>
+          <el-button @click="download('latex')">下载 LaTeX</el-button>
+        </div>
+      </div>
+      <div v-if="previewUrl" class="preview-frame theme-card"><iframe :src="previewUrl" title="PDF 预览" /></div>
+      <div class="panel theme-card saved-panel">
+        <div class="panel-heading"><div><h4>简历库</h4><p>已生成的版本会自动保存为可追溯文档。</p></div><el-button link @click="loadDocuments">刷新</el-button></div>
+        <el-table :data="documents" size="small"><el-table-column prop="name" label="名称" /><el-table-column prop="created_at" label="创建时间" width="180" /></el-table>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import { useRouter } from 'vue-router';
+import { getPositionDetailApi, getSimplePositionPageApi, type SimplePositionItem } from '@/api/jobs';
+import { listExperiencesApi } from '@/api/experiences';
+import {
+  buildResumeGenerationAssetUrl,
+  createResumeGenerationApi,
+  getResumeGenerationApi,
+  listGenerationTemplatesApi,
+  listSavedResumeDocumentsApi,
+  retryResumeGenerationApi,
+  type SavedResumeDocument,
+} from '@/api/resumeGeneration';
+import type { ExperienceItemResponse, ExperienceType, ResumeGenerationJob, ResumeTemplateSummary } from '@/types/resumeLatexContracts';
+import { useUserStore } from '@/store/user';
+
+const router = useRouter();
+const userStore = useUserStore();
+const activeStep = ref(0);
+const jdMode = ref<'JOB_ID' | 'TEXT'>('JOB_ID');
+const selectedJobId = ref<string>();
+const selectedJobText = ref('');
+const jdText = ref('');
+const jobs = ref<SimplePositionItem[]>([]);
+const jobLoading = ref(false);
+const templates = ref<ResumeTemplateSummary[]>([]);
+const selectedTemplate = ref<ResumeTemplateSummary>();
+const experiences = ref<ExperienceItemResponse[]>([]);
+const selectedExperienceIds = ref<string[]>([]);
+const experienceKeyword = ref('');
+const aiAutoSelect = ref(true);
+const targetPages = ref<1 | 2>(1);
+const language = ref<'zh' | 'en'>('zh');
+const showAvatar = ref(false);
+const starting = ref(false);
+const job = ref<ResumeGenerationJob>();
+const documents = ref<SavedResumeDocument[]>([]);
+const previewUrl = ref('');
+const previewLoading = ref(false);
+let timer: number | undefined;
+let previewObjectUrl = '';
+
+const hasJd = computed(() => jdMode.value === 'JOB_ID' ? Boolean(selectedJobId.value && selectedJobText.value) : jdText.value.trim().length >= 20);
+const filteredExperiences = computed(() => {
+  const query = experienceKeyword.value.trim().toLowerCase();
+  if (!query) return experiences.value;
+  return experiences.value.filter((item) => `${item.title} ${item.tags.join(' ')} ${JSON.stringify(item.attributes)}`.toLowerCase().includes(query));
+});
+const statusLabel = computed(() => ({ PENDING: '排队中', PROCESSING: '处理中', COMPILED: '生成完成', FAILED: '生成失败' }[job.value?.status || 'PENDING'] || '处理中'));
+
+function typeLabel(type: ExperienceType) {
+  return ({ WORK: '工作', PROJECT: '项目', SKILL: '技能', CERTIFICATE: '证书', COMPETITION_AWARD: '获奖' } as Record<string, string>)[type] || type;
+}
+function experienceSummary(item: ExperienceItemResponse) {
+  const attrs = item.attributes || {};
+  return String(attrs.role || attrs.category || (Array.isArray(attrs.bullets) ? attrs.bullets[0] : '') || '暂无摘要');
+}
+
+async function searchJobs(query: string) {
+  jobLoading.value = true;
+  try {
+    const result = await getSimplePositionPageApi({ page: 1, pageSize: 30, name: query.trim() || undefined });
+    jobs.value = result.list || [];
+  } catch (error) {
+    ElMessage.error((error as Error).message || '岗位加载失败');
+  } finally {
+    jobLoading.value = false;
+  }
+}
+async function loadSelectedJob() {
+  if (!selectedJobId.value) return;
+  try {
+    const detail = await getPositionDetailApi(selectedJobId.value);
+    selectedJobText.value = String(detail.jobContent || detail.content || detail.description || '');
+  } catch (error) {
+    ElMessage.error((error as Error).message || '岗位详情加载失败');
+  }
+}
+async function loadCatalog() {
+  try {
+    const [templateResult, experienceResult] = await Promise.all([
+      listGenerationTemplatesApi(),
+      listExperiencesApi({ page: 1, page_size: 100, archive: 'active' }),
+    ]);
+    templates.value = templateResult || [];
+    selectedTemplate.value = templates.value[0];
+    experiences.value = experienceResult.items || [];
+  } catch (error) {
+    ElMessage.error((error as Error).message || '生成素材加载失败');
+  }
+}
+async function startGeneration() {
+  if (!selectedTemplate.value || !hasJd.value) return;
+  starting.value = true;
+  try {
+    job.value = await createResumeGenerationApi({
+      jd_source_type: jdMode.value,
+      jd_text: jdMode.value === 'TEXT' ? jdText.value.trim() : undefined,
+      job_id: jdMode.value === 'JOB_ID' ? selectedJobId.value : undefined,
+      template_id: selectedTemplate.value.id,
+      template_version: selectedTemplate.value.version,
+      target_pages: targetPages.value,
+      language: language.value,
+      show_avatar: showAvatar.value,
+      selected_item_ids: aiAutoSelect.value ? null : selectedExperienceIds.value,
+      ai_recommendation_mode: aiAutoSelect.value ? 'JD_AUTO_SELECT_AND_TAILOR' : 'MANUAL_ONLY',
+      personal_info: {
+        name: userStore.userInfo?.username || '',
+        email: userStore.userInfo?.email || '',
+      },
+    });
+    activeStep.value = 2;
+    beginPolling();
+  } catch (error) {
+    ElMessage.error((error as Error).message || '生成任务创建失败');
+  } finally {
+    starting.value = false;
+  }
+}
+function beginPolling() {
+  stopPolling();
+  timer = window.setInterval(async () => {
+    if (!job.value) return;
+    try {
+      job.value = await getResumeGenerationApi(job.value.job_id);
+      if (job.value.status === 'COMPILED' || job.value.status === 'FAILED') stopPolling();
+    } catch (error) {
+      stopPolling();
+      ElMessage.error((error as Error).message || '生成状态获取失败');
+    }
+  }, 1800);
+}
+function stopPolling() {
+  if (timer) window.clearInterval(timer);
+  timer = undefined;
+}
+async function retry() {
+  if (!job.value) return;
+  try {
+    job.value = await retryResumeGenerationApi(job.value.job_id);
+    beginPolling();
+  } catch (error) {
+    ElMessage.error((error as Error).message || '重试失败');
+  }
+}
+async function fetchAsset(format: 'pdf' | 'latex') {
+  if (!job.value) return null;
+  const response = await fetch(buildResumeGenerationAssetUrl(job.value.job_id, format), {
+    headers: userStore.token ? { Authorization: `Bearer ${userStore.token}` } : undefined,
+  });
+  if (!response.ok) throw new Error(`下载失败（${response.status}）`);
+  return response.blob();
+}
+async function previewPdf() {
+  previewLoading.value = true;
+  try {
+    const blob = await fetchAsset('pdf');
+    if (!blob) return;
+    if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = URL.createObjectURL(blob);
+    previewUrl.value = previewObjectUrl;
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'PDF 预览失败');
+  } finally {
+    previewLoading.value = false;
+  }
+}
+async function download(format: 'pdf' | 'latex') {
+  try {
+    const blob = await fetchAsset(format);
+    if (!blob || !job.value) return;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `resume-${job.value.job_id.slice(0, 8)}.${format === 'pdf' ? 'pdf' : 'tex'}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (error) {
+    ElMessage.error((error as Error).message || '下载失败');
+  }
+}
+async function loadDocuments() {
+  try { documents.value = await listSavedResumeDocumentsApi(); } catch (error) { ElMessage.error((error as Error).message || '简历库加载失败'); }
+}
+
+onMounted(() => {
+  void searchJobs('');
+  void loadCatalog();
+  void loadDocuments();
+});
+onBeforeUnmount(() => {
+  stopPolling();
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+});
+</script>
+
+<style scoped>
+.generation-page { display: grid; gap: 16px; }
+.intro, .panel, .panel-options { padding: 18px; }
+.intro { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.intro h3, .panel-heading h4, .progress-head h4 { margin: 4px 0 6px; color: #111827; }
+.intro p, .panel-heading p { margin: 0; color: #6b7280; font-size: 13px; }
+.eyebrow { color: #64748b; font-size: 11px; letter-spacing: 1px; font-weight: 700; }
+.panel-heading { display: flex; justify-content: space-between; margin-bottom: 16px; }
+.mode-switch { margin-bottom: 16px; }
+.job-picker { display: grid; gap: 14px; }
+.job-preview { max-height: 220px; overflow: auto; white-space: pre-wrap; line-height: 1.7; padding: 14px; color: #475569; background: #f8fafc; border-radius: 8px; }
+.actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.template-grid { display: grid; gap: 10px; }
+.template-card { display: grid; gap: 5px; text-align: left; padding: 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; }
+.template-card.selected { border-color: #2563eb; background: #eff6ff; }
+.template-card span, .template-card small { color: #64748b; }
+.experience-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.experience-list { display: grid; gap: 8px; max-height: 360px; overflow: auto; }
+.experience-option { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid #f1f5f9; }
+.experience-option span { display: grid; gap: 4px; }
+.experience-option small { color: #64748b; }
+.panel-options { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.panel-options .actions { margin: 0 0 0 auto; }
+.result-layout { display: grid; gap: 16px; }
+.progress-head { display: flex; justify-content: space-between; align-items: center; }
+.stage { color: #64748b; font-size: 13px; }
+.error-box { display: flex; gap: 12px; align-items: center; padding: 12px; color: #b91c1c; background: #fef2f2; border-radius: 8px; }
+.error-box > div { display: grid; gap: 4px; }
+.error-box small { color: #991b1b; }
+.recommendation, .download-actions { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.recommendation span { color: #475569; font-size: 13px; }
+.preview-frame { height: min(76vh, 900px); padding: 0; overflow: hidden; }
+.preview-frame iframe { width: 100%; height: 100%; border: 0; }
+.saved-panel { margin-top: 0; }
+@media (max-width: 900px) { .workspace { grid-template-columns: 1fr; } .panel-options { grid-column: auto; } .panel-options .actions { width: 100%; margin-left: 0; justify-content: flex-end; } }
+</style>

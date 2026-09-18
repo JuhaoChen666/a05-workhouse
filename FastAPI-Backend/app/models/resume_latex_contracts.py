@@ -152,9 +152,11 @@ class ResumeGenerationRequest(BaseModel):
     jd_text: Optional[str] = Field(None, description="原始 JD 文本内容")
     job_id: Optional[str] = Field(None, description="关联系统内岗位库的主键ID")
     template_id: str = Field("tpl-billryan-classic", description="选用的 LaTeX 模板标识")
+    template_version: str | None = Field(None, min_length=1, max_length=32)
     target_pages: int = Field(1, ge=1, le=2, description="目标页数限制 (1 或 2，MVP 默认 1)")
     language: Literal["zh", "en"] = "zh"
     show_avatar: bool = Field(True, description="是否插入证件照")
+    personal_info: dict[str, Any] = Field(default_factory=dict)
     selected_item_ids: Optional[List[str]] = Field(None, description="用户显式勾选的经历ID，为空则由AI全权推荐")
     ai_recommendation_mode: Literal["MANUAL_ONLY", "JD_AUTO_SELECT_AND_TAILOR"] = Field(
         "JD_AUTO_SELECT_AND_TAILOR",
@@ -170,6 +172,8 @@ class ResumeGenerationRequest(BaseModel):
             raise ValueError("JOB_ID requires job_id; JD is resolved by server")
         if self.selected_item_ids is not None and len(set(self.selected_item_ids)) != len(self.selected_item_ids):
             raise ValueError("duplicate experience selection")
+        if len(self.personal_info) > 32:
+            raise ValueError("personal_info has too many fields")
         return self
 
 
@@ -189,5 +193,9 @@ class ResumeGenerationJobResponse(BaseModel):
     pdf_download_url: Optional[str] = None
     latex_source_url: Optional[str] = None
     compile_error_message: Optional[str] = None
+    compile_error_location: Optional[str] = None
+    stage: str = "PENDING"
+    retryable: bool = False
+    recommendation: Optional[dict[str, Any]] = None
     traces: List[AITailoredBulletTrace] = Field(default_factory=list)
     created_at: datetime
