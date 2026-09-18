@@ -59,9 +59,19 @@
         <el-empty v-if="!filteredExperiences.length" description="暂无可用经历" :image-size="60" />
       </div>
       <div class="panel-options theme-card">
-        <el-select v-model="targetPages" style="width: 130px"><el-option :value="1" label="1 页" /><el-option :value="2" label="2 页" /></el-select>
+        <el-select v-model="targetPages" style="width: 130px"><el-option :value="1" label="最多 1 页" /><el-option :value="2" label="最多 2 页" /></el-select>
         <el-select v-model="language" style="width: 130px"><el-option value="zh" label="中文" /><el-option value="en" label="English" /></el-select>
-        <el-checkbox v-model="showAvatar">保留头像</el-checkbox>
+        <el-checkbox v-model="showAvatar" :disabled="!selectedTemplate?.supports_avatar">保留头像</el-checkbox>
+        <p>页数为 PDF 实际页数上限。语言控制标题，来源事实保留原文；无法验证的 AI 改写不会应用。</p>
+        <el-form label-position="top" class="personal-info">
+          <el-form-item v-for="field in personalFields" :key="field.key" :label="field.label"><el-input v-model="personal[field.key]" /></el-form-item>
+          <div v-for="(entry, index) in personal.education" :key="index">
+            <h4>教育经历 {{ Number(index) + 1 }}</h4>
+            <el-form-item v-for="field in educationFields" :key="field.key" :label="field.label"><el-input v-model="entry[field.key]" /></el-form-item>
+            <el-button @click="personal.education.splice(Number(index), 1)">移除教育经历</el-button>
+          </div>
+          <el-button @click="personal.education.push({ school: '', major: '', degree: '', date_range: '', gpa: '' })">添加教育经历</el-button>
+        </el-form>
         <div class="actions"><el-button @click="activeStep = 0">上一步</el-button><el-button type="primary" class="theme-primary-btn" :loading="starting" @click="startGeneration">开始生成</el-button></div>
       </div>
     </div>
@@ -73,7 +83,7 @@
           <strong>{{ job?.progress_percentage || 0 }}%</strong>
         </div>
         <el-progress :percentage="job?.progress_percentage || 0" :status="job?.status === 'FAILED' ? 'exception' : undefined" />
-        <p class="stage">{{ job?.stage || '等待任务启动' }}</p>
+        <p class="stage">{{ stageLabel }}</p>
         <div v-if="job?.status === 'FAILED'" class="error-box">
           <div>
             <strong>{{ job.compile_error_message || '生成失败' }}</strong>
@@ -81,10 +91,11 @@
           </div>
           <el-button v-if="job.retryable" type="primary" link @click="retry">重试</el-button>
         </div>
-        <div v-if="job?.recommendation" class="recommendation">
-          <span>关键词 {{ job.recommendation.keyword_count }} 个</span>
-          <span>已选经历 {{ job.recommendation.selected_item_ids.length }} 条</span>
-          <span>删减建议 {{ job.recommendation.trimmed_item_ids.length }} 条</span>
+        <div v-if="job?.result_metadata" class="recommendation">
+          <el-alert v-if="job.result_metadata.ai_status === 'DEGRADED'" type="warning" :title="`AI 未成功，已按关键词降级选择：${job.result_metadata.ai_error_code}`" :closable="false" />
+          <span>已选经历 {{ job.result_metadata.selected_item_ids?.length || 0 }} 条</span>
+          <span v-if="job.result_metadata.actual_pages">实际 {{ job.result_metadata.actual_pages }} 页 / 上限 {{ job.result_metadata.maximum_pages }} 页</span>
+          <span v-if="job.result_metadata.unverified_rewrites_preserved">{{ job.result_metadata.unverified_rewrites_preserved }} 条无法验证的改写已保留原文</span>
         </div>
         <div v-if="job?.status === 'COMPILED'" class="download-actions">
           <el-button type="primary" class="theme-primary-btn" :loading="previewLoading" @click="previewPdf">预览 PDF</el-button>
@@ -93,22 +104,19 @@
         </div>
       </div>
       <div v-if="previewUrl" class="preview-frame theme-card"><iframe :src="previewUrl" title="PDF 预览" /></div>
-      <div class="panel theme-card saved-panel">
-        <div class="panel-heading"><div><h4>简历库</h4><p>已生成的版本会自动保存为可追溯文档。</p></div><el-button link @click="loadDocuments">刷新</el-button></div>
-        <el-table :data="documents" size="small"><el-table-column prop="name" label="名称" /><el-table-column prop="created_at" label="创建时间" width="180" /></el-table>
-      </div>
+      <ResumeDocumentLibrary :key="job?.document_id || job?.job_id" />
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import ResumeDocumentLibrary from '@/components/ResumeDocumentLibrary.vue';
 import { ElMessage } from 'element-plus';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { getPositionDetailApi, getSimplePositionPageApi, type SimplePositionItem } from '@/api/jobs';
 import { listExperiencesApi } from '@/api/experiences';
 import {
-  buildResumeGenerationAssetUrl,
   createResumeGenerationApi,
   getResumeGenerationApi,
   listGenerationTemplatesApi,
@@ -120,7 +128,11 @@ import type { ExperienceItemResponse, ExperienceType, ResumeGenerationJob, Resum
 import { useUserStore } from '@/store/user';
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
+const personal = reactive<Record<string, any>>({ name: userStore.userInfo?.username || '', email: userStore.userInfo?.email || '', title: '', phone: '', city: '', github: '', education: [] });
+const personalFields = [{ key: 'name', label: '姓名' }, { key: 'title', label: '求职方向' }, { key: 'phone', label: '电话' }, { key: 'email', label: '邮箱' }, { key: 'city', label: '城市' }, { key: 'github', label: 'GitHub / 作品链接' }];
+const educationFields = [{ key: 'school', label: '学校' }, { key: 'major', label: '专业' }, { key: 'degree', label: '学历' }, { key: 'date_range', label: '就读起止年月' }, { key: 'gpa', label: 'GPA（选填）' }];
 const activeStep = ref(0);
 const jdMode = ref<'JOB_ID' | 'TEXT'>('JOB_ID');
 const selectedJobId = ref<string>();
@@ -152,6 +164,7 @@ const filteredExperiences = computed(() => {
   return experiences.value.filter((item) => `${item.title} ${item.tags.join(' ')} ${JSON.stringify(item.attributes)}`.toLowerCase().includes(query));
 });
 const statusLabel = computed(() => ({ PENDING: '排队中', PROCESSING: '处理中', COMPILED: '生成完成', FAILED: '生成失败' }[job.value?.status || 'PENDING'] || '处理中'));
+const stageLabel = computed(() => ({ PENDING: '等待处理', CLAIMED: '已开始处理', CONTENT_SELECTION: '选择和核对内容', LATEX_RENDER: '生成排版源码', ISOLATED_COMPILE: '编译 PDF', PERSIST_OUTPUTS: '保存简历', COMPLETED: '已完成', FAILED: '生成失败', INTERRUPTED: '服务中断，请重试' } as Record<string, string>)[job.value?.stage || 'PENDING'] || '处理中');
 
 function typeLabel(type: ExperienceType) {
   return ({ WORK: '工作', PROJECT: '项目', SKILL: '技能', CERTIFICATE: '证书', COMPETITION_AWARD: '获奖' } as Record<string, string>)[type] || type;
@@ -187,9 +200,14 @@ async function loadCatalog() {
       listGenerationTemplatesApi(),
       listExperiencesApi({ page: 1, page_size: 100, archive: 'active' }),
     ]);
-    templates.value = templateResult || [];
+    templates.value = (templateResult || []).filter(template => template.protocol_version === '1.1');
     selectedTemplate.value = templates.value[0];
     experiences.value = experienceResult.items || [];
+    for (let next = 2; experiences.value.length < experienceResult.total; next++) {
+      const result = await listExperiencesApi({ page: next, page_size: 100, archive: 'active' });
+      if (!result.items.length) break;
+      experiences.value.push(...result.items);
+    }
   } catch (error) {
     ElMessage.error((error as Error).message || '生成素材加载失败');
   }
@@ -209,12 +227,10 @@ async function startGeneration() {
       show_avatar: showAvatar.value,
       selected_item_ids: aiAutoSelect.value ? null : selectedExperienceIds.value,
       ai_recommendation_mode: aiAutoSelect.value ? 'JD_AUTO_SELECT_AND_TAILOR' : 'MANUAL_ONLY',
-      personal_info: {
-        name: userStore.userInfo?.username || '',
-        email: userStore.userInfo?.email || '',
-      },
+      personal_info: personal,
     });
     activeStep.value = 2;
+    await router.replace({ query: { job: job.value.job_id } });
     beginPolling();
   } catch (error) {
     ElMessage.error((error as Error).message || '生成任务创建失败');
@@ -222,23 +238,37 @@ async function startGeneration() {
     starting.value = false;
   }
 }
+let disposed = false;
 function beginPolling() {
   stopPolling();
-  timer = window.setInterval(async () => {
-    if (!job.value) return;
+  async function poll() {
+    const id = job.value?.job_id;
+    if (!id || disposed) return;
     try {
-      job.value = await getResumeGenerationApi(job.value.job_id);
-      if (job.value.status === 'COMPILED' || job.value.status === 'FAILED') stopPolling();
-    } catch (error) {
-      stopPolling();
-      ElMessage.error((error as Error).message || '生成状态获取失败');
-    }
-  }, 1800);
+      const latest = await getResumeGenerationApi(id);
+      if (job.value?.job_id !== id || disposed) return;
+      job.value = latest;
+      if (latest.status === 'COMPILED' || latest.status === 'FAILED') return;
+      timer = window.setTimeout(poll, 1800);
+    } catch (error) { ElMessage.error((error as Error).message || '生成状态获取失败'); }
+  }
+  timer = window.setTimeout(poll, 1800);
 }
 function stopPolling() {
-  if (timer) window.clearInterval(timer);
+  if (timer) window.clearTimeout(timer);
   timer = undefined;
 }
+watch(() => route.query.job, async id => {
+  if (typeof id !== 'string') return;
+  stopPolling();
+  try {
+    const loaded = await getResumeGenerationApi(id);
+    if (route.query.job !== id || disposed) return;
+    job.value = loaded;
+    activeStep.value = 2;
+    if (!['COMPILED', 'FAILED'].includes(loaded.status)) beginPolling();
+  } catch (error) { ElMessage.error((error as Error).message); }
+}, { immediate: true });
 async function retry() {
   if (!job.value) return;
   try {
@@ -250,7 +280,10 @@ async function retry() {
 }
 async function fetchAsset(format: 'pdf' | 'latex') {
   if (!job.value) return null;
-  const response = await fetch(buildResumeGenerationAssetUrl(job.value.job_id, format), {
+  const path = format === 'pdf' ? job.value.pdf_download_url : job.value.latex_source_url;
+  if (!path || !job.value.document_id) throw new Error('文档不存在或已删除，请刷新简历库');
+  const base = String(import.meta.env.VITE_INTERVIEW_API_ORIGIN || '').replace(/\/$/, '');
+  const response = await fetch(`${base}${path}`, {
     headers: userStore.token ? { Authorization: `Bearer ${userStore.token}` } : undefined,
   });
   if (!response.ok) throw new Error(`下载失败（${response.status}）`);
@@ -293,6 +326,7 @@ onMounted(() => {
   void loadDocuments();
 });
 onBeforeUnmount(() => {
+  disposed = true;
   stopPolling();
   if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
 });

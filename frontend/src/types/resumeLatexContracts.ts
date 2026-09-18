@@ -13,7 +13,7 @@ export interface BaseExperienceItem {
   tags: string[]
   is_archived: boolean
   sort_order?: number
-  source_type?: 'MANUAL' | 'PDF_IMPORT'
+  source_type?: 'MANUAL' | 'PDF_IMPORT' | 'MARKDOWN_IMPORT'
   source_resume_id?: number | null
   source_locator?: Record<string, unknown>
 }
@@ -67,7 +67,7 @@ export interface ResumeTemplateMetadata {
   id: string
   name: string
   version: string
-  protocol_version?: '1.0'
+  protocol_version?: '1.0' | '1.1'
   entry_file: string
   supported_languages: Array<"zh" | "en">
   [key: string]: unknown
@@ -94,7 +94,7 @@ export interface ResumeTemplateSummary {
   version: string
   name: string
   description: string
-  protocol_version: '1.0'
+  protocol_version: '1.0' | '1.1'
   supported_sections: ResumeTemplateSection[]
   supported_pages: number[]
   supported_languages: Array<'zh' | 'en'>
@@ -117,7 +117,7 @@ export interface TemplateValidationIssue {
 
 export interface TemplateValidationReport {
   valid: boolean
-  protocol_version: '1.0'
+  protocol_version: '1.0' | '1.1'
   required_sections: ResumeTemplateSection[]
   referenced_roots: string[]
   issues: TemplateValidationIssue[]
@@ -179,6 +179,7 @@ export interface AITailoredBulletTrace {
 
 export interface ResumeGenerationJob {
   job_id: string
+  document_id?: string | null
   status: 'PENDING' | 'PROCESSING' | 'COMPILED' | 'FAILED'
   progress_percentage: number
   pdf_download_url?: string
@@ -189,10 +190,11 @@ export interface ResumeGenerationJob {
   retryable?: boolean
   recommendation?: {
     selected_item_ids: string[]
-    keyword_matches: Record<string, string[]>
-    keyword_count: number
-    trimmed_item_ids: string[]
+    keyword_matches?: Record<string, string[]>
+    keyword_count?: number
+    trimmed_item_ids?: string[]
   } | null
+  result_metadata?: { ai_status?: string; ai_error_code?: string; actual_pages?: number; maximum_pages?: number; selected_item_ids?: string[]; module_order?: string[]; unverified_rewrites_preserved?: number } | null
   traces: AITailoredBulletTrace[]
   created_at: string
 }
@@ -209,7 +211,7 @@ export interface ExperienceItemResponse {
   is_archived: boolean
   sort_order: number
   revision: number
-  source_type: "MANUAL" | "PDF_IMPORT"
+  source_type: "MANUAL" | "PDF_IMPORT" | "MARKDOWN_IMPORT"
   source_resume_id: number | null
   source_locator: Record<string, unknown>
   created_at: string
