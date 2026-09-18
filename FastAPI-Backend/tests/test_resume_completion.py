@@ -40,16 +40,13 @@ def test_fabricated_source_or_fact_is_rejected(selected, original, rewritten):
 
 
 @pytest.mark.asyncio
-async def test_unverified_semantic_rewrite_preserves_original_and_reports_it(monkeypatch):
+async def test_fabricated_company_rewrite_is_rejected(monkeypatch):
     ai = generation.StructuredAIPlan(selected_item_ids=["owned"], module_order=list(FIXED_SECTIONS),
         tailored_bullets=[{"source_item_id": "owned", "original_bullet": item()["attributes"]["bullets"][0],
                           "tailored_bullet": "在虚构公司领导 Python 团队，提升吞吐量 20%"}])
     monkeypatch.setattr(generation, "request_structured_ai_plan", AsyncMock(return_value=ai))
-    data, traces, plan = await generation.build_ai_plan(jd_text="Python", experiences=[item()],
-        personal_info={}, selected_item_ids=None)
-    assert traces[0].tailored_bullet == traces[0].original_bullet
-    assert "虚构公司" not in str(data)
-    assert plan["unverified_rewrites_preserved"] == 1
+    with pytest.raises(generation.LatexCompileError, match="AI_FACT_VIOLATION"):
+        await generation.build_ai_plan(jd_text="Python", experiences=[item()], personal_info={}, selected_item_ids=None)
 
 
 @pytest.mark.asyncio
@@ -120,7 +117,7 @@ async def test_container_timeout_removes_only_verified_task_container(monkeypatc
     monkeypatch.setenv("RESUME_LATEX_IMAGE", "sha256:" + "a" * 64)
     monkeypatch.setenv("RESUME_COMPILE_WORK_ROOT", str(tmp_path))
     monkeypatch.setattr(sandbox.shutil, "which", lambda name: "docker")
-    calls, task = [], []
+    calls, task, alive = [], [], [True]
     async def capture(command, **kwargs):
         calls.append(command)
         if command[1] == "info":
@@ -133,12 +130,16 @@ async def test_container_timeout_removes_only_verified_task_container(monkeypatc
             raise asyncio.TimeoutError()
         if command[1] == "inspect":
             return 0, task[0].encode()
+        if command[1] == "ps":
+            return 0, ("b" * 64).encode() if alive[0] else b""
         assert command == ["docker", "rm", "--force", "b" * 64]
+        alive[0] = False
         return 0, b""
     monkeypatch.setattr(sandbox, "_capture", capture)
     with pytest.raises(SandboxError, match="COMPILE_TIMEOUT"):
         await sandbox.compile_isolated("source")
-    assert calls[-1] == ["docker", "rm", "--force", "b" * 64]
+    assert ["docker", "rm", "--force", "b" * 64] in calls
+    assert not alive[0] and not list(tmp_path.iterdir())
 
 
 @pytest.mark.asyncio

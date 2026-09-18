@@ -373,6 +373,7 @@ def test_migration_roundtrip_preserves_legacy_schema_and_rows(mysql_schema):
             "resumes", "resume_optimizations", "resume_phase1_alembic_version",
             "experience_items", "resume_templates", "resume_generation_jobs", "resume_documents",
             "experience_import_batches", "experience_import_drafts",
+            "resume_execution_slots",
         }
         assert [(c["name"], str(c["type"])) for c in old_columns] == [(c["name"], str(c["type"])) for c in inspect(engine).get_columns("resumes")]
     finally:

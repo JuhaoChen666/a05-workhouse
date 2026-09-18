@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
 import json
 import os
 import re
@@ -277,6 +278,15 @@ def validated_plan(ai, experiences):
         numbers = set(re.findall(r"\d+(?:[.,]\d+)*%?", bullet.tailored_bullet))
         if not numbers <= set(re.findall(r"\d+(?:[.,]\d+)*%?", bullet.original_bullet)):
             raise LatexCompileError("AI_FACT_VIOLATION: unsupported numerical fact", retryable=False)
+        frozen_text = json.dumps(source[bullet.source_item_id], ensure_ascii=False).lower()
+        # Conservative guards for explicit entity claims. These do not claim to
+        # prove semantic equivalence; all remaining changes still require review.
+        entities = re.findall(r"[\u4e00-\u9fffA-Za-z0-9]{2,}(?:公司|集团|银行)", bullet.tailored_bullet)
+        technologies = {"aws", "azure", "kubernetes", "docker", "react", "java", "python", "mysql", "redis", "tensorflow"}
+        added_tech = technologies & set(re.findall(r"[a-z]+", bullet.tailored_bullet.lower()))
+        if any(entity.lower() not in frozen_text for entity in entities) or any(
+                tech not in set(re.findall(r"[a-z]+", frozen_text)) for tech in added_tech):
+            raise LatexCompileError("AI_FACT_VIOLATION: unsupported entity claim", retryable=False)
         preserved += bullet.tailored_bullet != bullet.original_bullet
     order = ["basic_info"] + [s for s in ai.module_order if s != "basic_info"]
     order += [s for s in FIXED_SECTIONS if s not in order]
@@ -301,7 +311,12 @@ async def build_ai_plan(*, jd_text, experiences, personal_info, selected_item_id
             chosen, order, preserved = validated_plan(ai, allowed)
             plan = {"selected_item_ids": ai.selected_item_ids, "module_order": order,
                 "recommendation_engine": "deepseek_structured_json", "ai_status": "SUCCEEDED",
-                "unverified_rewrites_preserved": preserved}
+                "unverified_rewrites_preserved": preserved, "keyword_matches": ai.keyword_matches,
+                "trim_suggestions": ai.trim_suggestions, "tailored_bullets": [row.model_dump(mode="json") for row in ai.tailored_bullets],
+                "review_required": bool(preserved), "review_status": "PENDING" if preserved else "NOT_REQUIRED"}
+            # Keyword claims are displayed only when they actually occur in the frozen source.
+            plan["keyword_matches"] = {id_: [word for word in words if word.lower() in json.dumps(_attributes(next(item for item in chosen if str(item['id']) == id_)), ensure_ascii=False).lower()]
+                for id_, words in ai.keyword_matches.items() if id_ in ai.selected_item_ids}
         except AIUnavailable as error:
             chosen, _, _ = rank_experiences(allowed, jd_text, selected_item_ids)
             plan = {**fallback, "ai_status": "DEGRADED", "ai_error_code": error.code}
@@ -311,6 +326,41 @@ async def build_ai_plan(*, jd_text, experiences, personal_info, selected_item_id
     plan.update(language=language, fact_policy="original_text_only; unverified semantic rewrites are not applied",
                 content_language_policy="localized headings; original facts remain in their source language")
     return build_render_data(chosen, personal_info), traces, plan
+
+
+def review_version(plan):
+    return hashlib.sha256(json.dumps({k: v for k, v in plan.items() if k != "version"},
+        sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf8")).hexdigest()
+
+
+def apply_review(plan, decision, experiences, personal):
+    """Apply only the exact, explicitly reviewed plan to a copy of frozen facts."""
+    if plan.get("version") != review_version(plan) or decision.get("version") != plan["version"]:
+        raise LatexCompileError("REVIEW_VERSION_CONFLICT", retryable=False)
+    ai = StructuredAIPlan.model_validate({key: plan.get(key, [] if key != "keyword_matches" else {})
+        for key in StructuredAIPlan.model_fields})
+    chosen, order, _ = validated_plan(ai, experiences)
+    accepted = decision["accepted_indices"]
+    if len(accepted) != len(set(accepted)) or any(type(index) is not int or index < 0 or index >= len(ai.tailored_bullets) for index in accepted):
+        raise LatexCompileError("REVIEW_DECISION_INVALID", retryable=False)
+    by_id = {str(item["id"]): item for item in chosen}
+    originals = {str(item["id"]): list(_attributes(item).get("bullets", [])) for item in chosen}
+    replacements = {}
+    for index in accepted:
+        row = ai.tailored_bullets[index]
+        item = by_id[row.source_item_id]
+        attrs = _attributes(item)
+        bullet_index = originals[row.source_item_id].index(row.original_bullet)
+        attrs["bullets"][bullet_index] = row.tailored_bullet
+        replacements[(row.source_item_id, row.original_bullet)] = row.tailored_bullet
+    traces = [AITailoredBulletTrace(source_item_id=id_, original_bullet=bullet,
+        tailored_bullet=replacements.get((id_, bullet), bullet),
+        keywords_matched=[word for word in plan.get("keyword_matches", {}).get(id_, []) if word.lower() in bullet.lower()])
+        for id_, bullets in originals.items() for bullet in bullets]
+    metadata = {**plan, "module_order": order, "review_status": "CONFIRMED", "review_required": False,
+        "accepted_rewrites": len(accepted), "unverified_rewrites_preserved": sum(row.tailored_bullet != row.original_bullet for index, row in enumerate(ai.tailored_bullets) if index not in accepted),
+        "fact_policy": "source-bound proposals; semantic changes explicitly confirmed by user"}
+    return build_render_data(chosen, personal), traces, metadata
 
 
 async def compile_latex(source: str, resources: dict[str, Any] | None = None) -> bytes:
@@ -360,16 +410,34 @@ async def run_generation_job(job_id: str, owner_id: int, *, token: str, factory=
                 if job.status != "PROCESSING" or job.run_token != token:
                     return
                 snapshot = {key: copy.deepcopy(getattr(job, key)) for key in
-                    ("jd_snapshot", "experience_snapshot", "personal_info_snapshot", "template_snapshot", "options_snapshot")}
+                    ("jd_snapshot", "experience_snapshot", "personal_info_snapshot", "template_snapshot", "options_snapshot", "review_plan", "review_decision")}
                 language, target_pages = job.language, job.target_pages
         options = snapshot["options_snapshot"] or {}
         await transition("PROCESSING", "CONTENT_SELECTION", 5)
-        data, traces, plan = await build_ai_plan(
-            jd_text=str((snapshot["jd_snapshot"] or {}).get("text") or ""),
-            experiences=list(snapshot["experience_snapshot"] or []),
-            personal_info=dict(snapshot["personal_info_snapshot"] or {}),
-            selected_item_ids=options.get("selected_item_ids"),
-            mode=options.get("ai_recommendation_mode", "JD_AUTO_SELECT_AND_TAILOR"), language=language)
+        if snapshot["review_plan"] is not None:
+            if snapshot["review_decision"] is not None:
+                data, traces, plan = apply_review(snapshot["review_plan"], snapshot["review_decision"], snapshot["experience_snapshot"], snapshot["personal_info_snapshot"])
+            else:
+                data, traces, plan = None, [], copy.deepcopy(snapshot["review_plan"])
+        else:
+            data, traces, plan = await build_ai_plan(
+                jd_text=str((snapshot["jd_snapshot"] or {}).get("text") or ""),
+                experiences=list(snapshot["experience_snapshot"] or []),
+                personal_info=dict(snapshot["personal_info_snapshot"] or {}),
+                selected_item_ids=options.get("selected_item_ids"),
+                mode=options.get("ai_recommendation_mode", "JD_AUTO_SELECT_AND_TAILOR"), language=language)
+        if plan.get("review_required"):
+            plan["version"] = review_version(plan)
+            async with factory() as session, session.begin():
+                mapper = ResumeStorageMapper(session, owner_id)
+                row = await mapper.owned(Job, job_id, lock=True)
+                if row.run_token != token or row.status != "PROCESSING":
+                    raise LatexCompileError("WORKER_LEASE_LOST", retryable=False)
+                row.review_plan = copy.deepcopy(plan)
+                row.result_metadata = copy.deepcopy(plan)
+                await mapper.update_job(job_id, status="WAITING_REVIEW", stage="REVIEW_REQUIRED", progress=25)
+                row.run_token = None
+            return
         trace_values = [trace.model_dump(mode="json") for trace in traces]
         await transition("PROCESSING", "LATEX_RENDER", 35, traces=trace_values, metadata=plan)
         template = snapshot["template_snapshot"]

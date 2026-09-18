@@ -189,7 +189,7 @@ class ResumeGenerationJobResponse(BaseModel):
     """简历生成异步任务响应状态"""
     job_id: str
     document_id: Optional[str] = None
-    status: str = Field(..., description="PENDING | PROCESSING | COMPILED | FAILED")
+    status: str = Field(..., description="PENDING | PROCESSING | WAITING_REVIEW | COMPILED | FAILED")
     progress_percentage: int = Field(0, ge=0, le=100)
     pdf_download_url: Optional[str] = None
     latex_source_url: Optional[str] = None
@@ -199,5 +199,7 @@ class ResumeGenerationJobResponse(BaseModel):
     retryable: bool = False
     recommendation: Optional[dict[str, Any]] = None
     result_metadata: Optional[dict[str, Any]] = None
+    review_plan: Optional[dict[str, Any]] = None
+    review_decision: Optional[dict[str, Any]] = None
     traces: List[AITailoredBulletTrace] = Field(default_factory=list)
     created_at: datetime

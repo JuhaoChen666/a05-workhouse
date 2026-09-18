@@ -355,7 +355,7 @@ def test_incremental_migration_preserves_p1_and_legacy(mysql_schema):
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT title FROM experience_items WHERE id='fixture'"))=="Preserve"
             assert connection.scalar(text("SELECT content_text FROM resumes WHERE id=1"))=="original"
-            assert connection.scalar(text("SELECT version_num FROM resume_phase1_alembic_version"))=="resume_runtime_001"
+            assert connection.scalar(text("SELECT version_num FROM resume_phase1_alembic_version"))=="resume_review_002"
     finally:
         engine.dispose()
 
