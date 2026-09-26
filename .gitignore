@@ -45,6 +45,7 @@ build/
 .venv/
 .phase1-local/
 .phase2-local/
+.resume-completion-local/
 .pytest_cache/
 pytest-cache-files-*/
 issue1-*.local.*

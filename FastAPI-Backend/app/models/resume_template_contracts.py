@@ -99,6 +99,15 @@ class TemplateRenderData(ProtocolModel):
 
 class TemplatePreviewOptions(ProtocolModel):
     show_avatar: bool = False
+    language: Literal["zh", "en"] = "zh"
+    module_order: list[Literal["basic_info", "education", "skills", "work", "projects", "certificates", "competitions"]] = Field(default_factory=lambda: list(FIXED_SECTIONS))
+
+    @field_validator("module_order")
+    @classmethod
+    def ordered_modules(cls, value):
+        if value != list(FIXED_SECTIONS):
+            raise ValueError("module_order is fixed: basic_info, education, skills, work, projects, certificates, competitions")
+        return value
 
 
 class TemplatePreviewRequest(ProtocolModel):

@@ -6,19 +6,22 @@ import os
 from typing import Annotated, Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
-from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
+from datetime import datetime, timezone
 
 from app.api.experience_dependencies import experience_session, private_store, trusted_owner
 from app.infrastructure.mapper.resume_storage_mapper import AssetNotFound, ResumeStorageMapper
 from app.infrastructure.private_resume_assets import PrivateAssets
+from app.infrastructure.private_resume_assets import private_asset_transaction
+from app.api.experience_http import ExperienceRoute
 from app.models.resume_latex_contracts import ResumeGenerationJobResponse, ResumeGenerationRequest
 from app.models.resume_storage_models import ResumeDocumentModel, ResumeGenerationJobModel, ResumeTemplateModel
-from app.services.resume_generation_service import jd_keywords, rank_experiences, run_generation_job
+from app.models.experience_import_models import ExperienceImportBatch
 
 
-router = APIRouter(prefix="/api/resume-generation", tags=["JD 简历生成"])
+router = APIRouter(prefix="/api/resume-generation", tags=["JD 简历生成"], route_class=ExperienceRoute)
 Owner = Annotated[int, Depends(trusted_owner)]
 Session = Annotated[object, Depends(experience_session)]
 Store = Annotated[PrivateAssets, Depends(private_store)]
@@ -27,23 +30,7 @@ Store = Annotated[PrivateAssets, Depends(private_store)]
 def _job_response(job: ResumeGenerationJobModel) -> ResumeGenerationJobResponse:
     error = job.error if isinstance(job.error, dict) else {}
     compiled = job.status == "COMPILED"
-    recommendation = None
-    if isinstance(job.jd_snapshot, dict):
-        chosen, matches, chosen_ids = rank_experiences(
-            list(job.experience_snapshot or []),
-            str(job.jd_snapshot.get("text") or ""),
-            (job.options_snapshot or {}).get("selected_item_ids"),
-        )
-        recommendation = {
-            "selected_item_ids": chosen_ids,
-            "keyword_matches": matches,
-            "keyword_count": len(jd_keywords(str(job.jd_snapshot.get("text") or ""))),
-            "trimmed_item_ids": [
-                str(item.get("id"))
-                for item in (job.experience_snapshot or [])
-                if str(item.get("id")) not in chosen_ids
-            ],
-        }
+    recommendation = job.result_metadata
     return ResumeGenerationJobResponse(
         job_id=job.id,
         status=job.status,
@@ -57,7 +44,23 @@ def _job_response(job: ResumeGenerationJobModel) -> ResumeGenerationJobResponse:
         traces=job.traces or [],
         created_at=job.created_at,
         recommendation=recommendation,
+        result_metadata=job.result_metadata,
+        review_plan=job.review_plan,
+        review_decision=job.review_decision,
     )
+
+
+async def _with_document(job, session):
+    result = _job_response(job)
+    if job.status == "COMPILED":
+        document = (await session.execute(select(ResumeDocumentModel).where(
+            ResumeDocumentModel.user_id == job.user_id, ResumeDocumentModel.generation_job_id == job.id,
+            ResumeDocumentModel.deleted_at.is_(None)).order_by(
+            ResumeDocumentModel.copied_from_id.is_(None).desc(), ResumeDocumentModel.created_at, ResumeDocumentModel.id))).scalars().first()
+        result.document_id = document.id if document else None
+        result.pdf_download_url = f"/api/resume-documents/{document.id}/pdf" if document else None
+        result.latex_source_url = f"/api/resume-documents/{document.id}/latex" if document else None
+    return result
 
 
 async def _resolve_job(job_id: str) -> dict[str, Any]:
@@ -72,13 +75,19 @@ async def _resolve_job(job_id: str) -> dict[str, Any]:
             response.raise_for_status()
             payload = response.json()
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"岗位详情获取失败: {exc}") from exc
+        raise HTTPException(status_code=502, detail="岗位详情服务暂不可用，请稍后重试或粘贴 JD") from None
     if isinstance(payload, dict):
+        if "code" in payload and str(payload["code"]) not in {"0", "200"}:
+            raise HTTPException(status_code=502, detail="岗位详情服务返回失败，请重试或粘贴 JD")
         if isinstance(payload.get("data"), dict):
             payload = payload["data"]
         elif isinstance(payload.get("result"), dict):
             payload = payload["result"]
-    content = payload.get("jobContent") if isinstance(payload, dict) else None
+    content = "\n\n".join(payload[key].strip() for key in ("responsibility", "skill_requirements")
+        if isinstance(payload, dict) and isinstance(payload.get(key), str) and payload[key].strip())
+    if not content and isinstance(payload, dict):
+        content = next((payload[key].strip() for key in ("jobContent", "content", "description")
+            if isinstance(payload.get(key), str) and payload[key].strip()), None)
     if not isinstance(content, str) or not content.strip():
         raise HTTPException(status_code=422, detail="岗位没有可用于生成的 JD 文本")
     return {"id": job_id, "jobContent": content, "source": payload}
@@ -87,6 +96,8 @@ async def _resolve_job(job_id: str) -> dict[str, Any]:
 async def _latest_template(session, template_id: str, version: str | None):
     statement = select(ResumeTemplateModel).where(ResumeTemplateModel.id == template_id)
     rows = list((await session.execute(statement)).scalars())
+    if not version:
+        rows = [row for row in rows if row.is_enabled and row.validation_status == "VALIDATED"]
     if version:
         row = next((item for item in rows if item.version == version), None)
     else:
@@ -99,13 +110,13 @@ async def _latest_template(session, template_id: str, version: str | None):
 @router.post("/jobs", response_model=ResumeGenerationJobResponse, status_code=202)
 async def create_generation_job(
     request: ResumeGenerationRequest,
-    background_tasks: BackgroundTasks,
     owner: Owner,
     session: Session,
+    store: Store,
 ):
     resolved_job = await _resolve_job(request.job_id) if request.jd_source_type == "JOB_ID" else None
     template_version = request.template_version
-    async with session.begin():
+    async with private_asset_transaction(session, store, owner):
         template = await _latest_template(session, request.template_id, template_version)
         values = request.model_dump(mode="json")
         values["template_version"] = template.version
@@ -115,7 +126,6 @@ async def create_generation_job(
             job = await mapper.create_job(values, resolved_job=resolved_job)
         except (ValueError, AssetNotFound) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-    background_tasks.add_task(run_generation_job, job.id, owner)
     return _job_response(job)
 
 
@@ -123,14 +133,57 @@ async def create_generation_job(
 async def list_generation_jobs(owner: Owner, session: Session):
     async with session.begin():
         jobs = await ResumeStorageMapper(session, owner).list_jobs()
-        return [_job_response(job) for job in jobs]
+        return [await _with_document(job, session) for job in jobs]
+
+
+@router.get("/metrics")
+async def generation_metrics(owner: Owner, session: Session):
+    async with session.begin():
+        rows = (await session.execute(select(ResumeGenerationJobModel.status,
+            ResumeGenerationJobModel.created_at, ResumeGenerationJobModel.started_at,
+            ResumeGenerationJobModel.finished_at, ResumeGenerationJobModel.error,
+            ResumeGenerationJobModel.result_metadata, ResumeGenerationJobModel.retry_count).where(
+            ResumeGenerationJobModel.user_id == owner))).all()
+        counts, failures, ai, durations = {}, {}, {}, []
+        longest = 0
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        for status, created, started, finished, error, metadata, retry in rows:
+            counts[status] = counts.get(status, 0) + 1
+            if status in ("PENDING", "PROCESSING"):
+                longest = max(longest, (now - created).total_seconds())
+            if started and finished:
+                durations.append((finished - started).total_seconds())
+            if error:
+                code = error.get("code", "UNKNOWN")
+                failures[code] = failures.get(code, 0) + 1
+            if metadata:
+                state = metadata.get("ai_status", "UNKNOWN")
+                ai[state] = ai.get(state, 0) + 1
+        terminal = counts.get("COMPILED", 0) + counts.get("FAILED", 0)
+        imports = (await session.execute(select(ExperienceImportBatch.ai_attempt_count, ExperienceImportBatch.ai_failure_count,
+            ExperienceImportBatch.retry_count).where(ExperienceImportBatch.user_id == owner))).all()
+        from app.models.resume_execution_models import ResumeExecutionSlot
+        resource_states = (await session.execute(select(ResumeExecutionSlot.state).join(ResumeGenerationJobModel,
+            ResumeExecutionSlot.job_id == ResumeGenerationJobModel.id).where(ResumeGenerationJobModel.user_id == owner))).scalars().all()
+        import_attempts = sum(row.ai_attempt_count for row in imports)
+        import_failures = sum(row.ai_failure_count for row in imports)
+        return {"status_counts": counts, "failure_rate": counts.get("FAILED", 0) / terminal if terminal else None,
+            "average_execution_seconds": sum(durations) / len(durations) if durations else None,
+            "failure_codes": failures, "ai_states": ai, "retry_total": sum(row.retry_count for row in rows),
+            "queue_depth": counts.get("PENDING", 0), "longest_unfinished_seconds": longest,
+            "waiting_review_count": counts.get("WAITING_REVIEW", 0),
+            "compile_capacity_occupied": sum(state != "FREE" for state in resource_states),
+            "compile_cleanup_required": resource_states.count("CLEANUP_REQUIRED"),
+            "import_ai_attempts": import_attempts, "import_ai_failures": import_failures,
+            "import_ai_failure_rate": import_failures / import_attempts if import_attempts else None,
+            "import_retry_total": sum(row.retry_count for row in imports)}
 
 
 @router.get("/jobs/{job_id}", response_model=ResumeGenerationJobResponse)
 async def get_generation_job(job_id: str, owner: Owner, session: Session):
     async with session.begin():
         try:
-            return _job_response(await ResumeStorageMapper(session, owner).get_job(job_id))
+            return await _with_document(await ResumeStorageMapper(session, owner).get_job(job_id), session)
         except AssetNotFound as exc:
             raise HTTPException(status_code=404, detail="生成任务不存在") from exc
 
@@ -138,19 +191,50 @@ async def get_generation_job(job_id: str, owner: Owner, session: Session):
 @router.post("/jobs/{job_id}/retry", response_model=ResumeGenerationJobResponse, status_code=202)
 async def retry_generation_job(
     job_id: str,
-    background_tasks: BackgroundTasks,
     owner: Owner,
     session: Session,
+    store: Store,
 ):
-    async with session.begin():
+    async with private_asset_transaction(session, store, owner):
         try:
             job = await ResumeStorageMapper(session, owner).retry_job(job_id)
         except AssetNotFound as exc:
             raise HTTPException(status_code=404, detail="生成任务不存在") from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-    background_tasks.add_task(run_generation_job, job.id, owner)
     return _job_response(job)
+
+
+class ReviewDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    version: str = Field(pattern="^[a-f0-9]{64}$")
+    accepted_indices: list[int] = Field(max_length=60)
+
+
+@router.post("/jobs/{job_id}/review", response_model=ResumeGenerationJobResponse, status_code=202)
+async def confirm_review(job_id: str, request: ReviewDecision, owner: Owner, session: Session):
+    from app.services.resume_generation_service import apply_review, LatexCompileError
+    async with session.begin():
+        mapper = ResumeStorageMapper(session, owner)
+        try:
+            row = await mapper.owned(ResumeGenerationJobModel, job_id, lock=True)
+        except AssetNotFound:
+            raise HTTPException(404, detail="生成任务不存在") from None
+        decision = request.model_dump(mode="json")
+        decision["accepted_indices"] = sorted(decision["accepted_indices"])
+        if row.review_decision is not None:
+            if row.review_decision != decision:
+                raise HTTPException(409, detail="该规划已确认，不能覆盖；请创建新任务")
+            return await _with_document(row, session)
+        if row.status != "WAITING_REVIEW" or row.review_plan is None or request.version != row.review_plan["version"]:
+            raise HTTPException(409, detail="规划版本或任务状态已变化，请重新读取")
+        try:
+            apply_review(row.review_plan, decision, row.experience_snapshot, row.personal_info_snapshot)
+        except LatexCompileError:
+            raise HTTPException(422, detail="改写确认内容无效，或规划来源校验失败") from None
+        row.review_decision = decision
+        await mapper.update_job(job_id, status="PENDING", stage="REVIEW_CONFIRMED", progress=25)
+        return _job_response(row)
 
 
 async def _read_output(job_id: str, owner: int, session, store: PrivateAssets, field: str):
@@ -173,7 +257,7 @@ async def _read_output(job_id: str, owner: int, session, store: PrivateAssets, f
     try:
         return store.read(owner, asset)
     except (ValueError, PermissionError, FileNotFoundError) as exc:
-        raise HTTPException(status_code=410, detail=f"生成文件不可用: {exc}") from exc
+        raise HTTPException(status_code=410, detail="生成文件不可用，请联系维护人员") from None
 
 
 @router.get("/jobs/{job_id}/pdf")

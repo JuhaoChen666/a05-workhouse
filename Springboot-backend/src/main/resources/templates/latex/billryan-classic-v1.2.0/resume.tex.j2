@@ -1,0 +1,67 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{xeCJK,fontspec,geometry,enumitem,multicol}
+\geometry{margin=1.8cm}
+\IfFontExistsTF{Noto Serif CJK SC}{\setCJKmainfont{Noto Serif CJK SC}}{\setCJKmainfont{Microsoft YaHei}}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{nosep,leftmargin=1.5em}
+\begin{document}
+\begin{center}
+{\LARGE\bfseries {{ basic_info.name | latex_escape }}}\\
+{{ basic_info.title | latex_escape }}\\
+{{ basic_info.phone | latex_escape }} \quad {{ basic_info.email | latex_escape }} \quad {{ basic_info.city | latex_escape }}\\
+{{ basic_info.github | latex_escape }}
+\end{center}
+{% if options.show_avatar and basic_info.avatar_path %}
+% Avatar is not supported by this version.
+{% endif %}
+{% for section in options.module_order %}
+{% if section == 'education' and education %}
+\section*{ {{ options.labels.education | latex_escape }} }
+{% for entry in education %}
+\textbf{ {{ entry.school | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.major | latex_escape }} \quad {{ entry.degree | latex_escape }} \quad {{ entry.gpa | latex_escape }}\par
+{% endfor %}
+{% endif %}
+{% if section == 'skills' and skills %}
+\section*{ {{ options.labels.skills | latex_escape }} }
+{% for entry in skills %}
+\textbf{ {{ entry.category | latex_escape }} }: {{ entry['items'] | latex_escape }}\par
+{% endfor %}
+{% endif %}
+{% if section == 'work' and work %}
+\section*{ {{ options.labels.work | latex_escape }} }
+{% for entry in work %}
+\textbf{ {{ entry.company | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.role | latex_escape }} \quad {{ entry.department | latex_escape }} \quad {{ entry.city | latex_escape }}
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet | latex_escape }}
+{% endfor %}\end{itemize}
+{% endfor %}
+{% endif %}
+{% if section == 'projects' and projects %}
+\section*{ {{ options.labels.projects | latex_escape }} }
+{% for entry in projects %}
+\textbf{ {{ entry.title | latex_escape }} } \hfill {{ entry.date_range | latex_escape }}\\
+{{ entry.role | latex_escape }} \quad {{ entry.tech_stack | latex_escape }}\\
+{{ entry.project_url | latex_escape }}
+\begin{itemize}
+{% for bullet in entry.bullets %}\item {{ bullet | latex_escape }}
+{% endfor %}\end{itemize}
+{% endfor %}
+{% endif %}
+{% if section == 'certificates' and certificates %}
+\section*{ {{ options.labels.certificates | latex_escape }} }
+{% for entry in certificates %}
+\textbf{ {{ entry.title | latex_escape }} } \quad {{ entry.authority | latex_escape }} \hfill {{ entry.issue_date | latex_escape }}\\
+{{ entry.category | latex_escape }} \quad {{ entry.certificate_no | latex_escape }} \quad {{ entry.description | latex_escape }}\par
+{% endfor %}
+{% endif %}
+{% if section == 'competitions' and competitions %}
+\section*{ {{ options.labels.competitions | latex_escape }} }
+{% for entry in competitions %}
+\textbf{ {{ entry.title | latex_escape }} } \quad {{ entry.award_level | latex_escape }} \hfill {{ entry.award_date | latex_escape }}\\
+{{ entry.organization | latex_escape }} \quad {{ entry.rank | latex_escape }} \quad {{ entry.description | latex_escape }}\par
+{% endfor %}
+{% endif %}
+{% endfor %}
+\end{document}

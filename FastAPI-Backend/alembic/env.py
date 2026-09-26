@@ -10,7 +10,9 @@ from app.models.resume_storage_schema import TABLE_NAMES
 from app.models import experience_import_models
 from app.models.experience_import_schema import TABLE_NAMES as IMPORT_TABLE_NAMES
 
-url = os.environ.get("RESUME_DATABASE_URL")
+url = os.environ.get("RESUME_DATABASE_URL") or os.environ.get("DATABASE_URL")
+if os.environ.get("RESUME_DATABASE_URL") and os.environ.get("DATABASE_URL") and make_url(os.environ["RESUME_DATABASE_URL"]) != make_url(os.environ["DATABASE_URL"]):
+    raise RuntimeError("DATABASE_URL and RESUME_DATABASE_URL must refer to the same explicit database")
 if not url or make_url(url).drivername != "mysql+aiomysql":
     raise RuntimeError("explicit RESUME_DATABASE_URL=mysql+aiomysql://... required")
 

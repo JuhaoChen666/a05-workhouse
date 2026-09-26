@@ -20,7 +20,7 @@ function normalizedRequestPath(config: InternalAxiosRequestConfig): string {
 
 export const apiOrigin =
   (import.meta.env.VITE_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  '';
+  'http://172.29.64.136:8080';
 
 /** 业务接口根路径（无 `/api` 前缀）；模拟面试 AI 见 `interviewApiJsonBase`（8000） */
 export const apiJsonBase = `${apiOrigin}`;
@@ -42,10 +42,7 @@ export const adminJsonBase = `${apiOrigin}${adminPathPrefix}`;
  */
 export const INTERVIEW_API_ORIGIN =
   (import.meta.env.VITE_INTERVIEW_API_ORIGIN as string | undefined)?.replace(/\/$/, '').trim() ||
-  '';
-  /*
-  ''
-  */
+  'http://172.29.64.136:8000';
 export const interviewApiJsonBase = `${INTERVIEW_API_ORIGIN}/api`;
 
 /**
@@ -66,6 +63,10 @@ function pickErrorMessage(payload: unknown): string | undefined {
   const m = o.message ?? o.msg ?? (typeof o.error === 'string' ? o.error : undefined);
   if (typeof m === 'string' && m.trim()) return m.trim();
   const d = o.detail;
+  if (d != null && typeof d === 'object' && !Array.isArray(d)) {
+    const message = (d as Record<string, unknown>).message;
+    if (typeof message === 'string') return message;
+  }
   if (typeof d === 'string' && d.trim()) return d.trim();
   if (Array.isArray(d) && d.length > 0) {
     const first = d[0] as Record<string, unknown> | undefined;
@@ -114,7 +115,8 @@ export function formatApiErrorText(payload: unknown, httpStatus?: number): strin
   return '响应格式异常';
 }
 
-function unwrapResponse<T = unknown>(response: { data: unknown }) {
+export function unwrapResponse<T = unknown>(response: { data: unknown; status?: number }) {
+  if (response.status === 204) return undefined as T;
   const raw = response.data;
   if (raw == null || typeof raw !== 'object') {
     return Promise.reject(new Error(formatApiErrorText(null)));
@@ -140,6 +142,14 @@ function formatAxiosError(error: unknown): Error {
   };
   const status = ax.response?.status;
   const body = ax.response?.data;
+  if (body != null && typeof body === 'object' && 'detail' in body) {
+    const detail = (body as { detail: unknown }).detail;
+    if (detail != null && typeof detail === 'object' && !Array.isArray(detail)) {
+      const structured = detail as { code?: string; message?: string; details?: Record<string, unknown> };
+      return Object.assign(new Error(`[${structured.code || status}] ${structured.message || '请求失败'}`),
+        { code: structured.code, details: structured.details, status });
+    }
+  }
   if (body != null && typeof body === 'object' && ('code' in body || pickErrorMessage(body))) {
     return new Error(formatApiErrorText(body, status));
   }

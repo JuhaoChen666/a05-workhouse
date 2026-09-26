@@ -32,9 +32,10 @@ app.use(express.json());
 app.use('/api/avatar-file', express.static(UPLOAD_DIR));
 
 // ---------- 内存数据 ----------
-let idSeq = { user: 2, position: 10, record: 1, report: 1, job: 20 };
+let idSeq = { user: 2, position: 10, record: 1, report: 1, job: 20, question: 3, resource: 3 };
 const users = [
   { id: '1', username: 'admin', password: bcrypt.hashSync('123456', 10), email: '', roleId: 2, roleName: '管理员', avatarUrl: null },
+  { id: '1001', username: 'testuser', password: bcrypt.hashSync('123456', 10), email: 'a18058867190@163.com', roleId: 2, roleName: '管理员', avatarUrl: null },
 ];
 const roles = [{ id: 1, name: '普通用户' }, { id: 2, name: '管理员' }];
 const positions = [
@@ -47,6 +48,29 @@ const positions = [
 const positionExtras = new Map();
 const interviewRecords = [];
 const reports = [];
+const questionBank = [
+  {
+    id: 1,
+    positionId: 2,
+    question: '请介绍一个你负责的前端项目，以及你在其中解决的核心问题。',
+    answer: '建议按背景、职责、方案、结果和复盘说明。',
+    knowledgeTags: 'Vue, TypeScript, 项目经验',
+  },
+  {
+    id: 2,
+    positionId: 1,
+    question: '如何定位并解决一个接口响应变慢的问题？',
+    answer: '可以从链路、数据库、缓存、网络和代码性能几个层面排查。',
+    knowledgeTags: '性能优化, 排障, 后端',
+  },
+];
+const learningResources = [
+  { id: 1, title: 'Vue 官方文档', link: 'https://vuejs.org/', tags: 'Vue, 前端' },
+  { id: 2, title: 'TypeScript Handbook', link: 'https://www.typescriptlang.org/docs/', tags: 'TypeScript' },
+];
+const adminResumes = [];
+const adminSessions = [];
+const verificationCodes = new Map();
 // 热门岗位（招聘信息）- 从网上整理的计算机相关招聘
 // companyLogo 字段使用公司英文标识，前端通过 `/img/${companyLogo}.ico` 加载对应图标
 const hotJobs = [
@@ -88,7 +112,7 @@ function getPositionName(positionId) {
 
 // ---------- 路由：认证 ----------
 app.post('/api/auth/register', (req, res) => {
-  const { username, password, confirmPassword } = req.body || {};
+  const { username, password, confirmPassword, email = '' } = req.body || {};
   if (!username || !password) return res.json(resErr(1001, '用户名或密码不能为空'));
   if (password !== confirmPassword) return res.json(resErr(1002, '两次密码不一致'));
   if (users.some((u) => u.username === username)) return res.json(resErr(1003, '用户名已存在'));
@@ -97,7 +121,7 @@ app.post('/api/auth/register', (req, res) => {
     id,
     username,
     password: bcrypt.hashSync(password, 10),
-    email: '',
+    email: String(email || '').trim(),
     roleId: 1,
     roleName: '普通用户',
     avatarUrl: null,
@@ -112,7 +136,8 @@ app.post('/api/auth/login', (req, res) => {
   if (!user || !bcrypt.compareSync(password, user.password))
     return res.json(resErr(1004, '用户名或密码错误'));
   const token = jwt.sign(
-    { id: user.id, username: user.username, roleId: user.roleId },
+    // FastAPI's shared resume auth contract requires a numeric owner id.
+    { id: Number(user.id), username: user.username, roleId: Number(user.roleId) },
     JWT_SECRET,
     { expiresIn: '2h' }
   );
@@ -130,7 +155,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/profile', authMiddleware, (req, res) => {
-  const user = users.find((u) => u.id === req.userId);
+  const user = users.find((u) => u.id === String(req.userId));
   if (!user) return res.json(resErr(1005, '用户不存在'));
   const role = roles.find((r) => r.id === user.roleId);
   return res.json(resOk({
@@ -146,7 +171,7 @@ app.get('/api/auth/profile', authMiddleware, (req, res) => {
 app.put('/api/auth/password', authMiddleware, (req, res) => {
   const { oldPassword, newPassword, confirmPassword } = req.body || {};
   if (newPassword !== confirmPassword) return res.json(resErr(1002, '两次新密码不一致'));
-  const user = users.find((u) => u.id === req.userId);
+  const user = users.find((u) => u.id === String(req.userId));
   if (!user) return res.json(resErr(1005, '用户不存在'));
   if (!bcrypt.compareSync(oldPassword, user.password)) return res.json(resErr(1006, '原密码错误'));
   user.password = bcrypt.hashSync(newPassword, 10);
@@ -154,7 +179,7 @@ app.put('/api/auth/password', authMiddleware, (req, res) => {
 });
 
 app.post('/api/auth/avatar', authMiddleware, upload.single('file'), (req, res) => {
-  const user = users.find((u) => u.id === req.userId);
+  const user = users.find((u) => u.id === String(req.userId));
   if (!user) return res.json(resErr(1005, '用户不存在'));
   if (req.file) {
     const avatarUrl = `/api/avatar-file/${req.file.filename}`;
@@ -175,6 +200,239 @@ app.post('/api/auth/avatar', authMiddleware, upload.single('file'), (req, res) =
   return res.json(resErr(400, '请上传图片或传 base64'));
 });
 
+// 管理端头像兼容接口：前端文档使用 /api/admin/users/:id/avatar，
+// 本机 Mock 复用登录用户的头像存储逻辑，避免页面因接口契约差异报 404。
+app.get('/api/admin/users/:id/avatar', authMiddleware, (req, res) => {
+  const user = users.find((u) => u.id === String(req.params.id));
+  if (!user) return res.json(resErr(1005, '用户不存在'));
+  return res.json(resOk({ avatarUrl: user.avatarUrl || '' }));
+});
+
+app.post('/api/admin/users/:id/avatar', authMiddleware, upload.single('file'), (req, res) => {
+  const user = users.find((u) => u.id === String(req.params.id));
+  if (!user) return res.json(resErr(1005, '用户不存在'));
+  if (String(req.userId) !== user.id && Number(req.roleId) !== 2) {
+    return res.json(resErr(403, '无权修改该用户头像'));
+  }
+  if (!req.file) return res.json(resErr(400, '请上传图片'));
+  const avatarUrl = `/api/avatar-file/${req.file.filename}`;
+  user.avatarUrl = avatarUrl;
+  return res.json(resOk({ avatarUrl }));
+});
+
+function adminMiddleware(req, res, next) {
+  authMiddleware(req, res, () => {
+    if (Number(req.roleId) !== 2) return res.json(resErr(403, '仅管理员可访问'));
+    next();
+  });
+}
+
+function userView(user) {
+  return {
+    id: Number(user.id),
+    username: user.username,
+    email: user.email || '',
+    avatar: user.avatarUrl || '',
+    avatarUrl: user.avatarUrl || '',
+    roleId: user.roleId,
+    roleName: user.roleName,
+  };
+}
+
+// ---------- 本机管理端兼容接口 ----------
+app.get('/api/admin/users', adminMiddleware, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+  const list = users.map(userView);
+  const start = (page - 1) * pageSize;
+  return res.json(resOk({ list: list.slice(start, start + pageSize), total: list.length, page, pageSize }));
+});
+
+app.get('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  const user = users.find((item) => item.id === String(req.params.id));
+  if (!user) return res.json(resErr(404, '用户不存在'));
+  return res.json(resOk(userView(user)));
+});
+
+app.post('/api/admin/users', adminMiddleware, (req, res) => {
+  const { username, password, email = '', roleId = 1 } = req.body || {};
+  if (!String(username || '').trim() || !String(password || '').trim()) {
+    return res.json(resErr(400, '用户名和密码不能为空'));
+  }
+  if (users.some((item) => item.username === username)) return res.json(resErr(409, '用户名已存在'));
+  const user = {
+    id: String(++idSeq.user),
+    username: String(username).trim(),
+    password: bcrypt.hashSync(String(password), 10),
+    email: String(email || '').trim(),
+    roleId: Number(roleId) === 2 ? 2 : 1,
+    roleName: Number(roleId) === 2 ? '管理员' : '普通用户',
+    avatarUrl: null,
+  };
+  users.push(user);
+  return res.json(resOk(userView(user)));
+});
+
+app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  const user = users.find((item) => item.id === String(req.params.id));
+  if (!user) return res.json(resErr(404, '用户不存在'));
+  const { username, email, roleId, password } = req.body || {};
+  if (username !== undefined) user.username = String(username).trim();
+  if (email !== undefined) user.email = String(email || '').trim();
+  if (roleId !== undefined) {
+    user.roleId = Number(roleId) === 2 ? 2 : 1;
+    user.roleName = user.roleId === 2 ? '管理员' : '普通用户';
+  }
+  if (password) user.password = bcrypt.hashSync(String(password), 10);
+  return res.json(resOk(userView(user)));
+});
+
+app.delete('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  const index = users.findIndex((item) => item.id === String(req.params.id));
+  if (index < 0) return res.json(resErr(404, '用户不存在'));
+  if (users[index].id === String(req.userId)) return res.json(resErr(409, '不能删除当前登录用户'));
+  users.splice(index, 1);
+  return res.json(resOk(null));
+});
+
+// Local-only verification flow: deterministic code keeps registration and
+// password recovery testable without SMTP or another external service.
+app.post('/api/auth/send-code', (req, res) => {
+  const { username = '', email = '', scene = 'reset' } = req.body || {};
+  const key = `${scene}:${String(username).trim()}:${String(email).trim().toLowerCase()}`;
+  verificationCodes.set(key, { code: '123456', expiresAt: Date.now() + 10 * 60 * 1000 });
+  return res.json(resOk({ code: '123456', expiresIn: 600, local: true }));
+});
+
+app.post('/api/auth/verify-code', (req, res) => {
+  const { username = '', email = '', code, newpassword, newPassword, confirmPassword } = req.body || {};
+  const password = newpassword || newPassword;
+  const user = users.find((item) =>
+    item.username === String(username).trim() ||
+    (email && item.email && item.email.toLowerCase() === String(email).trim().toLowerCase())
+  );
+  if (!user) return res.json(resErr(1005, '用户不存在'));
+  if (!password || password !== confirmPassword) return res.json(resErr(1002, '两次新密码不一致'));
+  const key = `reset:${String(username).trim()}:${String(email).trim().toLowerCase()}`;
+  const saved = verificationCodes.get(key);
+  if (String(code || '') !== '123456' && (!saved || saved.expiresAt < Date.now() || saved.code !== String(code))) {
+    return res.json(resErr(1009, '验证码错误或已过期'));
+  }
+  user.password = bcrypt.hashSync(String(password), 10);
+  verificationCodes.delete(key);
+  return res.json(resOk(null));
+});
+
+// The frontend uses POST for the authenticated password-change flow.
+app.post('/api/auth/password', authMiddleware, (req, res) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body || {};
+  const user = users.find((u) => u.id === String(req.userId));
+  if (!user) return res.json(resErr(1005, '用户不存在'));
+  if (newPassword !== confirmPassword) return res.json(resErr(1002, '两次新密码不一致'));
+  if (req.body?.code && String(req.body.code) !== '123456') return res.json(resErr(1009, '验证码错误或已过期'));
+  if (!bcrypt.compareSync(oldPassword, user.password)) return res.json(resErr(1006, '原密码错误'));
+  user.password = bcrypt.hashSync(newPassword, 10);
+  return res.json(resOk(null));
+});
+
+function adminPositionView(position) {
+  const extra = positionExtras.get(position.id) || {};
+  return {
+    id: position.id,
+    name: position.name,
+    sortOrder: position.sortOrder,
+    sort_order: position.sortOrder,
+    ...extra,
+  };
+}
+
+app.get('/api/admin/positions/page', adminMiddleware, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+  const keyword = String(req.query.name || '').trim().toLowerCase();
+  const all = positions
+    .map(adminPositionView)
+    .filter((item) => !keyword || item.name.toLowerCase().includes(keyword));
+  const start = (page - 1) * pageSize;
+  return res.json(resOk({ list: all.slice(start, start + pageSize), total: all.length, page, pageSize }));
+});
+
+app.get('/api/admin/positions/:id', adminMiddleware, (req, res) => {
+  const position = positions.find((item) => item.id === Number(req.params.id));
+  if (!position) return res.json(resErr(404, '岗位不存在'));
+  return res.json(resOk(adminPositionView(position)));
+});
+
+app.post('/api/admin/positions', adminMiddleware, (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.json(resErr(400, '岗位名称不能为空'));
+  const position = { id: ++idSeq.position, name, sortOrder: Number(req.body?.sort_order ?? 0) || 0 };
+  positions.push(position);
+  return res.json(resOk(adminPositionView(position)));
+});
+
+function savePositionInfo(req, res) {
+  const body = req.body || {};
+  const id = Number(body.id);
+  const position = positions.find((item) => item.id === id);
+  if (!position) return res.json(resErr(404, '岗位不存在'));
+  if (body.name !== undefined) position.name = String(body.name).trim();
+  positionExtras.set(id, {
+    ...(positionExtras.get(id) || {}),
+    responsibility: String(body.responsibility || ''),
+    responsibilities: String(body.responsibility || ''),
+    salary_junior: String(body.salary_junior || ''),
+    salary_mid: String(body.salary_mid || ''),
+    salary_senior: String(body.salary_senior || ''),
+    salary_expert: String(body.salary_expert || ''),
+    skill_requirements: String(body.skill_requirements || ''),
+    requirements: String(body.skill_requirements || ''),
+  });
+  return res.json(resOk(adminPositionView(position)));
+}
+
+app.post('/api/admin/positions/info', adminMiddleware, savePositionInfo);
+app.put('/api/admin/positions/info', adminMiddleware, savePositionInfo);
+app.put('/api/admin/positions/:id', adminMiddleware, (req, res) => {
+  return savePositionInfo({ ...req, body: { ...(req.body || {}), id: Number(req.params.id) } }, res);
+});
+app.delete('/api/admin/positions/:id', adminMiddleware, (req, res) => {
+  const id = Number(req.params.id);
+  const index = positions.findIndex((item) => item.id === id);
+  if (index < 0) return res.json(resErr(404, '岗位不存在'));
+  positions.splice(index, 1);
+  positionExtras.delete(id);
+  return res.json(resOk(null));
+});
+
+function pagedRows(rows, req) {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+  const start = (page - 1) * pageSize;
+  return { list: rows.slice(start, start + pageSize), total: rows.length, page, pageSize };
+}
+
+app.get('/api/admin/resumes/page', adminMiddleware, (req, res) => {
+  const userId = req.query.userId ? Number(req.query.userId) : null;
+  const rows = userId ? adminResumes.filter((item) => item.userId === userId) : adminResumes;
+  return res.json(resOk(pagedRows(rows, req)));
+});
+app.delete('/api/admin/resumes/:id', adminMiddleware, (req, res) => {
+  const index = adminResumes.findIndex((item) => item.id === Number(req.params.id));
+  if (index >= 0) adminResumes.splice(index, 1);
+  return res.json(resOk(null));
+});
+app.get('/api/admin/sessions/page', adminMiddleware, (req, res) => {
+  const userId = req.query.userId ? Number(req.query.userId) : null;
+  const rows = userId ? adminSessions.filter((item) => item.userId === userId) : adminSessions;
+  return res.json(resOk(pagedRows(rows, req)));
+});
+app.delete('/api/admin/sessions/:id', adminMiddleware, (req, res) => {
+  const index = adminSessions.findIndex((item) => item.sessionId === String(req.params.id));
+  if (index >= 0) adminSessions.splice(index, 1);
+  return res.json(resOk(null));
+});
+
 // ---------- 角色、岗位（面试用） ----------
 app.get('/api/roles', authMiddleware, (_, res) => {
   return res.json(resOk(roles.map((r) => ({ id: r.id, name: r.name }))));
@@ -188,6 +446,23 @@ app.get('/api/positions', authMiddleware, (_, res) => {
     return { id: p.id, name: p.name, sortOrder: p.sortOrder, ...extra };
   });
   return res.json(resOk(merged));
+});
+
+app.get('/api/positions/simple/page', authMiddleware, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+  const keyword = String(req.query.name || '').trim().toLowerCase();
+  const all = positions
+    .filter((item) => !keyword || item.name.toLowerCase().includes(keyword))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      englishName: item.name.replace(/\s+/g, '-').toLowerCase(),
+      responsibility: positionExtras.get(item.id)?.responsibility || '',
+    }));
+  const start = (page - 1) * pageSize;
+  return res.json(resOk({ total: all.length, pageSize, page, list: all.slice(start, start + pageSize) }));
 });
 
 // ---------- 面试记录 ----------
@@ -415,6 +690,97 @@ app.get('/api/jobs/:id', authMiddleware, (req, res) => {
     salaryMax: j.salaryMax,
     jobContent: j.jobContent,
   }));
+});
+
+app.get('/api/jobs/search', authMiddleware, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10));
+  const keyword = String(req.query.keyword || '').trim().toLowerCase();
+  const type = String(req.query.type || '').trim().toLowerCase();
+  const rows = hotJobs.filter((job) => {
+    const matchesKeyword = !keyword ||
+      `${job.name} ${job.companyName} ${job.jobContent}`.toLowerCase().includes(keyword);
+    const matchesType = !type || String(job.type || '').toLowerCase() === type;
+    return matchesKeyword && matchesType;
+  });
+  const start = (page - 1) * pageSize;
+  return res.json(resOk({ list: rows.slice(start, start + pageSize), total: rows.length, page, pageSize }));
+});
+
+// ---------- 题库与学习资源兼容接口 ----------
+function questionView(item) {
+  const position = positions.find((row) => row.id === item.positionId);
+  return { ...item, positionName: position?.name || '' };
+}
+app.get('/api/question-bank', authMiddleware, (req, res) => {
+  const positionId = req.query.positionId ? Number(req.query.positionId) : null;
+  const rows = questionBank.filter((item) => !positionId || item.positionId === positionId).map(questionView);
+  return res.json(resOk(pagedRows(rows, req)));
+});
+app.get('/api/question-bank/:id', authMiddleware, (req, res) => {
+  const item = questionBank.find((row) => row.id === Number(req.params.id));
+  return item ? res.json(resOk(questionView(item))) : res.json(resErr(404, '题目不存在'));
+});
+app.post('/api/question-bank', adminMiddleware, (req, res) => {
+  const body = req.body || {};
+  if (!body.positionId || !String(body.question || '').trim()) return res.json(resErr(400, '岗位和题目不能为空'));
+  const item = {
+    id: idSeq.question++,
+    positionId: Number(body.positionId),
+    question: String(body.question).trim(),
+    answer: body.answer == null ? null : String(body.answer),
+    knowledgeTags: body.knowledgeTags == null ? null : String(body.knowledgeTags),
+  };
+  questionBank.push(item);
+  return res.json(resOk(questionView(item)));
+});
+app.put('/api/question-bank/:id', adminMiddleware, (req, res) => {
+  const item = questionBank.find((row) => row.id === Number(req.params.id));
+  if (!item) return res.json(resErr(404, '题目不存在'));
+  const body = req.body || {};
+  if (body.positionId !== undefined) item.positionId = Number(body.positionId);
+  if (body.question !== undefined) item.question = String(body.question);
+  if (body.answer !== undefined) item.answer = body.answer == null ? null : String(body.answer);
+  if (body.knowledgeTags !== undefined) item.knowledgeTags = body.knowledgeTags == null ? null : String(body.knowledgeTags);
+  return res.json(resOk(questionView(item)));
+});
+app.delete('/api/question-bank/:id', adminMiddleware, (req, res) => {
+  const index = questionBank.findIndex((row) => row.id === Number(req.params.id));
+  if (index < 0) return res.json(resErr(404, '题目不存在'));
+  questionBank.splice(index, 1);
+  return res.json(resOk(null));
+});
+
+app.get('/api/learning-resource', authMiddleware, (req, res) => {
+  return res.json(resOk(pagedRows(learningResources, req)));
+});
+app.post('/api/learning-resource', adminMiddleware, (req, res) => {
+  const body = req.body || {};
+  if (!String(body.title || '').trim() || !String(body.link || '').trim()) {
+    return res.json(resErr(400, '标题和链接不能为空'));
+  }
+  const item = { id: idSeq.resource++, title: String(body.title).trim(), link: String(body.link).trim(), tags: String(body.tags || '') };
+  learningResources.push(item);
+  return res.json(resOk(item));
+});
+app.put('/api/learning-resource/:id', adminMiddleware, (req, res) => {
+  const item = learningResources.find((row) => row.id === Number(req.params.id));
+  if (!item) return res.json(resErr(404, '资源不存在'));
+  const body = req.body || {};
+  if (body.title !== undefined) item.title = String(body.title);
+  if (body.link !== undefined) item.link = String(body.link);
+  if (body.tags !== undefined) item.tags = String(body.tags || '');
+  return res.json(resOk(item));
+});
+app.delete('/api/learning-resource/:id', adminMiddleware, (req, res) => {
+  const index = learningResources.findIndex((row) => row.id === Number(req.params.id));
+  if (index < 0) return res.json(resErr(404, '资源不存在'));
+  learningResources.splice(index, 1);
+  return res.json(resOk(null));
+});
+
+app.get('/health', (_, res) => {
+  return res.json({ status: 'healthy', service: 'node-local' });
 });
 
 // ---------- 启动 ----------

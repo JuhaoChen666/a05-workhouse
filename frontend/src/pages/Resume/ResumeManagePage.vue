@@ -1,12 +1,13 @@
 <template>
   <section class="resume-page theme-page-shell fade-in-up delay-1">
+    <ResumeDocumentLibrary />
     <div class="resume-toolbar theme-card">
       <div class="toolbar-text">
         <h3>我的简历</h3>
         <p>支持上传、在线预览与管理，简历将用于后续面试配置。</p>
       </div>
       <div class="resume-upload-area">
-        <el-button class="optimize-btn" @click="openOptimizeDialog">简历优化</el-button>
+        <el-button class="optimize-btn" @click="router.push({ name: 'HomeResumeGeneration' })">生成 LaTeX 简历</el-button>
         <el-upload
           :show-file-list="false"
           :auto-upload="false"
@@ -85,6 +86,7 @@ import { deleteResumeApi, getResumeItemApi, getResumeListApi, uploadResumeApi } 
 import { buildResumeFilePublicUrl } from '@/config/resumeAssets';
 import { useUserStore } from '@/store/user';
 import ResumePdfPreview from '@/components/ResumePdfPreview.vue';
+import ResumeDocumentLibrary from '@/components/ResumeDocumentLibrary.vue';
 import ResumeOptimizeUploadDialog from '@/components/ResumeOptimizeUploadDialog.vue';
 
 type ResumeItem = { id: number; name: string; content: string; updatedAt: string };
@@ -107,10 +109,6 @@ const currentPage = ref(1);
 const pageSize = ref(5);
 const total = ref(0);
 const optimizeUploadDialogVisible = ref(false);
-
-function openOptimizeDialog() {
-  optimizeUploadDialogVisible.value = true;
-}
 
 function onOptimizeUploadConfirmed() {
   void router.push({ name: 'HomeResumeOptimize' });

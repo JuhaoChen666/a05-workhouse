@@ -40,4 +40,11 @@ class ExperienceRoute(APIRoute):
 
 def experience_response(row):
     from app.models.resume_latex_contracts import ExperienceItemResponse
-    return ExperienceItemResponse.model_validate(row, from_attributes=True)
+    result = ExperienceItemResponse.model_validate(row, from_attributes=True)
+    def public(value):
+        if isinstance(value, list):
+            return [public(entry) for entry in value]
+        if isinstance(value, dict):
+            return {key: public(entry) for key, entry in value.items() if key not in {"key", "local_path", "path"}}
+        return value
+    return result.model_copy(update={"source_locator": public(result.source_locator)})

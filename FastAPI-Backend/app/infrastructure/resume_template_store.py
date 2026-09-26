@@ -77,7 +77,7 @@ def read_bundle(directory):
     }
 
 
-async def initialize_templates(session, root=BUILTIN_ROOT):
+async def initialize_templates(session, root=BUILTIN_ROOT, *, version=None):
     if not session.in_transaction():
         raise RuntimeError("caller transaction required")
     root = safe_path(root).resolve(strict=True)
@@ -87,6 +87,8 @@ async def initialize_templates(session, root=BUILTIN_ROOT):
         if not path.is_dir():
             continue
         values = read_bundle(path)
+        if version is not None and values["version"] != version:
+            continue
         identity = values["id"], values["version"]
         if identity in identities:
             raise TemplateVersionConflict("duplicate bundle identity")
@@ -111,21 +113,20 @@ async def initialize_templates(session, root=BUILTIN_ROOT):
     return inserted
 
 
-async def main():
-    from sqlalchemy.engine import make_url
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-    url = os.environ.get("RESUME_DATABASE_URL")
-    if not url or make_url(url).drivername != "mysql+aiomysql":
-        raise RuntimeError("explicit RESUME_DATABASE_URL required")
-    engine = create_async_engine(url)
+async def main(version=None):
+    from app.infrastructure.resume_runtime import session_factory
+    factory = session_factory()
     try:
-        async with async_sessionmaker(engine)() as session, session.begin():
-            count = await initialize_templates(session)
+        async with factory() as session, session.begin():
+            count = await initialize_templates(session, version=version)
         print(f"Initialized {count} immutable template versions")
     finally:
-        await engine.dispose()
+        await factory.kw["bind"].dispose()
 
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version")
+    asyncio.run(main(parser.parse_args().version))

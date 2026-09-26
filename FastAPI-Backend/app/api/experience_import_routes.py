@@ -1,6 +1,7 @@
 """PDF -> persistent editable drafts -> explicit confirmation."""
 from typing import Annotated
 from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
 from fastapi import APIRouter, Depends, File, UploadFile, Query
 from app.api.experience_dependencies import trusted_owner, experience_session, private_store, draft_extractor, legacy_pdf_root
 from app.api.experience_http import ExperienceRoute
@@ -17,6 +18,36 @@ def import_service(owner=Depends(trusted_owner), session=Depends(experience_sess
     return ExperienceImportService(session, owner, store, extractor, legacy_root=legacy_root)
 
 Service = Annotated[ExperienceImportService, Depends(import_service)]
+
+
+class MarkdownImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    legacy_optimization_id: str = Field(min_length=1, max_length=36)
+
+
+@router.post("/markdown", status_code=201)
+async def import_markdown(request: MarkdownImport, service: Service):
+    return await service.from_markdown(request.legacy_optimization_id)
+
+
+@router.get("")
+async def list_imports(service: Service, page: int = Query(1, ge=1, le=1000000)):
+    from sqlalchemy import select
+    from app.models.experience_import_models import ExperienceImportBatch
+    async with service.session.begin():
+        rows = (await service.session.execute(select(ExperienceImportBatch).where(
+            ExperienceImportBatch.user_id == service.owner).order_by(ExperienceImportBatch.created_at.desc(), ExperienceImportBatch.id).offset((page - 1) * 50).limit(50))).scalars()
+        return [{"id": row.id, "status": row.status, "expires_at": row.expires_at} for row in rows]
+
+
+@router.get("/sources")
+async def list_sources(service: Service, page: int = Query(1, ge=1, le=1000000)):
+    from sqlalchemy import select
+    from app.models.session_models import ResumeModel
+    async with service.session.begin():
+        rows = (await service.session.execute(select(ResumeModel).where(ResumeModel.user_id == service.owner)
+            .order_by(ResumeModel.id.desc()).offset((page - 1) * 100).limit(100))).scalars()
+        return [{"id": row.id, "filename": row.filename} for row in rows]
 
 
 @router.post("/upload", status_code=201)

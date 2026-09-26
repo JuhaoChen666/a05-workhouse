@@ -4,7 +4,7 @@ import com.example.springbootbackend.entity.Positions_Info;
 import org.apache.ibatis.annotations.*;
 
 public interface Positions_infoMapper {
-    @Select("SELECT * FROM positions_info where id = #{id}")
+    @Select("SELECT id, name, responsibilities as responsibility, salary_junior, salary_mid, salary_senior, salary_expert, skill_requirements, create_time, update_time FROM positions_info where id = #{id}")
     Positions_Info getPositions_InfoById(Integer id);
     
     // 添加岗位信息

@@ -279,7 +279,7 @@ function handleQuickEntry(key: string) {
     return;
   }
   if (key === 'resume') {
-    router.push({ name: 'HomeResumeOptimize' });
+    router.push({ name: 'HomeResumeGeneration' });
     return;
   }
   if (key === 'question') {

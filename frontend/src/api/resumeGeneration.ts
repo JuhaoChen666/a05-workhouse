@@ -1,4 +1,5 @@
 import { interviewRequest } from './request';
+import { buildInterviewAssetUrl } from './resumeAssets';
 import type {
   ResumeGenerationJob,
   ResumeGenerationRequest,
@@ -30,13 +31,16 @@ export function retryResumeGenerationApi(jobId: string) {
   );
 }
 
+export function confirmResumeReviewApi(jobId: string, version: string, accepted_indices: number[]) {
+  return interviewRequest.post<ResumeGenerationJob>(`/resume-generation/jobs/${encodeURIComponent(jobId)}/review`, { version, accepted_indices });
+}
+
 export function listSavedResumeDocumentsApi() {
   return interviewRequest.get<SavedResumeDocument[]>('/resume-generation/documents');
 }
 
 export function buildResumeGenerationAssetUrl(jobId: string, format: 'pdf' | 'latex') {
-  const base = String(import.meta.env.VITE_INTERVIEW_API_ORIGIN || '').replace(/\/$/, '');
-  return `${base}/api/resume-generation/jobs/${encodeURIComponent(jobId)}/${format}`;
+  return buildInterviewAssetUrl(`/api/resume-generation/jobs/${encodeURIComponent(jobId)}/${format}`);
 }
 
 export function listGenerationTemplatesApi() {

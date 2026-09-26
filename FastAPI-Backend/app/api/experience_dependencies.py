@@ -46,14 +46,17 @@ async def experience_session():
     except (ValueError, ArgumentError):
         # Do not fall back to the legacy default business database.
         raise HTTPException(503, {"code":"STORAGE_NOT_CONFIGURED", "message":"Explicit MySQL DATABASE_URL required"}) from None
-    from app.infrastructure.database import AsyncSessionLocal
-    async with AsyncSessionLocal() as session:
+    from app.infrastructure.resume_runtime import session_factory
+    async with session_factory()() as session:
         yield session
 
 
 def private_store():
-    from app.infrastructure.private_resume_assets import PrivateAssets, DEFAULT_ROOT
-    return PrivateAssets(os.environ.get("RESUME_PRIVATE_ASSET_ROOT", str(DEFAULT_ROOT)))
+    from app.infrastructure.resume_runtime import asset_store
+    try:
+        return asset_store()
+    except ValueError:
+        raise HTTPException(503, detail="私有文件根目录未配置") from None
 
 
 def draft_extractor():

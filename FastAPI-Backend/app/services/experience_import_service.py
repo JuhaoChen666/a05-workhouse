@@ -71,6 +71,24 @@ class ExperienceImportService:
             id_ = await self.new_batch(files, content)
         return await self.process(id_)
 
+    async def from_markdown(self, legacy_id):
+        from app.models.session_models import ResumeOptimizationModel
+        async with private_asset_transaction(self.session, self.store, self.owner) as files:
+            source = await ExperienceMapper(self.session, self.owner).legacy(ResumeOptimizationModel,
+                ResumeOptimizationModel.session_id, legacy_id)
+            text = source.optimized_text
+            if not isinstance(text, str) or not text.strip() or len(text.encode("utf-8")) > 1024 * 1024:
+                raise ExperienceError("MARKDOWN_SOURCE_UNAVAILABLE", "历史 Markdown 为空或超出导入限制", 409)
+            now = utcnow()
+            asset = files.write(text.encode("utf-8"), "bin")
+            row = Batch(id=str(uuid4()), user_id=self.owner, source_optimization_id=legacy_id,
+                source_asset=asset.model_dump(mode="json"), pages=[], status="PROCESSING", error=None,
+                created_at=now, updated_at=now, expires_at=now + IMPORT_TTL)
+            self.session.add(row)
+            await self.session.flush()
+            id_ = row.id
+        return await self.process(id_)
+
     async def from_existing(self, source_resume_id):
         async with private_asset_transaction(self.session, self.store, self.owner) as files:
             from app.models.session_models import ResumeModel
@@ -97,11 +115,20 @@ class ExperienceImportService:
             row = await self.owned_batch(id_)
             if row.status != "PROCESSING":
                 raise ExperienceError("IMPORT_STATE", "Import is not processing", 409)
-            asset, lease = row.source_asset, row.updated_at
+            asset, lease, legacy_id = row.source_asset, row.updated_at, row.source_optimization_id
         try:
             content = self.store.read(self.owner, asset)
-            pages = await asyncio.to_thread(extract_pdf, content)
+            pages = [{"page": 1, "text": content.decode("utf-8")}] if legacy_id else await asyncio.to_thread(extract_pdf, content)
+            async with self.session.begin():
+                row = await self.owned_batch(id_)
+                if row.status != "PROCESSING" or row.updated_at != lease:
+                    raise ExperienceError("IMPORT_STATE", "Import processing state changed", 409)
+                row.ai_attempt_count += 1
             drafts = await run_extractor(self.extractor, pages)
+            if legacy_id:
+                for draft in drafts:
+                    draft["locator"].pop("page", None)
+                    draft["locator"]["legacy_optimization_id"] = legacy_id
         except Exception as error:
             if not isinstance(error, ExperienceError):
                 error = ExperienceError("IMPORT_PROCESSING_FAILED", "PDF draft processing failed", 502)
@@ -110,6 +137,8 @@ class ExperienceImportService:
                 if row.status == "PROCESSING" and row.updated_at == lease:
                     row.status, row.updated_at = "FAILED", utcnow()
                     row.error = {"code": error.code, "message": error.message}
+                    if error.code.startswith("AI_"):
+                        row.ai_failure_count += 1
             raise ExperienceError(error.code, error.message, error.status, details={"import_id": id_}) from None
         async with self.session.begin():
             row = await self.owned_batch(id_)
@@ -131,6 +160,9 @@ class ExperienceImportService:
                 Draft.batch_id == id_, Draft.user_id == self.owner).order_by(Draft.sort_order, Draft.id))).scalars())
             return {"id": row.id, "status": row.status, "error": row.error,
                     "source_resume_id": row.source_resume_id,
+                    "source_format": "markdown" if row.source_optimization_id else "pdf",
+                    "retry_count": row.retry_count, "ai_attempt_count": row.ai_attempt_count,
+                    "ai_failure_count": row.ai_failure_count,
                     "source": {"sha256": row.source_asset["sha256"], "size_bytes": row.source_asset["size_bytes"]} if row.source_asset else None,
                     "expires_at": row.expires_at, "items": [draft_response(d) for d in drafts],
                     "confirmation_result": row.confirmation_result, "files_purged_at": row.files_purged_at}
@@ -143,6 +175,7 @@ class ExperienceImportService:
             if row.status != "FAILED" or row.expires_at <= utcnow() or row.source_asset is None:
                 raise ExperienceError("IMPORT_STATE", "Only unexpired failed imports can be retried", 409)
             row.status, row.error, row.updated_at = "PROCESSING", None, utcnow()
+            row.retry_count += 1
         return await self.process(id_)
 
     async def owned_draft(self, batch_id, draft_id):
@@ -207,7 +240,7 @@ class ExperienceImportService:
                     raise RevisionConflict("draft changed")
                 try:
                     value = ContentAdapter.validate_python(draft.content).model_dump(mode="json")
-                    value.update(source_type="PDF_IMPORT", source_resume_id=batch.source_resume_id,
+                    value.update(source_type="MARKDOWN_IMPORT" if batch.source_optimization_id else "PDF_IMPORT", source_resume_id=batch.source_resume_id,
                                  source_locator={**draft.locator, "asset": batch.source_asset, "import_id": batch.id,
                                                  "draft_id": draft.id, "user_confirmed": True})
                     inputs.append((draft.id, value))

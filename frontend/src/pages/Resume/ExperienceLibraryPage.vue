@@ -11,6 +11,7 @@
       </el-button>
     </div>
 
+    <PdfExperienceImportPanel @confirmed="reload" />
     <div class="filters theme-card">
       <el-input v-model="keyword" clearable placeholder="搜索标题、标签或内容" @keyup.enter="reload">
         <template #prefix><el-icon><Search /></el-icon></template>
@@ -24,16 +25,14 @@
         <el-option label="已归档" value="archived" />
         <el-option label="全部" value="all" />
       </el-select>
-      <el-select v-model="sortMode" placeholder="排序方式">
-        <el-option label="自定义顺序" value="custom" />
-        <el-option label="最近更新" value="updated" />
-        <el-option label="按标题" value="title" />
-      </el-select>
       <el-button :icon="Refresh" circle title="刷新" @click="reload" />
     </div>
 
     <div class="table-wrap theme-card">
-      <el-table v-loading="loading" :data="sortedItems" stripe>
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column label="保存顺序（小值在前）" width="200">
+          <template #default="{ row }"><el-input-number :model-value="row.sort_order" :min="0" :max="2147483647" @change="saveOrder(row, $event)" /></template>
+        </el-table-column>
         <el-table-column label="经历" min-width="240">
           <template #default="{ row }">
             <div class="title-cell">
@@ -54,8 +53,10 @@
         <el-table-column label="来源" width="150">
           <template #default="{ row }">
             <el-tag :type="row.source_type === 'PDF_IMPORT' ? 'warning' : 'info'" size="small">
-              {{ row.source_type === 'PDF_IMPORT' ? 'PDF 导入' : '手动录入' }}
+              {{ row.source_type === 'PDF_IMPORT' ? 'PDF 导入' : row.source_type === 'MARKDOWN_IMPORT' ? '历史 Markdown 确认' : '手动录入' }}
             </el-tag>
+            <p v-if="row.source_locator.page">第 {{ row.source_locator.page }} 页</p>
+            <el-tooltip v-if="row.source_locator.snippet" :content="String(row.source_locator.snippet)"><span>查看来源片段</span></el-tooltip>
           </template>
         </el-table-column>
         <el-table-column prop="updated_at" label="更新时间" width="175" />
@@ -159,7 +160,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
+import PdfExperienceImportPanel from '@/components/PdfExperienceImportPanel.vue';
+import { interviewRequest } from '@/api/request';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Refresh, Search } from '@element-plus/icons-vue';
 import {
@@ -188,7 +191,6 @@ const keyword = ref('');
 const tagFilter = ref('');
 const typeFilter = ref<ExperienceType>();
 const archiveFilter = ref<'active' | 'archived' | 'all'>('active');
-const sortMode = ref<'custom' | 'updated' | 'title'>('custom');
 const dialogVisible = ref(false);
 const editingId = ref<string>();
 
@@ -218,16 +220,13 @@ const emptyForm = () => reactive<Record<string, any>>({
 });
 let form = emptyForm();
 
-const sortedItems = computed(() => {
-  const result = [...items.value];
-  if (sortMode.value === 'updated') {
-    return result.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  }
-  if (sortMode.value === 'title') {
-    return result.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
-  }
-  return result;
-});
+async function saveOrder(row: ExperienceItemResponse, value: number | undefined) {
+  if (value == null || value === row.sort_order) return;
+  try {
+    await interviewRequest.patch(`/experiences/${row.id}/order`, { sort_order: value, expected_revision: row.revision });
+    await fetchItems();
+  } catch (error) { ElMessage.error((error as Error).message); await fetchItems(); }
+}
 
 function typeLabel(type: ExperienceType) {
   return typeOptions.find((item) => item.value === type)?.label || type;
@@ -299,6 +298,7 @@ function splitLines(value: string) {
 }
 
 function payload() {
+  const current = items.value.find(item => item.id === editingId.value);
   const common = {
     type: form.type,
     title: String(form.title).trim(),
@@ -308,6 +308,8 @@ function payload() {
     source_type: 'MANUAL',
     source_resume_id: null,
     source_locator: {},
+    sort_order: current?.sort_order ?? 0,
+    is_archived: current?.is_archived ?? false,
   };
   if (form.type === 'WORK') {
     return { ...common, role: String(form.role).trim(), department: form.department || null, city: form.city || null, bullets: splitLines(form.bullets_text) };

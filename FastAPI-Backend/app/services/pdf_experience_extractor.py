@@ -34,7 +34,8 @@ def extract_pdf(content: bytes) -> list[dict]:
             streams = page.get_contents()
             if streams is not None and len(streams.get_data()) > 8 * 1024 * 1024:
                 raise ExperienceError("PDF_CONTENT_LIMIT", "PDF page content is too large", 413)
-            text = (page.extract_text() or "").strip()
+            import re
+            text = re.sub(r'[\ue000-\uf8ff]', ' ', page.extract_text() or "").strip()
             total += len(text)
             if total > MAX_TEXT:
                 raise ExperienceError("PDF_TEXT_LIMIT", "PDF text exceeds 100000 characters", 413)
@@ -58,12 +59,48 @@ def draft_issues(content):
         return validation_issues(error)
 
 
+def _snippet_in_page(snippet: str, page_text: str) -> bool:
+    if snippet in page_text:
+        return True
+    import re
+    clean_snippet = re.sub(r'[\ue000-\uf8ff•·▪\-\*]', ' ', snippet)
+    clean_page = re.sub(r'[\ue000-\uf8ff•·▪\-\*]', ' ', page_text)
+    if clean_snippet.strip() in clean_page:
+        return True
+    ws_snippet = re.sub(r'\s+', ' ', clean_snippet).strip()
+    ws_page = re.sub(r'\s+', ' ', clean_page).strip()
+    if ws_snippet in ws_page:
+        return True
+    compact_snippet = re.sub(r'\s+', '', clean_snippet)
+    compact_page = re.sub(r'\s+', '', clean_page)
+    if len(compact_snippet) >= 6 and compact_snippet in compact_page:
+        return True
+    return False
+
+
 def normalize_ai_drafts(raw, pages):
     if isinstance(raw, str):
+        text = raw.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
         try:
-            raw = json.loads(raw)
+            raw = json.loads(text, strict=False)
         except (json.JSONDecodeError, ValueError):
-            raise ExperienceError("AI_INVALID_JSON", "AI returned invalid JSON", 502) from None
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end > start:
+                try:
+                    raw = json.loads(text[start:end + 1], strict=False)
+                except (json.JSONDecodeError, ValueError):
+                    raise ExperienceError("AI_INVALID_JSON", "AI returned invalid JSON", 502) from None
+            else:
+                raise ExperienceError("AI_INVALID_JSON", "AI returned invalid JSON", 502) from None
+
     if not isinstance(raw, dict) or set(raw) != {"items"} or not isinstance(raw["items"], list):
         raise ExperienceError("AI_INVALID_OUTPUT", "AI must return an object with an items array", 502)
     if not 1 <= len(raw["items"]) <= 100:
@@ -78,7 +115,7 @@ def normalize_ai_drafts(raw, pages):
             raise ExperienceError("AI_UNKNOWN_CATEGORY", "AI returned an unknown experience category", 502)
         if type(page) is not int or page not in by_page or not isinstance(snippet, str) or not snippet.strip():
             raise ExperienceError("AI_INVALID_SOURCE", "AI returned an invalid page or source snippet", 502)
-        if len(snippet) > 2000 or snippet not in by_page[page]:
+        if len(snippet) > 2000 or not _snippet_in_page(snippet, by_page[page]):
             raise ExperienceError("AI_INVALID_SOURCE", "AI source snippet does not occur in the extracted page", 502)
         # A draft may miss mandatory fields, but never import server-controlled metadata.
         forbidden = {"id", "user_id", "created_at", "updated_at", "revision", "source_type", "source_resume_id", "source_locator"}

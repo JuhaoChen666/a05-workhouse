@@ -11,9 +11,9 @@
     @update:model-value="onDialogModelUpdate"
   >
     <el-radio-group v-model="uploadMode" class="mode-radios">
-      <el-radio-button label="file">上传文件</el-radio-button>
-      <el-radio-button label="text">文字简历</el-radio-button>
-      <el-radio-button label="library">我的简历</el-radio-button>
+      <el-radio-button value="file">上传文件</el-radio-button>
+      <el-radio-button value="text">文字简历</el-radio-button>
+      <el-radio-button value="library">我的简历</el-radio-button>
     </el-radio-group>
 
     <div class="dialog-body">
