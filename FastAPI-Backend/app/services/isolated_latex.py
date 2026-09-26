@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import os
 import re
 import shutil
+import tempfile
 from pathlib import Path
+from pathlib import PurePosixPath
 from uuid import uuid4
 
 MAX_OUTPUT = 18 * 1024 * 1024
@@ -17,6 +20,90 @@ class SandboxError(RuntimeError):
     def __init__(self, message, *, location=None):
         super().__init__(message)
         self.location = location
+
+
+def _write_compile_inputs(root: Path, source: str, resources: dict | None) -> None:
+    encoded_source = source.encode("utf-8")
+    if len(encoded_source) > 2 * 1024 * 1024:
+        raise SandboxError("SOURCE_TOO_LARGE")
+    (root / "resume.tex").write_bytes(encoded_source)
+    total = 0
+    for name, value in (resources or {}).items():
+        path = PurePosixPath(name)
+        if path.is_absolute() or ".." in path.parts or "\\" in name or name in ("resume.tex", "resume.pdf"):
+            raise SandboxError("RESOURCE_PATH_INVALID")
+        if not isinstance(value, dict) or value.get("encoding") != "base64":
+            raise SandboxError("RESOURCE_ENCODING_INVALID")
+        try:
+            content = base64.b64decode(value["content"], validate=True)
+        except (KeyError, ValueError, TypeError):
+            raise SandboxError("RESOURCE_CONTENT_INVALID") from None
+        if len(content) != value.get("size_bytes") or hashlib.sha256(content).hexdigest() != value.get("sha256"):
+            raise SandboxError("RESOURCE_DIGEST_INVALID")
+        total += len(content)
+        if total > 32 * 1024 * 1024:
+            raise SandboxError("RESOURCES_TOO_LARGE")
+        target = root.joinpath(*path.parts)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+
+async def compile_local(source: str, resources: dict | None = None) -> bytes:
+    """Compile frozen LaTeX inputs with the host's local MiKTeX installation."""
+    engine = os.environ.get("RESUME_LATEX_ENGINE", "xelatex")
+    if engine not in {"xelatex", "pdflatex"}:
+        raise SandboxError("LOCAL_LATEX_ENGINE_INVALID")
+    executable = shutil.which(engine)
+    if not executable:
+        raise SandboxError(f"LOCAL_LATEX_UNAVAILABLE: {engine} not found on PATH")
+
+    configured_root = os.environ.get("RESUME_COMPILE_WORK_ROOT", "")
+    if configured_root:
+        base = Path(configured_root).expanduser().resolve()
+        if not base.is_dir():
+            raise SandboxError("LOCAL_LATEX_WORK_ROOT_INVALID")
+    else:
+        base = Path(tempfile.gettempdir()).resolve()
+    root = Path(tempfile.mkdtemp(prefix="resume-local-", dir=str(base))).resolve()
+    try:
+        _write_compile_inputs(root, source, resources)
+        log_path = root / "compile.log"
+        env = os.environ.copy()
+        env.update({
+            "HOME": str(root),
+            "TEXMFOUTPUT": str(root),
+            "openin_any": "p",
+            "openout_any": "p",
+            "shell_escape": "f",
+        })
+        process = await asyncio.create_subprocess_exec(
+            executable, "-no-shell-escape", "-interaction=nonstopmode",
+            "-halt-on-error", "resume.tex",
+            cwd=str(root), env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        try:
+            output, _ = await asyncio.wait_for(process.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            raise SandboxError("COMPILE_TIMEOUT") from None
+        log_path.write_bytes(output)
+        if process.returncode:
+            tail = output[-8192:]
+            error_line = re.search(rb"(?:^|\n)l\.(\d{1,6})\b", tail)
+            location = f"line {error_line.group(1).decode()}" if error_line else None
+            raise SandboxError("COMPILE_FAILED", location=location)
+        pdf_path = root / "resume.pdf"
+        if not pdf_path.is_file():
+            raise SandboxError("COMPILE_OUTPUT_INVALID")
+        pdf = pdf_path.read_bytes()
+        if not pdf.startswith(b"%PDF-") or len(pdf) > 12 * 1024 * 1024:
+            raise SandboxError("COMPILE_OUTPUT_INVALID")
+        return pdf
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def docker_environment():

@@ -61,12 +61,12 @@ def test_versioned_templates_render_real_order_and_language(name):
     bundle = read_bundle(BUILTIN_ROOT / name)
     report = validate_snapshot(bundle)
     assert report.valid, report.issues
-    order = ["basic_info", "projects", "education", "skills", "work", "certificates", "competitions"]
+    order = list(FIXED_SECTIONS)
     request = TemplatePreviewRequest(data={"basic_info": {"name": "中 & 文"},
         "education": [{"school": "学校"}], "projects": [{"title": "项目", "bullets": ["50%_test"]}]},
         options={"language": "en", "module_order": order})
     source = render_snapshot(bundle, request).latex_source
-    assert source.index("Projects") < source.index("Education")
+    assert source.index("Education") < source.index("Projects")
     assert "中 \\& 文" in source and "50\\%\\_test" in source
     zh = render_snapshot(bundle, request.model_copy(update={"options": request.options.model_copy(update={"language": "zh"})})).latex_source
     assert "项目经历" in zh and source != zh

@@ -14,8 +14,8 @@
 
           <el-form-item label="面试模式">
             <el-radio-group v-model="interviewMode">
-              <el-radio label="text">常规面试（文本+语音）</el-radio>
-              <el-radio label="avatar">虚拟人面试</el-radio>
+              <el-radio value="text">常规面试（文本+语音）</el-radio>
+              <el-radio value="avatar">虚拟人面试</el-radio>
             </el-radio-group>
             <div class="mode-tip">
               常规面试内置文本与语音输入；虚拟人面试会在会话页展示虚拟人口播区域，鉴权由后端完成。
@@ -32,8 +32,8 @@
 
           <el-form-item label="简历方式">
             <el-radio-group v-model="resumeInputMode">
-              <el-radio label="text">文字输入</el-radio>
-              <el-radio label="file">上传 PDF/Word</el-radio>
+              <el-radio value="text">文字输入</el-radio>
+              <el-radio value="file">上传 PDF/Word</el-radio>
             </el-radio-group>
           </el-form-item>
 

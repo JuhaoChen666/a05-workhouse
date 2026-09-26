@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/admin/positions")
@@ -26,6 +27,35 @@ public class AdminPositionsController {
             PermissionUtil.requireAdmin();
             Map<String, Object> result = positionsService.getPositionsByPage(name, page, pageSize);
             return Result.success(result);
+        } catch (ServiceException e) {
+            if (e.getMessage().equals("需要管理员权限")) {
+                return Result.noPermission();
+            }
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}")
+    public Result getPositionDetail(@PathVariable Integer id) {
+        try {
+            PermissionUtil.requireAdmin();
+            Positions_Info info = positionsService.getPosition_InfoById(id);
+            if (info == null) {
+                return Result.resourceNotExist();
+            }
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", info.getId());
+            data.put("name", info.getName());
+            data.put("responsibility", info.getResponsibility());
+            data.put("responsibilities", info.getResponsibility());
+            data.put("salary_junior", info.getSalary_junior());
+            data.put("salary_mid", info.getSalary_mid());
+            data.put("salary_senior", info.getSalary_senior());
+            data.put("salary_expert", info.getSalary_expert());
+            data.put("skill_requirements", info.getSkill_requirements());
+            data.put("create_time", info.getCreate_time());
+            data.put("update_time", info.getUpdate_time());
+            return Result.success(data);
         } catch (ServiceException e) {
             if (e.getMessage().equals("需要管理员权限")) {
                 return Result.noPermission();

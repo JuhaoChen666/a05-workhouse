@@ -60,7 +60,8 @@
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
-import { interviewRequest, INTERVIEW_API_ORIGIN } from '@/api/request';
+import { interviewRequest } from '@/api/request';
+import { buildInterviewAssetUrl } from '@/api/resumeAssets';
 import { useUserStore } from '@/store/user';
 import { markdownImport } from '@/api/experienceImports';
 import type { SavedResumeDocument } from '@/api/resumeGeneration';
@@ -100,7 +101,18 @@ async function open(row: SavedResumeDocument) {
 async function regenerate() {
   loading.value = true;
   try {
-    const result = await interviewRequest.post<ResumeGenerationJob>(`/resume-documents/${detail.value.id}/regenerate`, edit);
+    const payload = {
+      ...edit,
+      personal_info: {
+        ...edit.personal_info,
+        education: (edit.personal_info.education || [])
+          .filter((entry: Record<string, unknown>) =>
+            Object.values(entry).some((value) => String(value || '').trim()),
+          )
+          .map((entry: Record<string, unknown>) => ({ ...entry })),
+      },
+    };
+    const result = await interviewRequest.post<ResumeGenerationJob>(`/resume-documents/${detail.value.id}/regenerate`, payload);
     visible.value = false;
     await router.push({ name: 'HomeResumeGeneration', query: { job: result.job_id } });
   } catch (error) { ElMessage.error((error as Error).message); }
@@ -132,7 +144,7 @@ async function remove(row: SavedResumeDocument) {
 }
 async function asset(row: SavedResumeDocument, format: 'pdf' | 'latex', preview = false) {
   try {
-    const response = await fetch(`${INTERVIEW_API_ORIGIN}/api/resume-documents/${row.id}/${format}`, { headers: { Authorization: `Bearer ${user.token}` } });
+    const response = await fetch(buildInterviewAssetUrl(`/api/resume-documents/${row.id}/${format}`), { headers: { Authorization: `Bearer ${user.token}` } });
     if (!response.ok) throw new Error(`文件不可用（${response.status}）`);
     const url = URL.createObjectURL(await response.blob());
     if (preview) { if (previewURL.value) URL.revokeObjectURL(previewURL.value); previewURL.value = url; previewDocumentId.value = row.id; previewVisible.value = true; }

@@ -105,8 +105,8 @@ class TemplatePreviewOptions(ProtocolModel):
     @field_validator("module_order")
     @classmethod
     def ordered_modules(cls, value):
-        if len(value) != len(set(value)) or set(value) != set(FIXED_SECTIONS) or value[0] != "basic_info":
-            raise ValueError("each module exactly once; basic_info first")
+        if value != list(FIXED_SECTIONS):
+            raise ValueError("module_order is fixed: basic_info, education, skills, work, projects, certificates, competitions")
         return value
 
 

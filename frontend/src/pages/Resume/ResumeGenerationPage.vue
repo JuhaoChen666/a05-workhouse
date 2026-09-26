@@ -20,8 +20,8 @@
         <div><h4>选择目标岗位</h4><p>可以选择系统岗位，也可以粘贴一段 JD。</p></div>
       </div>
       <el-radio-group v-model="jdMode" class="mode-switch">
-        <el-radio-button label="JOB_ID">系统岗位</el-radio-button>
-        <el-radio-button label="TEXT">粘贴 JD</el-radio-button>
+        <el-radio-button value="JOB_ID">系统岗位</el-radio-button>
+        <el-radio-button value="TEXT">粘贴 JD</el-radio-button>
       </el-radio-group>
       <div v-if="jdMode === 'JOB_ID'" class="job-picker">
         <el-select v-model="selectedJobId" filterable remote :remote-method="searchJobs" :loading="jobLoading" placeholder="搜索岗位" @change="loadSelectedJob">
@@ -63,16 +63,26 @@
         <el-select v-model="language" style="width: 130px"><el-option value="zh" label="中文" /><el-option value="en" label="English" /></el-select>
         <el-checkbox v-model="showAvatar" :disabled="!selectedTemplate?.supports_avatar">保留头像</el-checkbox>
         <p>页数为 PDF 实际页数上限。语言控制标题，来源事实保留原文；AI 改写须逐条核对来源并明确确认后采用。</p>
-        <el-form label-position="top" class="personal-info">
+        <el-alert
+          v-if="profileMissingFields.length"
+          class="profile-alert"
+          type="warning"
+          :closable="false"
+          :title="`个人资料还缺少：${profileMissingFields.join('、')}`"
+        />
+        <el-form ref="personalInfoRef" label-position="top" class="personal-info">
           <el-form-item v-for="field in personalFields" :key="field.key" :label="field.label"><el-input v-model="personal[field.key]" /></el-form-item>
           <div v-for="(entry, index) in personal.education" :key="index">
             <h4>教育经历 {{ Number(index) + 1 }}</h4>
             <el-form-item v-for="field in educationFields" :key="field.key" :label="field.label"><el-input v-model="entry[field.key]" /></el-form-item>
             <el-button @click="personal.education.splice(Number(index), 1)">移除教育经历</el-button>
           </div>
-          <el-button @click="personal.education.push({ school: '', major: '', degree: '', date_range: '', gpa: '' })">添加教育经历</el-button>
+          <div class="profile-actions">
+            <el-button @click="saveProfile">保存个人资料</el-button>
+            <el-button @click="personal.education.push(emptyEducationEntry())">添加教育经历</el-button>
+          </div>
         </el-form>
-        <div class="actions"><el-button @click="activeStep = 0">上一步</el-button><el-button type="primary" class="theme-primary-btn" :loading="starting" @click="startGeneration">开始生成</el-button></div>
+        <div class="actions"><el-button @click="activeStep = 0">上一步</el-button><el-button type="primary" class="theme-primary-btn" :loading="starting" :disabled="profileMissingFields.length > 0" @click="startGeneration">开始生成</el-button></div>
       </div>
     </div>
 
@@ -130,6 +140,14 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import { getPositionDetailApi, getSimplePositionPageApi, type SimplePositionItem } from '@/api/jobs';
 import { listExperiencesApi } from '@/api/experiences';
+import { buildInterviewAssetUrl } from '@/api/resumeAssets';
+import {
+  emptyEducationEntry,
+  loadResumePersonalProfile,
+  resumeProfileMissingFields,
+  saveResumePersonalProfile,
+  type ResumePersonalProfile,
+} from '@/api/resumeProfile';
 import {
   createResumeGenerationApi,
   confirmResumeReviewApi,
@@ -145,9 +163,23 @@ import { useUserStore } from '@/store/user';
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
-const personal = reactive<Record<string, any>>({ name: userStore.userInfo?.username || '', email: userStore.userInfo?.email || '', title: '', phone: '', city: '', github: '', education: [] });
-const personalFields = [{ key: 'name', label: '姓名' }, { key: 'title', label: '求职方向' }, { key: 'phone', label: '电话' }, { key: 'email', label: '邮箱' }, { key: 'city', label: '城市' }, { key: 'github', label: 'GitHub / 作品链接' }];
-const educationFields = [{ key: 'school', label: '学校' }, { key: 'major', label: '专业' }, { key: 'degree', label: '学历' }, { key: 'date_range', label: '就读起止年月' }, { key: 'gpa', label: 'GPA（选填）' }];
+const personal = reactive<ResumePersonalProfile>(loadResumePersonalProfile(userStore.userInfo));
+const personalInfoRef = ref<any>();
+const personalFields: Array<{ key: keyof Omit<ResumePersonalProfile, 'education'>; label: string }> = [
+  { key: 'name', label: '姓名' },
+  { key: 'title', label: '求职方向' },
+  { key: 'phone', label: '电话' },
+  { key: 'email', label: '邮箱' },
+  { key: 'city', label: '城市' },
+  { key: 'github', label: 'GitHub / 作品链接' },
+];
+const educationFields: Array<{ key: 'school' | 'major' | 'degree' | 'date_range' | 'gpa'; label: string }> = [
+  { key: 'school', label: '学校' },
+  { key: 'major', label: '专业' },
+  { key: 'degree', label: '学历' },
+  { key: 'date_range', label: '就读起止年月' },
+  { key: 'gpa', label: 'GPA（选填）' },
+];
 const activeStep = ref(0);
 const jdMode = ref<'JOB_ID' | 'TEXT'>('JOB_ID');
 const selectedJobId = ref<string>();
@@ -175,6 +207,7 @@ let timer: number | undefined;
 let previewObjectUrl = '';
 
 const hasJd = computed(() => jdMode.value === 'JOB_ID' ? Boolean(selectedJobId.value && selectedJobText.value) : jdText.value.trim().length >= 20);
+const profileMissingFields = computed(() => resumeProfileMissingFields(personal));
 const filteredExperiences = computed(() => {
   const query = experienceKeyword.value.trim().toLowerCase();
   if (!query) return experiences.value;
@@ -229,14 +262,37 @@ async function loadCatalog() {
     ElMessage.error((error as Error).message || '生成素材加载失败');
   }
 }
+function saveProfile() {
+  saveResumePersonalProfile(personal, userStore.userInfo);
+  ElMessage.success('个人资料已保存，下次生成会自动带入');
+}
+function personalSnapshot() {
+  return {
+    ...personal,
+    education: personal.education
+      .filter((entry) => Object.values(entry).some((value) => String(value || '').trim()))
+      .map((entry) => ({ ...entry })),
+  };
+}
 async function startGeneration() {
   if (!selectedTemplate.value || !hasJd.value) return;
+  saveResumePersonalProfile(personal, userStore.userInfo);
+  if (profileMissingFields.value.length) {
+    personalInfoRef.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ElMessage.warning(`请先补全：${profileMissingFields.value.join('、')}`);
+    return;
+  }
   starting.value = true;
   try {
+    // The local mock exposes job details through the frontend API, while the
+    // resume service only trusts server-side job IDs. Submit the loaded JD as
+    // text in development so the complete local flow does not depend on a
+    // second, unavailable position service.
+    const useLoadedJobText = jdMode.value === 'JOB_ID' && import.meta.env.DEV;
     job.value = await createResumeGenerationApi({
-      jd_source_type: jdMode.value,
-      jd_text: jdMode.value === 'TEXT' ? jdText.value.trim() : undefined,
-      job_id: jdMode.value === 'JOB_ID' ? selectedJobId.value : undefined,
+      jd_source_type: useLoadedJobText ? 'TEXT' : jdMode.value,
+      jd_text: useLoadedJobText ? selectedJobText.value.trim() : jdMode.value === 'TEXT' ? jdText.value.trim() : undefined,
+      job_id: useLoadedJobText ? undefined : jdMode.value === 'JOB_ID' ? selectedJobId.value : undefined,
       template_id: selectedTemplate.value.id,
       template_version: selectedTemplate.value.version,
       target_pages: targetPages.value,
@@ -244,7 +300,7 @@ async function startGeneration() {
       show_avatar: showAvatar.value,
       selected_item_ids: aiAutoSelect.value ? null : selectedExperienceIds.value,
       ai_recommendation_mode: aiAutoSelect.value ? 'JD_AUTO_SELECT_AND_TAILOR' : 'MANUAL_ONLY',
-      personal_info: personal,
+      personal_info: personalSnapshot(),
     });
     activeStep.value = 2;
     await router.replace({ query: { job: job.value.job_id } });
@@ -309,8 +365,7 @@ async function fetchAsset(format: 'pdf' | 'latex') {
   if (!job.value) return null;
   const path = format === 'pdf' ? job.value.pdf_download_url : job.value.latex_source_url;
   if (!path || !job.value.document_id) throw new Error('文档不存在或已删除，请刷新简历库');
-  const base = String(import.meta.env.VITE_INTERVIEW_API_ORIGIN || '').replace(/\/$/, '');
-  const response = await fetch(`${base}${path}`, {
+  const response = await fetch(buildInterviewAssetUrl(path), {
     headers: userStore.token ? { Authorization: `Bearer ${userStore.token}` } : undefined,
   });
   if (!response.ok) throw new Error(`下载失败（${response.status}）`);
@@ -381,6 +436,9 @@ onBeforeUnmount(() => {
 .experience-option { display: flex; gap: 8px; padding: 10px; border-bottom: 1px solid #f1f5f9; }
 .experience-option span { display: grid; gap: 4px; }
 .experience-option small { color: #64748b; }
+.profile-alert { width: 100%; margin: 2px 0 4px; }
+.personal-info { width: 100%; }
+.profile-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .panel-options { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .panel-options .actions { margin: 0 0 0 auto; }
 .result-layout { display: grid; gap: 16px; }

@@ -6,6 +6,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -27,6 +28,12 @@ MAX_PDF_BYTES = 12 * 1024 * 1024
 COMPILE_SLOTS = asyncio.Semaphore(max(1, int(os.getenv("LATEX_COMPILE_CONCURRENCY", "2"))))
 
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#._-]{1,}|[\u4e00-\u9fff]{2,}")
+OUTCOME_RE = re.compile(r"(?:\d+(?:[.,]\d+)*%?|提升|降低|增长|减少|优化|落地|上线|交付|负责)")
+logger = logging.getLogger(__name__)
+# A one-page resume still needs enough density to look intentional. The
+# budget is an editorial guard, not a reason to remove an entire core section.
+PAGE_ITEM_LIMITS = {1: 8, 2: 16}
+PAGE_CONTENT_BUDGETS = {1: 38, 2: 72}
 
 
 class LatexCompileError(RuntimeError):
@@ -85,27 +92,91 @@ def _flatten(value: Any) -> list[str]:
     return [str(value)]
 
 
+def _experience_value(item: dict[str, Any], matched: list[str]) -> tuple[int, int]:
+    """Estimate resume value and layout cost without changing source facts."""
+    attrs = _attributes(item)
+    item_type = str(item.get("type") or "")
+    type_value = {
+        "WORK": 34,
+        "PROJECT": 30,
+        "SKILL": 22,
+        "CERTIFICATE": 12,
+        "COMPETITION_AWARD": 10,
+    }.get(item_type, 8)
+    bullets = [str(value).strip() for value in attrs.get("bullets") or [] if str(value).strip()]
+    technical = attrs.get("tech_stack") or attrs.get("skills") or []
+    technical_count = len(technical) if isinstance(technical, list) else (1 if technical else 0)
+    text = " ".join(_flatten(item))
+    outcome_count = len(OUTCOME_RE.findall(text))
+    score = (
+        type_value
+        + len(matched) * 14
+        + min(outcome_count, 5) * 8
+        + min(technical_count, 6) * 3
+        + (8 if item.get("start_date") or item.get("end_date") else 0)
+    )
+    # Bullets and long source text consume the scarce vertical space of a one-page CV.
+    cost = 3 + min(len(bullets), 5) + min(len(text) // 420, 5)
+    return score, cost
+
+
 def rank_experiences(
     items: list[dict[str, Any]],
     jd_text: str,
     selected_item_ids: list[str] | None,
     *,
-    limit: int = 16,
+    limit: int | None = None,
+    target_pages: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, list[str]], list[str]]:
     """Rank existing facts; never fabricate an experience or a metric."""
     keywords = jd_keywords(jd_text)
     selected = set(selected_item_ids or [])
-    scored: list[tuple[int, int, dict[str, Any], list[str]]] = []
+    if limit is None:
+        limit = PAGE_ITEM_LIMITS.get(target_pages or 2, 16)
+    budget = PAGE_CONTENT_BUDGETS.get(target_pages or 2, PAGE_CONTENT_BUDGETS[2])
+    scored: list[tuple[float, int, int, dict[str, Any], list[str]]] = []
     for index, item in enumerate(items):
         haystack = " ".join(_flatten(item)).lower()
         matched = [keyword for keyword in keywords if keyword in haystack][:12]
-        score = len(matched) * 10 + (1000 if str(item.get("id")) in selected else 0)
-        scored.append((score, index, item, matched))
-    scored.sort(key=lambda value: (-value[0], value[1], str(value[2].get("id", ""))))
-    chosen = scored[:limit]
-    selected_ids = [str(item.get("id")) for _, _, item, _ in chosen]
-    matches = {str(item.get("id")): matched for _, _, item, matched in chosen}
-    return [item for _, _, item, _ in chosen], matches, selected_ids
+        value, cost = _experience_value(item, matched)
+        if str(item.get("id")) in selected:
+            value += 1000
+        scored.append((value / cost, value, index, item, matched))
+    scored.sort(key=lambda value: (-value[0], -value[1], value[2], str(value[3].get("id", ""))))
+    chosen: list[tuple[float, int, int, dict[str, Any], list[str]]] = []
+    chosen_ids_set: set[str] = set()
+    used_budget = 0
+
+    def add_row(row) -> bool:
+        nonlocal used_budget
+        item_id = str(row[3].get("id"))
+        if item_id in chosen_ids_set or len(chosen) >= limit:
+            return False
+        cost = _experience_value(row[3], row[4])[1]
+        if chosen and used_budget + cost > budget:
+            return False
+        chosen.append(row)
+        chosen_ids_set.add(item_id)
+        used_budget += cost
+        return True
+
+    # Core coverage comes before keyword score. Otherwise an AI/JD-heavy
+    # selection can accidentally produce a project-only resume for a user who
+    # has real employment history.
+    for required_type in ("WORK", "PROJECT"):
+        candidates = [row for row in scored if row[3].get("type") == required_type]
+        if candidates:
+            add_row(candidates[0])
+
+    for row in scored:
+        add_row(row)
+        if len(chosen) >= limit:
+            break
+    if not chosen and scored:
+        chosen.append(scored[0])
+    selected_ids = [str(item.get("id")) for _, _, _, item, _ in chosen]
+    matches = {str(item.get("id")): matched for _, _, _, item, matched in chosen}
+    return [item for _, _, _, item, _ in chosen], matches, selected_ids
 
 
 def _attributes(item: dict[str, Any]) -> dict[str, Any]:
@@ -196,8 +267,11 @@ def plan_resume(
     experiences: list[dict[str, Any]],
     personal_info: dict[str, Any],
     selected_item_ids: list[str] | None,
+    target_pages: int | None = None,
 ) -> tuple[TemplateRenderData, list[AITailoredBulletTrace], dict[str, Any]]:
-    chosen, matches, chosen_ids = rank_experiences(experiences, jd_text, selected_item_ids)
+    chosen, matches, chosen_ids = rank_experiences(
+        experiences, jd_text, selected_item_ids, target_pages=target_pages
+    )
     traces: list[AITailoredBulletTrace] = []
     for item in chosen:
         attrs = _attributes(item)
@@ -213,10 +287,11 @@ def plan_resume(
     data = build_render_data(chosen, personal_info)
     plan = {
         "selected_item_ids": chosen_ids,
-        "module_order": ["basic_info", "education", "skills", "work", "projects", "certificates", "competitions"],
+        "module_order": list(FIXED_SECTIONS),
         "keyword_matches": matches,
         "trimmed_item_ids": [str(item.get("id")) for item in experiences if str(item.get("id")) not in chosen_ids],
         "recommendation_engine": "keyword_ranked_safe_tailoring",
+        "selection_policy": f"quality_ranked_page_{target_pages or 2}",
     }
     return data, traces, plan
 
@@ -232,29 +307,57 @@ async def request_structured_ai_plan(*, jd_text, experiences, fallback, language
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         raise AIUnavailable("AI_NOT_CONFIGURED")
-    prompt = "Only use supplied facts. Return JSON: selected_item_ids, module_order, tailored_bullets " \
-        "(source_item_id,original_bullet,tailored_bullet,keywords_matched), keyword_matches, trim_suggestions. " \
-        "Do not invent metrics, employers, dates or technologies. Requested language: " + language
+    prompt = (
+        "Only use supplied facts. Return one JSON object with these keys: "
+        "selected_item_ids, tailored_bullets "
+        "(source_item_id,original_bullet,tailored_bullet,keywords_matched), "
+        "keyword_matches, trim_suggestions. "
+        'Return JSON in this shape: {"selected_item_ids":[],"tailored_bullets":[],'
+        '"keyword_matches":{},"trim_suggestions":[]}. '
+        "Do not return a module_order field. The server owns the fixed order "
+        "basic_info, education, skills, work, projects, certificates, competitions. "
+        "Do not invent metrics, employers, dates or technologies. Requested language: "
+        + language
+    )
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            async with client.stream("POST", os.environ.get("RESUME_AI_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions",
-                headers={"Authorization": "Bearer " + key}, json={"model": os.environ.get("RESUME_AI_MODEL", "deepseek-chat"),
-                "response_format": {"type": "json_object"}, "temperature": 0, "max_tokens": 12000,
-                "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": json.dumps(
-                    {"jd": jd_text[:12000], "experiences": experiences}, ensure_ascii=False)}]}) as response:
-                response.raise_for_status()
-                body = bytearray()
-                async for chunk in response.aiter_bytes():
-                    body.extend(chunk)
-                    if len(body) > 512000:
-                        raise AIUnavailable("AI_RESPONSE_TOO_LARGE")
-                content = json.loads(body)["choices"][0]["message"]["content"]
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                os.environ.get("RESUME_AI_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions",
+                headers={"Authorization": "Bearer " + key},
+                json={
+                    "model": os.environ.get("RESUME_AI_MODEL", os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")),
+                    "response_format": {"type": "json_object"},
+                    "thinking": {"type": "disabled"},
+                    "stream": False,
+                    "temperature": 0,
+                    "max_tokens": 12000,
+                    "messages": [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": json.dumps(
+                            {"jd": jd_text[:12000], "experiences": experiences}, ensure_ascii=False)},
+                    ],
+                },
+            )
+            response.raise_for_status()
+            if len(response.content) > 512000:
+                raise AIUnavailable("AI_RESPONSE_TOO_LARGE")
+            payload = response.json()
+            content = payload["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise AIUnavailable("AI_EMPTY_OUTPUT")
             return StructuredAIPlan.model_validate(json.loads(content))
     except AIUnavailable:
         raise
     except ValidationError:
         raise AIUnavailable("AI_INVALID_OUTPUT") from None
-    except Exception:
+    except httpx.HTTPStatusError as error:
+        logger.warning("resume AI request rejected status=%s", error.response.status_code)
+        raise AIUnavailable("AI_HTTP_ERROR") from None
+    except (httpx.HTTPError, json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
+        logger.warning("resume AI response invalid type=%s", type(error).__name__)
+        raise AIUnavailable("AI_REQUEST_FAILED") from None
+    except Exception as error:
+        logger.warning("resume AI request failed type=%s", type(error).__name__)
         raise AIUnavailable("AI_REQUEST_FAILED") from None
 
 
@@ -263,8 +366,6 @@ def validated_plan(ai, experiences):
     ids = ai.selected_item_ids
     if len(ids) != len(set(ids)) or any(id_ not in source for id_ in ids):
         raise LatexCompileError("AI_SOURCE_VIOLATION: unknown or duplicate experience", retryable=False)
-    if len(ai.module_order) != len(set(ai.module_order)) or any(s not in FIXED_SECTIONS for s in ai.module_order):
-        raise LatexCompileError("AI_SOURCE_VIOLATION: invalid module order", retryable=False)
     preserved = 0
     seen = set()
     for bullet in ai.tailored_bullets:
@@ -288,13 +389,11 @@ def validated_plan(ai, experiences):
                 tech not in set(re.findall(r"[a-z]+", frozen_text)) for tech in added_tech):
             raise LatexCompileError("AI_FACT_VIOLATION: unsupported entity claim", retryable=False)
         preserved += bullet.tailored_bullet != bullet.original_bullet
-    order = ["basic_info"] + [s for s in ai.module_order if s != "basic_info"]
-    order += [s for s in FIXED_SECTIONS if s not in order]
-    return [copy.deepcopy(source[id_]) for id_ in ids], order, preserved
+    return [copy.deepcopy(source[id_]) for id_ in ids], list(FIXED_SECTIONS), preserved
 
 
 async def build_ai_plan(*, jd_text, experiences, personal_info, selected_item_ids,
-                        mode="JD_AUTO_SELECT_AND_TAILOR", language="zh"):
+                        mode="JD_AUTO_SELECT_AND_TAILOR", language="zh", target_pages=2):
     allowed = experiences if selected_item_ids is None else [item for item in experiences if str(item["id"]) in selected_item_ids]
     if selected_item_ids is not None and {str(item["id"]) for item in allowed} != set(selected_item_ids):
         raise LatexCompileError("SOURCE_UNAVAILABLE: selected experience missing", retryable=False)
@@ -305,21 +404,63 @@ async def build_ai_plan(*, jd_text, experiences, personal_info, selected_item_id
                 "recommendation_engine": "manual", "ai_status": "NOT_REQUESTED"}
     else:
         _, _, fallback = plan_resume(jd_text=jd_text, experiences=allowed,
-            personal_info=personal_info, selected_item_ids=selected_item_ids)
+            personal_info=personal_info, selected_item_ids=selected_item_ids,
+            target_pages=target_pages)
         try:
             ai = await request_structured_ai_plan(jd_text=jd_text, experiences=allowed, fallback=fallback, language=language)
-            chosen, order, preserved = validated_plan(ai, allowed)
-            plan = {"selected_item_ids": ai.selected_item_ids, "module_order": order,
+            ai_chosen, order, preserved = validated_plan(ai, allowed)
+            # AI may identify many relevant facts, but the page target controls
+            # the final editorial cut so a one-page resume stays readable.
+            chosen, _, chosen_ids = rank_experiences(
+                allowed, jd_text, [str(item["id"]) for item in ai_chosen],
+                target_pages=target_pages,
+            )
+            retained_bullets = [
+                row for row in ai.tailored_bullets if row.source_item_id in chosen_ids
+            ]
+            plan = {"selected_item_ids": chosen_ids, "module_order": order,
                 "recommendation_engine": "deepseek_structured_json", "ai_status": "SUCCEEDED",
-                "unverified_rewrites_preserved": preserved, "keyword_matches": ai.keyword_matches,
-                "trim_suggestions": ai.trim_suggestions, "tailored_bullets": [row.model_dump(mode="json") for row in ai.tailored_bullets],
-                "review_required": bool(preserved), "review_status": "PENDING" if preserved else "NOT_REQUIRED"}
+                "unverified_rewrites_preserved": sum(
+                    row.tailored_bullet != row.original_bullet for row in retained_bullets
+                ),
+                "keyword_matches": ai.keyword_matches,
+                "trim_suggestions": ai.trim_suggestions,
+                "tailored_bullets": [row.model_dump(mode="json") for row in retained_bullets],
+                "review_required": any(
+                    row.tailored_bullet != row.original_bullet for row in retained_bullets
+                ),
+                "review_status": "PENDING" if any(
+                    row.tailored_bullet != row.original_bullet for row in retained_bullets
+                ) else "NOT_REQUIRED",
+                "selection_policy": f"quality_ranked_page_{target_pages}",
+                "trimmed_item_ids": [item_id for item_id in ai.selected_item_ids if item_id not in chosen_ids]}
+            if chosen_ids != ai.selected_item_ids:
+                plan["selected_item_ids"] = chosen_ids
             # Keyword claims are displayed only when they actually occur in the frozen source.
-            plan["keyword_matches"] = {id_: [word for word in words if word.lower() in json.dumps(_attributes(next(item for item in chosen if str(item['id']) == id_)), ensure_ascii=False).lower()]
-                for id_, words in ai.keyword_matches.items() if id_ in ai.selected_item_ids}
+            plan["keyword_matches"] = {
+                id_: [
+                    word for word in words
+                    if word.lower() in json.dumps(
+                        _attributes(next(item for item in chosen if str(item["id"]) == id_)),
+                        ensure_ascii=False,
+                    ).lower()
+                ]
+                for id_, words in ai.keyword_matches.items() if id_ in chosen_ids
+            }
         except AIUnavailable as error:
-            chosen, _, _ = rank_experiences(allowed, jd_text, selected_item_ids)
+            chosen, _, _ = rank_experiences(
+                allowed, jd_text, selected_item_ids, target_pages=target_pages
+            )
             plan = {**fallback, "ai_status": "DEGRADED", "ai_error_code": error.code}
+        except LatexCompileError as error:
+            # A malformed presentation order does not invalidate source facts.
+            # Keep the deterministic keyword plan instead of failing the job.
+            if str(error) != "AI_SOURCE_VIOLATION: invalid module order":
+                raise
+            chosen, _, _ = rank_experiences(
+                allowed, jd_text, selected_item_ids, target_pages=target_pages
+            )
+            plan = {**fallback, "ai_status": "DEGRADED", "ai_error_code": "AI_INVALID_OUTPUT"}
     traces = [AITailoredBulletTrace(source_item_id=str(item["id"]), original_bullet=str(bullet),
         tailored_bullet=str(bullet), keywords_matched=[word for word in jd_keywords(jd_text) if word in str(bullet).lower()])
         for item in chosen for bullet in _attributes(item).get("bullets", [])]
@@ -364,11 +505,13 @@ def apply_review(plan, decision, experiences, personal):
 
 
 async def compile_latex(source: str, resources: dict[str, Any] | None = None) -> bytes:
-    from app.services.isolated_latex import SandboxError, compile_isolated
+    from app.services.isolated_latex import SandboxError, compile_isolated, compile_local
     if len(source.encode("utf-8")) > MAX_SOURCE_BYTES:
         raise LatexCompileError("SOURCE_TOO_LARGE", retryable=False)
     async with COMPILE_SLOTS:
         try:
+            if os.environ.get("RESUME_COMPILE_MODE", "docker").lower() == "local":
+                return await compile_local(source, resources)
             return await compile_isolated(source, resources)
         except SandboxError as error:
             raise LatexCompileError(str(error), location=error.location) from None
@@ -425,7 +568,8 @@ async def run_generation_job(job_id: str, owner_id: int, *, token: str, factory=
                 experiences=list(snapshot["experience_snapshot"] or []),
                 personal_info=dict(snapshot["personal_info_snapshot"] or {}),
                 selected_item_ids=options.get("selected_item_ids"),
-                mode=options.get("ai_recommendation_mode", "JD_AUTO_SELECT_AND_TAILOR"), language=language)
+                mode=options.get("ai_recommendation_mode", "JD_AUTO_SELECT_AND_TAILOR"),
+                language=language, target_pages=target_pages)
         if plan.get("review_required"):
             plan["version"] = review_version(plan)
             async with factory() as session, session.begin():
