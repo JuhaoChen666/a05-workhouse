@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from app.api import interview_routes, resume_routes, resume_optimize_routes, resume_template_routes, resume_generation_routes
+from app.api.resume_library_routes import router as resume_library_router
 from app.RAG.interview_service import InterviewService
 from app.api.experience_app import register_experience_routes
 
@@ -39,6 +40,7 @@ app.include_router(resume_template_routes.router)
 app.include_router(resume_generation_routes.router)
 from app.api.resume_document_routes import router as resume_documents_router
 app.include_router(resume_documents_router)
+app.include_router(resume_library_router)
 register_experience_routes(app)
 
 # 挂载静态文件目录，允许访问简历 PDF

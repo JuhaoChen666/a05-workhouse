@@ -59,7 +59,7 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'resume',
             name: 'HomeResume',
-            meta: { title: '简历管理' },
+            meta: { title: '简历库' },
             component: () => import('../pages/Resume/ResumeManagePage.vue'),
           },
           {

@@ -5,13 +5,16 @@
         <h3>经历库</h3>
         <p>集中管理项目、工作、技能、证书和获奖经历，生成简历时可直接复用。</p>
       </div>
-      <el-button type="primary" class="theme-primary-btn" @click="openCreate">
-        <el-icon><Plus /></el-icon>
-        新增经历
-      </el-button>
+      <div class="toolbar-actions">
+        <el-button class="import-button" @click="importPanel?.open()"><el-icon><Upload /></el-icon>导入经历</el-button>
+        <el-button type="primary" class="theme-primary-btn" @click="openCreate">
+          <el-icon><Plus /></el-icon>
+          新增经历
+        </el-button>
+      </div>
     </div>
 
-    <PdfExperienceImportPanel @confirmed="reload" />
+    <PdfExperienceImportPanel ref="importPanel" @confirmed="reload" />
     <div class="filters theme-card">
       <el-input v-model="keyword" clearable placeholder="搜索标题、标签或内容" @keyup.enter="reload">
         <template #prefix><el-icon><Search /></el-icon></template>
@@ -19,20 +22,15 @@
       <el-select v-model="typeFilter" clearable placeholder="全部类型" @change="reload">
         <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
-      <el-input v-model="tagFilter" clearable placeholder="标签筛选" @keyup.enter="reload" />
       <el-select v-model="archiveFilter" @change="reload">
         <el-option label="当前经历" value="active" />
         <el-option label="已归档" value="archived" />
         <el-option label="全部" value="all" />
       </el-select>
-      <el-button :icon="Refresh" circle title="刷新" @click="reload" />
     </div>
 
     <div class="table-wrap theme-card">
       <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column label="保存顺序（小值在前）" width="200">
-          <template #default="{ row }"><el-input-number :model-value="row.sort_order" :min="0" :max="2147483647" @change="saveOrder(row, $event)" /></template>
-        </el-table-column>
         <el-table-column label="经历" min-width="240">
           <template #default="{ row }">
             <div class="title-cell">
@@ -162,9 +160,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import PdfExperienceImportPanel from '@/components/PdfExperienceImportPanel.vue';
-import { interviewRequest } from '@/api/request';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Refresh, Search } from '@element-plus/icons-vue';
+import { Plus, Search, Upload } from '@element-plus/icons-vue';
 import {
   archiveExperienceApi,
   createExperienceApi,
@@ -188,11 +185,11 @@ const page = ref(1);
 const pageSize = ref(12);
 const total = ref(0);
 const keyword = ref('');
-const tagFilter = ref('');
 const typeFilter = ref<ExperienceType>();
 const archiveFilter = ref<'active' | 'archived' | 'all'>('active');
 const dialogVisible = ref(false);
 const editingId = ref<string>();
+const importPanel = ref<InstanceType<typeof PdfExperienceImportPanel>>();
 
 const emptyForm = () => reactive<Record<string, any>>({
   type: 'WORK',
@@ -220,14 +217,6 @@ const emptyForm = () => reactive<Record<string, any>>({
 });
 let form = emptyForm();
 
-async function saveOrder(row: ExperienceItemResponse, value: number | undefined) {
-  if (value == null || value === row.sort_order) return;
-  try {
-    await interviewRequest.patch(`/experiences/${row.id}/order`, { sort_order: value, expected_revision: row.revision });
-    await fetchItems();
-  } catch (error) { ElMessage.error((error as Error).message); await fetchItems(); }
-}
-
 function typeLabel(type: ExperienceType) {
   return typeOptions.find((item) => item.value === type)?.label || type;
 }
@@ -252,7 +241,7 @@ async function fetchItems() {
       page_size: pageSize.value,
       type: typeFilter.value,
       keyword: keyword.value.trim() || undefined,
-      tag: tagFilter.value.split(',').map((item) => item.trim()).filter(Boolean),
+      tag: [],
       archive: archiveFilter.value,
     });
     items.value = response.items || [];
@@ -374,9 +363,12 @@ onMounted(() => void fetchItems());
 <style scoped>
 .experience-page { display: grid; gap: 16px; }
 .toolbar, .filters { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; flex-wrap: wrap; }
+.toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.import-button { border-color: #ddd6fe; background: #f8f6ff; color: #6d28d9; }
+.import-button:hover { border-color: #c4b5fd; background: #f1edff; color: #5b21b6; }
 .toolbar h3 { margin: 0 0 6px; color: #111827; }
 .toolbar p { margin: 0; color: #6b7280; font-size: 13px; }
-.filters :deep(.el-input) { width: 240px; }
+.filters :deep(.el-input) { width: 320px; }
 .filters :deep(.el-select) { width: 150px; }
 .table-wrap { padding: 8px; }
 .title-cell { display: grid; gap: 4px; }

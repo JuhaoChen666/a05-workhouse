@@ -53,6 +53,6 @@ export function deleteResumeApi(body: ResumeDeleteBody) {
   return interviewRequest.delete<unknown>('/resumes/delete', { data: body });
 }
 
-export function getResumeItemApi(id: number | string) {
-  return interviewRequest.get<ResumeItemRes>(`/resumes/item/${id}`);
+export function getResumeItemApi(id: number | string, signal?: AbortSignal) {
+  return interviewRequest.get<ResumeItemRes>(`/resumes/item/${id}`, signal ? { signal } : undefined);
 }

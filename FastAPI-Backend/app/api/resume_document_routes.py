@@ -9,7 +9,7 @@ from app.api.experience_dependencies import experience_session, private_store, t
 from app.infrastructure.mapper.resume_storage_mapper import AssetNotFound, ResumeStorageMapper
 from app.infrastructure.private_resume_assets import private_asset_transaction, verify_references
 from app.models.resume_storage_contracts import DocumentName
-from app.models.resume_storage_models import ResumeGenerationJobModel, utcnow
+from app.models.resume_storage_models import ResumeGenerationJobModel, ResumeThumbnailModel, utcnow
 from app.models.resume_latex_contracts import ResumeGenerationRequest
 from app.services.resume_generation_service import build_render_data
 from app.api.resume_generation_routes import _job_response
@@ -49,7 +49,19 @@ def public_snapshot(value):
 
 def summary(row):
     return {"id": row.id, "name": row.name, "format": row.format, "generation_job_id": row.generation_job_id,
-            "copied_from_id": row.copied_from_id, "created_at": row.created_at, "updated_at": row.updated_at}
+            "copied_from_id": row.copied_from_id, "created_at": row.created_at, "updated_at": row.updated_at,
+            "thumbnail_url": None}
+
+
+async def summary_with_thumbnail(row, session):
+    result = summary(row)
+    thumb = (await session.execute(select(ResumeThumbnailModel.id).where(
+        ResumeThumbnailModel.user_id == row.user_id, ResumeThumbnailModel.source_kind == "generated",
+        ResumeThumbnailModel.source_id == row.id, ResumeThumbnailModel.status == "READY",
+        ResumeThumbnailModel.asset.is_not(None)))).scalar_one_or_none()
+    if thumb is not None:
+        result["thumbnail_url"] = f"/api/resume-library/thumbnail/generated/{row.id}"
+    return result
 
 
 async def get_document(mapper, id):
@@ -62,7 +74,7 @@ async def get_document(mapper, id):
 @router.get("")
 async def list_documents(owner: Owner, session: Session):
     async with session.begin():
-        return [summary(row) for row in await ResumeStorageMapper(session, owner).list_documents()]
+        return [await summary_with_thumbnail(row, session) for row in await ResumeStorageMapper(session, owner).list_documents()]
 
 
 @router.get("/legacy-markdown")
@@ -78,7 +90,8 @@ async def legacy_markdown(owner: Owner, session: Session):
 async def detail(document_id: UUID, owner: Owner, session: Session):
     async with session.begin():
         row = await get_document(ResumeStorageMapper(session, owner), document_id)
-        return {**summary(row), "snapshot": public_snapshot(row.snapshot), "markdown_content": row.markdown_content}
+        result = await summary_with_thumbnail(row, session)
+        return {**result, "snapshot": public_snapshot(row.snapshot), "markdown_content": row.markdown_content}
 
 
 @router.patch("/{document_id}")
@@ -86,7 +99,7 @@ async def rename(document_id: UUID, request: NameRequest, owner: Owner, session:
     async with session.begin():
         mapper = ResumeStorageMapper(session, owner)
         await get_document(mapper, document_id)
-        return summary(await mapper.rename_document(str(document_id), request.name))
+        return await summary_with_thumbnail(await mapper.rename_document(str(document_id), request.name), session)
 
 
 @router.post("/{document_id}/copy", status_code=201)
@@ -94,7 +107,7 @@ async def copy_document(document_id: UUID, request: NameRequest, owner: Owner, s
     async with private_asset_transaction(session, store, owner):
         mapper = ResumeStorageMapper(session, owner)
         await get_document(mapper, document_id)
-        return summary(await mapper.copy_document(str(document_id), request.name))
+        return await summary_with_thumbnail(await mapper.copy_document(str(document_id), request.name), session)
 
 
 @router.delete("/{document_id}", status_code=204)

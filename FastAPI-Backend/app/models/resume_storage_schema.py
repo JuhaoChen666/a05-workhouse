@@ -2,7 +2,7 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects.mysql import DATETIME
 
-TABLE_NAMES = ("experience_items", "resume_templates", "resume_generation_jobs", "resume_documents")
+TABLE_NAMES = ("experience_items", "resume_templates", "resume_generation_jobs", "resume_documents", "resume_thumbnails")
 
 
 def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=None):
@@ -85,4 +85,16 @@ def define_tables(metadata, legacy_resume_type=None, legacy_optimization_type=No
         object_check("snapshot"), object_check("pdf_asset"), object_check("latex_asset"),
         sa.Index("ix_document_owner_list", "user_id", "deleted_at", "created_at"),
         sa.Index("ix_document_retention", "files_purged_at", "purge_after"), **options)
-    return experience, template, job, document
+    thumbnail = sa.Table("resume_thumbnails", metadata,
+        column("id", sa.BigInteger, primary_key=True, autoincrement=True), owner(),
+        column("source_kind", sa.String(16), nullable=False), column("source_id", sa.String(36, collation="utf8mb4_bin"), nullable=False),
+        column("source_sha256", sa.String(64), nullable=False), json_column("asset", nullable=True),
+        column("status", sa.String(16), nullable=False), column("attempt_count", sa.Integer, nullable=False),
+        column("error_code", sa.String(64)), column("available_at", DATETIME(fsp=6), nullable=False),
+        column("created_at", DATETIME(fsp=6), nullable=False), column("updated_at", DATETIME(fsp=6), nullable=False),
+        sa.UniqueConstraint("user_id", "source_kind", "source_id", name="uq_thumbnail_source"),
+        sa.CheckConstraint("user_id > 0 AND source_kind IN ('uploaded','generated')", name="ck_thumbnail_source"),
+        sa.CheckConstraint("status IN ('PENDING','PROCESSING','READY','FAILED') AND attempt_count BETWEEN 0 AND 3", name="ck_thumbnail_status"),
+        object_check("asset"),
+        sa.Index("ix_thumbnail_queue", "status", "available_at", "updated_at"), **options)
+    return experience, template, job, document, thumbnail

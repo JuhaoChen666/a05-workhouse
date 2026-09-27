@@ -18,8 +18,17 @@ from app.infrastructure.resume_runtime import session_factory, asset_store
 from app.infrastructure.mapper.resume_storage_mapper import ResumeStorageMapper
 from app.models.resume_storage_models import ResumeGenerationJobModel as Job
 from app.services.resume_generation_service import run_generation_job
+from app.services.resume_thumbnails import run_thumbnail_once
 
 logger = logging.getLogger(__name__)
+
+
+async def _thumbnail_slot(factory, store):
+    try:
+        return await run_thumbnail_once(factory, store=store)
+    except Exception as error:
+        logger.warning("thumbnail worker slot failed error=%s", type(error).__name__)
+        return False
 
 
 async def run_once(factory=None, *, store=None, compiler=None):
@@ -37,6 +46,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
                 Job.status == "PROCESSING").order_by(Job.updated_at, Job.id).limit(100))).all()
     # Recovery is independent of queue depth and does not require a free compile slot.
     for job_id, owner in interrupted:
+        recovered = False
         async with factory.kw["bind"].connect() as lease:
             key = "resume-job:" + job_id
             if not (await lease.execute(text("SELECT GET_LOCK(:key, 0)"), {"key": key})).scalar():
@@ -50,9 +60,12 @@ async def run_once(factory=None, *, store=None, compiler=None):
                     await mapper.update_job(job_id, status="FAILED", stage="INTERRUPTED", progress=0,
                         error={"code": "WORKER_INTERRUPTED", "message": "执行服务中断，请重试冻结的输入", "retryable": True})
                     row.run_token = None
-                return True
+                recovered = True
             finally:
                 await lease.execute(text("SELECT RELEASE_LOCK(:key)"), {"key": key})
+        if recovered:
+            await _thumbnail_slot(factory, store)
+            return True
     async with factory() as session, session.begin():
         candidates = (await session.execute(select(Job.id, Job.user_id).where(Job.status == "PENDING")
             .order_by(Job.created_at, Job.id).limit(100))).all()
@@ -71,6 +84,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
     for job_id, owner in candidates:
         # Keep a dedicated connection for the entire execution. A crash releases its lock;
         # the next worker explicitly fails orphaned PROCESSING tasks, preserving snapshots.
+        completed = False
         async with factory.kw["bind"].connect() as lease:
             lock = "resume-job:" + job_id
             if not (await lease.execute(text("SELECT GET_LOCK(:key, 0)"), {"key": lock})).scalar():
@@ -133,7 +147,7 @@ async def run_once(factory=None, *, store=None, compiler=None):
                     logger.info("resume job=%s status=%s duration_seconds=%s error_code=%s ai_status=%s retries=%s",
                         job_id, result.status, duration, (result.error or {}).get("code"),
                         (result.result_metadata or {}).get("ai_status"), result.retry_count)
-                return True
+                completed = True
             finally:
                 if slot:
                     if token:
@@ -153,7 +167,10 @@ async def run_once(factory=None, *, store=None, compiler=None):
                     await lease.execute(text("SELECT RELEASE_LOCK(:key)"), {"key": lock})
                 except Exception:
                     pass
-    return False
+        if completed:
+            await _thumbnail_slot(factory, store)
+            return True
+    return await _thumbnail_slot(factory, store)
 
 
 async def main(once=False):

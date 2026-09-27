@@ -130,8 +130,10 @@ def test_mysql_schema_json_and_scope():
         if old is None: os.environ.pop("RESUME_DATABASE_URL", None)
         else: os.environ["RESUME_DATABASE_URL"] = old
     sql = output.getvalue()
-    assert sql.count("CREATE TABLE") == 8  # Version, four P1, two P2 and durable execution slots.
+    assert sql.count("CREATE TABLE") == 9  # Version, storage/import tables, worker slots and thumbnail derivatives.
     assert "CREATE TABLE resume_execution_slots" in sql and "WAITING_REVIEW" in sql
     assert "CREATE TABLE experience_import_batches" in sql and "CREATE TABLE experience_import_drafts" in sql
+    assert "CREATE TABLE resume_thumbnails" in sql and "uq_thumbnail_source" in sql
+    assert "source_kind IN ('uploaded','generated')" in sql and "attempt_count BETWEEN 0 AND 3" in sql
     assert " JSON " in sql and "RESTRICT" in sql
     assert "ALTER TABLE resumes" not in sql and "DROP TABLE" not in sql

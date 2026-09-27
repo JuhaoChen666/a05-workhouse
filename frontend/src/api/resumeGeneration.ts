@@ -13,6 +13,7 @@ export interface SavedResumeDocument {
   generation_job_id?: string | null;
   created_at: string;
   updated_at: string;
+  thumbnail_url?: string | null;
 }
 
 export function createResumeGenerationApi(payload: ResumeGenerationRequest) {

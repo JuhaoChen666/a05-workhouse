@@ -1,12 +1,14 @@
 """Owner-scoped persistence. Every operation participates in caller transaction."""
 from copy import deepcopy
+import logging
 from datetime import timedelta
 from uuid import uuid4
 from sqlalchemy import select, update
 from app.models.resume_storage_contracts import ExperienceInput, GenerationInput, DocumentInput, DocumentNameAdapter, FileAsset, owner_id
 from app.models.resume_storage_models import (
     ExperienceItemModel as Experience, ResumeTemplateModel as Template,
-    ResumeGenerationJobModel as Job, ResumeDocumentModel as Document, utcnow,
+    ResumeGenerationJobModel as Job, ResumeDocumentModel as Document,
+    ResumeThumbnailModel as Thumbnail, utcnow,
 )
 from app.models.session_models import ResumeModel, ResumeOptimizationModel
 from app.infrastructure.private_resume_assets import verify_references
@@ -21,6 +23,17 @@ class RevisionConflict(ValueError):
 
 
 COMMON = {"type", "title", "start_date", "end_date", "tags", "is_archived", "sort_order", "source_type", "source_resume_id", "source_locator"}
+logger = logging.getLogger(__name__)
+
+
+def copy_thumbnail_state(source, target):
+    target.source_sha256 = source.source_sha256
+    target.asset = deepcopy(source.asset)
+    target.status = source.status if source.status != "PROCESSING" else "PENDING"
+    target.attempt_count = source.attempt_count if target.status != "PENDING" else 0
+    target.error_code = source.error_code
+    target.available_at = utcnow()
+    target.updated_at = utcnow()
 
 
 class ResumeStorageMapper:
@@ -203,6 +216,10 @@ class ResumeStorageMapper:
         row = Document(id=str(uuid4()), user_id=self.owner, created_at=now, updated_at=now, **values)
         self.session.add(row)
         await self.session.flush()
+        if row.format == "latex" and row.pdf_asset:
+            from app.services.resume_thumbnails import register_thumbnail
+            pdf = FileAsset.model_validate(row.pdf_asset)
+            await register_thumbnail(self.session, self.owner, "generated", row.id, pdf.sha256)
         return row
 
     async def get_document(self, id_):
@@ -224,7 +241,24 @@ class ResumeStorageMapper:
         row = await self.owned(Document, id_, active=True, lock=True)
         values = {k: deepcopy(getattr(row, k)) for k in ("format", "generation_job_id", "snapshot", "pdf_asset", "latex_asset", "markdown_content", "legacy_optimization_id")}
         verify_references(self.session, self.owner, [values["snapshot"], values["pdf_asset"], values["latex_asset"]])
-        return await self._add_document(name=name, copied_from_id=id_, **values)
+        clone = await self._add_document(name=name, copied_from_id=id_, **values)
+        if clone.format == "latex":
+            try:
+                async with self.session.begin_nested():
+                    source_thumb = (await self.session.execute(select(Thumbnail).where(
+                        Thumbnail.user_id == self.owner, Thumbnail.source_kind == "generated",
+                        Thumbnail.source_id == id_,
+                    ))).scalar_one_or_none()
+                    if source_thumb is not None:
+                        target_thumb = (await self.session.execute(select(Thumbnail).where(
+                            Thumbnail.user_id == self.owner, Thumbnail.source_kind == "generated",
+                            Thumbnail.source_id == clone.id,
+                        ))).scalar_one_or_none()
+                        if target_thumb is not None:
+                            copy_thumbnail_state(source_thumb, target_thumb)
+            except Exception as error:
+                logger.warning("copied resume thumbnail lookup failed error=%s", type(error).__name__)
+        return clone
 
     async def delete_document(self, id_, *, retention_days=30):
         if type(retention_days) is not int or retention_days < 0:

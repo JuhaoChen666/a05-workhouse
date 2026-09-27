@@ -45,7 +45,7 @@
     </div>
 
     <main class="home-main theme-page-shell">
-      <div class="theme-section-header fade-in-up">
+      <div v-if="!hideSectionHeader" class="theme-section-header fade-in-up">
         <h2 class="theme-section-title">
           {{ pageHeaderText }} <span v-if="pageSubtitle">{{ pageSubtitle }}</span>
         </h2>
@@ -106,7 +106,7 @@ const menuItems =   [
   { name: "Home", label: "首页", icon: HomeFilled },
   { name: "HomeInterviewType", label: "面试", icon: ChatDotRound },
   { name: "HomeQuestion", label: "AI押题", icon: Opportunity },
-  { name: "HomeResume", label: "简历管理", icon: Document },
+  { name: "HomeResume", label: "简历库", icon: Document },
   { name: "HomeExperienceLibrary", label: "经历库", icon: Document },
   { name: "HomeResumeGeneration", label: "生成简历", icon: Opportunity },
   { name: "HomeDoc", label: "帮助文档", icon: Notebook },
@@ -127,7 +127,7 @@ const titleMap: Record<string, string> = {
   HomeInterview: "面试设置",
   HomeQuestion: "AI押题",
   HomePredictQuestions: "面试押题",
-  HomeResume: "简历管理",
+  HomeResume: "简历库",
   HomeExperienceLibrary: "经历库",
   HomeResumeGeneration: "JD 简历生成",
   HomeResumeOptimize: "简历优化",
@@ -139,6 +139,7 @@ const titleMap: Record<string, string> = {
 };
 
 const activeRouteName = computed(() => String(route.name || "Home"));
+const hideSectionHeader = computed(() => ["HomeResume", "HomeExperienceLibrary"].includes(activeRouteName.value));
 const transitionName = ref("fade-slide");
 const setupStepMap: Record<string, number> = {
   HomeInterviewType: 0,
