@@ -28,6 +28,10 @@ class ResumeDocumentModel(Base):
     __table__ = _tables[3]
 
 
+class ResumeThumbnailModel(Base):
+    __table__ = _tables[4]
+
+
 def immutable_fields(model, fields):
     @event.listens_for(model, "before_update")
     def reject_change(mapper, connection, target):

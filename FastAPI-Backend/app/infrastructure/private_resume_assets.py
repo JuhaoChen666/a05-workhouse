@@ -7,12 +7,12 @@ from uuid import uuid4
 from sqlalchemy import select, text, or_, and_
 from app.infrastructure.resume_template_store import safe_path
 from app.models.resume_storage_contracts import FileAsset, CleanupCursor, owner_id
-from app.models.resume_storage_models import ExperienceItemModel, ResumeDocumentModel, ResumeGenerationJobModel, utcnow
+from app.models.resume_storage_models import ExperienceItemModel, ResumeDocumentModel, ResumeGenerationJobModel, ResumeThumbnailModel, utcnow
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ROOT = BACKEND_ROOT / "data/private_resume_assets"
 LEGACY_ROOTS = (BACKEND_ROOT / "data/resumes", BACKEND_ROOT / "data/optimizations")
-MEDIA = {"pdf": "application/pdf", "tex": "text/x-tex", "bin": "application/octet-stream"}
+MEDIA = {"pdf": "application/pdf", "tex": "text/x-tex", "bin": "application/octet-stream", "png": "image/png"}
 
 
 class PrivateAssets:
@@ -72,6 +72,20 @@ class PrivateAssets:
         if path.exists():
             self.read(owner, asset)
             path.unlink()
+
+
+def thumbnail_cleanup_plan(expired, all_rows):
+    """Return asset candidates and references retained by non-expired identities."""
+    expired_ids = {(row.source_kind, row.source_id) for row in expired}
+    candidates, protected = {}, set()
+    for row in expired:
+        for asset in assets_in(row.asset):
+            candidates[asset.key] = asset
+    for row in all_rows:
+        identity = row.source_kind, row.source_id
+        if identity not in expired_ids:
+            protected.update(asset.key for asset in assets_in(row.asset))
+    return candidates, protected
 
 
 def assets_in(value):
@@ -180,6 +194,16 @@ async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, li
             for row in rows:
                 for asset in assets_in([row.pdf_asset, row.latex_asset]):
                     candidates[asset.key] = asset
+            expired_document_ids = {row.id for row in rows}
+            expired_thumbnails = list((await session.execute(select(ResumeThumbnailModel).where(
+                ResumeThumbnailModel.user_id == owner, ResumeThumbnailModel.source_kind == "generated",
+                ResumeThumbnailModel.source_id.in_(expired_document_ids), ResumeThumbnailModel.asset.is_not(None),
+            ).with_for_update())).scalars()) if expired_document_ids else []
+            thumbnail_rows = list((await session.execute(select(ResumeThumbnailModel).where(
+                ResumeThumbnailModel.user_id == owner, ResumeThumbnailModel.asset.is_not(None),
+            ).with_for_update())).scalars()) if expired_document_ids else []
+            thumbnail_candidates, thumbnail_protected = thumbnail_cleanup_plan(expired_thumbnails, thumbnail_rows)
+            candidates.update(thumbnail_candidates)
             protected = set()
             sources = (await session.execute(select(ExperienceItemModel.source_locator).where(
                 ExperienceItemModel.user_id == owner,
@@ -202,6 +226,9 @@ async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, li
             ).with_for_update().execution_options(populate_existing=True))).scalars()
             for row in living:
                 protected.update(a.key for a in assets_in([row.snapshot, row.pdf_asset, row.latex_asset]))
+            # Copies can share a thumbnail asset; hold its bytes while another
+            # source identity still owns a thumbnail record.
+            protected.update(thumbnail_protected)
             running = (await session.execute(select(ResumeGenerationJobModel).where(
                 ResumeGenerationJobModel.user_id == owner, ResumeGenerationJobModel.status.in_(["PENDING", "PROCESSING"])
             ).with_for_update().execution_options(populate_existing=True))).scalars()
@@ -217,6 +244,15 @@ async def cleanup_documents(session, store, owner, *, dry_run=True, now=None, li
                 # Failed unlink/commit leaves an eligible tombstone for retry.
                 for asset in removable.values():
                     store.remove(owner, asset)
+                for thumbnail in expired_thumbnails:
+                    if thumbnail.asset:
+                        # Release the expired source's reference even when a live
+                        # copy still protects the shared bytes; a later cleanup of
+                        # the last owner can then remove the asset.
+                        thumbnail.asset = None
+                        thumbnail.status = "FAILED"
+                        thumbnail.error_code = "SOURCE_PURGED"
+                        thumbnail.updated_at = now
                 for row in rows:
                     keys = {a.key for a in assets_in([row.pdf_asset, row.latex_asset])}
                     if not keys & protected:

@@ -20,10 +20,10 @@ class GenerationInput(ResumeGenerationRequest):
 
 class FileAsset(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    key: str = Field(pattern=r"^[1-9][0-9]*/[0-9a-f]{32}\.(pdf|tex|bin)$")
+    key: str = Field(pattern=r"^[1-9][0-9]*/[0-9a-f]{32}\.(pdf|tex|bin|png)$")
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     size_bytes: int = Field(ge=0)
-    media_type: Literal["application/pdf", "text/x-tex", "application/octet-stream"]
+    media_type: Literal["application/pdf", "text/x-tex", "application/octet-stream", "image/png"]
 
 
 DocumentName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]

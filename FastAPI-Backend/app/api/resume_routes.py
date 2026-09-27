@@ -1,5 +1,7 @@
 import os
 import uuid
+import hashlib
+import logging
 import aiofiles
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +12,11 @@ from datetime import datetime
 from sqlalchemy import select, func
 from app.models.interview_models import ResumeDeleteRequest, ResumeListItem, ResumeListResponse
 from app.infrastructure.legacy_resume_deletion import delete_legacy_resume, LegacyResumeNotFound, LegacyResumeInUse
+from app.services.resume_thumbnails import register_thumbnail
 
 
 router = APIRouter(prefix="/api/resumes", tags=["简历管理"])
+logger = logging.getLogger(__name__)
 
 # 确保存储目录存在
 UPLOAD_DIR = "data/resumes"
@@ -35,6 +39,7 @@ async def upload_resume(
     file_ext = os.path.splitext(file.filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    source_committed = False
 
     try:
         # 3. 异步保存文件到本地
@@ -58,16 +63,28 @@ async def upload_resume(
         )
         
         db.add(new_resume)
+        await db.flush()
+        saved_id, saved_filename = new_resume.id, new_resume.filename
         await db.commit()
-        await db.refresh(new_resume)
+        source_committed = True
+        text_preview = text_content[:200] + "..." if len(text_content) > 200 else text_content
+
+        # Thumbnail work is durable but derived. Preserve the committed upload if
+        # the thumbnail table is unavailable or registration itself fails.
+        try:
+            await register_thumbnail(db, user_id, "uploaded", saved_id, hashlib.sha256(content).hexdigest())
+            await db.commit()
+        except Exception as error:
+            await db.rollback()
+            logger.warning("uploaded resume thumbnail registration failed error=%s", type(error).__name__)
 
         return {
             "code": 200,
             "message": "简历上传并解析成功",
             "data": {
-                "id": new_resume.id,
-                "filename": new_resume.filename,
-                "text_preview": text_content[:200] + "..." if len(text_content) > 200 else text_content
+                "id": saved_id,
+                "filename": saved_filename,
+                "text_preview": text_preview
             }
         }
 
@@ -75,7 +92,7 @@ async def upload_resume(
         if db:
             await db.rollback()
         # 如果文件已保存但后续失败，删除本地文件
-        if os.path.exists(file_path):
+        if not source_committed and os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"上传处理失败: {str(e)}")
 
